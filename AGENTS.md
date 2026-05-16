@@ -361,6 +361,34 @@ test(db): cover source product upsert
 
 Prefer concise messages that describe the user-visible or project-visible change. If a commit completes an issue, mention the issue in the body or closing comment.
 
+## Testing Approach
+
+Use a pragmatic TDD style for implementation work.
+
+This does not mean writing a test before every line of code. It means defining the expected behavior before implementing risky or contract-heavy logic, especially where regressions would be expensive or source data is brittle.
+
+Prefer tests-first for:
+
+- parsers and source-specific extraction;
+- parsed-product normalization;
+- money, date, unit, title, and fingerprint normalization;
+- repository upsert and persistence workflows;
+- scrape orchestration logic;
+- pagination and completeness checks;
+- API endpoints and response schemas.
+
+For external sources such as 2GIS, use characterization-first testing before locking behavior:
+
+1. Inspect or capture representative real source responses.
+2. Store small focused fixtures under `tests/fixtures/` when they are useful.
+3. Write tests against the observed response shape.
+4. Implement the parser/client behavior.
+5. Update fixtures deliberately when the source contract changes.
+
+Do not test invented assumptions about unofficial APIs as if they were stable contracts. For 2GIS and other brittle sources, real samples plus focused tests are preferred over broad live-network tests.
+
+Use mocked HTTP clients for normal automated tests. Keep live source checks as explicit smoke/debug flows, not required unit tests or default CI behavior.
+
 ## Verification Before Finishing Work
 
 Run relevant checks before finalizing changes.
