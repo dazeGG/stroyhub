@@ -26,6 +26,7 @@ Core fields:
 - `raw`: `jsonb`, nullable
 - `last_scraped_at`: `timestamp with time zone`, nullable
 - `next_scrape_at`: `timestamp with time zone`, nullable
+- `scrape_interval`: `integer`, required, default `86400`
 - `scrape_status`: `text`, required
 - `error_count`: `integer`, required, default `0`
 - `created_at`: `timestamp with time zone`, required
@@ -221,6 +222,7 @@ Initial values:
 Use these defaults in the first schema implementation:
 
 - `shops.scrape_status`: `new`
+- `shops.scrape_interval`: `86400`
 - `shops.error_count`: `0`
 - `source_products.is_active`: `true`
 - `price_snapshots.currency`: `RUB`

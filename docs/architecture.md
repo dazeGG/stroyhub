@@ -47,4 +47,16 @@ Development is managed with `uv`:
 - `uv.lock` pins dependency versions.
 - `.venv` is local and ignored by git.
 
-The API can be run with `uv run uvicorn apps.api.main:app --reload`. The worker will be added once Redis and Celery task wiring are ready.
+The API can be run with `uv run uvicorn apps.api.main:app --reload`.
+
+The worker can be run with:
+
+```bash
+uv run celery -A apps.worker.celery_app:celery_app worker --loglevel=info
+```
+
+Celery Beat dispatches due shop scraping once per day at `00:00 Asia/Yakutsk`:
+
+```bash
+uv run celery -A apps.worker.celery_app:celery_app beat --loglevel=info
+```
