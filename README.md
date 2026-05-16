@@ -35,6 +35,20 @@ cp .env.example .env
 
 This creates a local `.venv` using the Python version pinned in `.python-version`. The virtual environment is not committed; dependency versions are committed in `uv.lock`.
 
+Start local services:
+
+```bash
+docker compose up -d
+```
+
+If your Docker installation uses the standalone Compose command:
+
+```bash
+docker-compose up -d
+```
+
+Docker Desktop or another Docker daemon must be running before starting the services.
+
 Run the current smoke test:
 
 ```bash
