@@ -38,6 +38,26 @@ class TwogisBranchPage:
     raw: JsonObject
 
 
+@dataclass(frozen=True, kw_only=True)
+class TwogisBranchItems:
+    branch_id: str
+    page_size: int
+    pages: list[TwogisBranchPage]
+    items: list[JsonObject]
+    pinned_items: list[JsonObject]
+    total: int | None
+    completeness: str
+    stop_reason: str
+
+    @property
+    def is_complete(self) -> bool:
+        return self.completeness == "complete"
+
+    @property
+    def is_partial(self) -> bool:
+        return self.completeness == "partial"
+
+
 class TwogisClient:
     def __init__(
         self,
@@ -127,6 +147,68 @@ class TwogisClient:
             raw=payload,
         )
 
+    def fetch_branch_items(
+        self,
+        *,
+        branch_id: str,
+        page_size: int = 50,
+        locale: str = "ru_RU",
+        max_pages: int = 100,
+    ) -> TwogisBranchItems:
+        if page_size < 1:
+            raise ValueError("page_size must be at least 1")
+        if max_pages < 1:
+            raise ValueError("max_pages must be at least 1")
+
+        pages: list[TwogisBranchPage] = []
+        items: list[JsonObject] = []
+        pinned_items_by_product_id: dict[str, JsonObject] = {}
+        total: int | None = None
+        stop_reason = "empty_page"
+
+        for page_number in range(1, max_pages + 1):
+            page = self.fetch_branch_page(
+                branch_id=branch_id,
+                page=page_number,
+                page_size=page_size,
+                locale=locale,
+            )
+            pages.append(page)
+
+            if total is None and page.total is not None:
+                total = page.total
+
+            items.extend(page.items)
+            _merge_pinned_items(pinned_items_by_product_id, page.pinned_items)
+
+            if total is not None and len(items) >= total:
+                stop_reason = "source_total_reached"
+                break
+
+            if not page.items:
+                stop_reason = "empty_page"
+                break
+        else:
+            stop_reason = "max_pages_reached"
+
+        completeness = _completeness(
+            pages=pages,
+            item_count=len(items),
+            total=total,
+            stop_reason=stop_reason,
+        )
+
+        return TwogisBranchItems(
+            branch_id=branch_id,
+            page_size=page_size,
+            pages=pages,
+            items=items,
+            pinned_items=list(pinned_items_by_product_id.values()),
+            total=total,
+            completeness=completeness,
+            stop_reason=stop_reason,
+        )
+
     def _request(self, params: dict[str, str | int]) -> httpx.Response:
         if self._client is not None:
             return self._client.get(self._base_url, params=params)
@@ -149,3 +231,44 @@ def _meta_code(payload: JsonObject) -> int | None:
 
     code = meta.get("code")
     return code if isinstance(code, int) else None
+
+
+def _merge_pinned_items(
+    pinned_items_by_product_id: dict[str, JsonObject],
+    pinned_items: list[JsonObject],
+) -> None:
+    for item in pinned_items:
+        product_id = _product_id(item)
+        key = product_id or f"raw:{len(pinned_items_by_product_id)}"
+        pinned_items_by_product_id.setdefault(key, item)
+
+
+def _product_id(item: JsonObject) -> str | None:
+    product = item.get("product")
+    if not isinstance(product, dict):
+        return None
+
+    product_id = product.get("id")
+    return product_id if isinstance(product_id, str) else None
+
+
+def _completeness(
+    *,
+    pages: list[TwogisBranchPage],
+    item_count: int,
+    total: int | None,
+    stop_reason: str,
+) -> str:
+    if not pages:
+        return "empty"
+
+    if item_count == 0:
+        return "empty"
+
+    if total is None:
+        return "complete" if stop_reason == "empty_page" else "partial"
+
+    if item_count >= total:
+        return "complete"
+
+    return "partial"

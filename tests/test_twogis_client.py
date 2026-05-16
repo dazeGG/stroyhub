@@ -106,3 +106,101 @@ def test_twogis_client_ignores_non_object_items() -> None:
     page = client.fetch_branch_page(branch_id="branch-1")
 
     assert page.items == [{"ok": True}]
+
+
+def test_twogis_client_fetches_pages_until_source_total_is_reached() -> None:
+    seen_pages: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        page_number = int(request.url.params["page"])
+        seen_pages.append(page_number)
+        items_by_page = {
+            1: [{"product": {"id": "1"}}, {"product": {"id": "2"}}],
+            2: [{"product": {"id": "3"}}],
+        }
+        return httpx.Response(
+            200,
+            json={
+                "result": {
+                    "total": 3,
+                    "items": items_by_page[page_number],
+                    "pinned_items": [{"product": {"id": "pinned-1"}}],
+                }
+            },
+        )
+
+    client = TwogisClient(client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+    result = client.fetch_branch_items(branch_id="branch-1", page_size=2)
+
+    assert seen_pages == [1, 2]
+    assert [item["product"]["id"] for item in result.items] == ["1", "2", "3"]
+    assert result.total == 3
+    assert result.stop_reason == "source_total_reached"
+    assert result.completeness == "complete"
+    assert result.is_complete
+    assert not result.is_partial
+    assert len(result.pinned_items) == 1
+
+
+def test_twogis_client_marks_empty_catalog_clearly() -> None:
+    client = TwogisClient(
+        client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda _: httpx.Response(200, json={"result": {"total": 0, "items": []}})
+            )
+        )
+    )
+
+    result = client.fetch_branch_items(branch_id="branch-1")
+
+    assert result.items == []
+    assert result.total == 0
+    assert result.stop_reason == "source_total_reached"
+    assert result.completeness == "empty"
+
+
+def test_twogis_client_marks_partial_when_empty_page_arrives_before_total() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        page_number = int(request.url.params["page"])
+        items = [{"product": {"id": "1"}}] if page_number == 1 else []
+        return httpx.Response(200, json={"result": {"total": 3, "items": items}})
+
+    client = TwogisClient(client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+    result = client.fetch_branch_items(branch_id="branch-1", page_size=1)
+
+    assert len(result.items) == 1
+    assert result.total == 3
+    assert result.stop_reason == "empty_page"
+    assert result.completeness == "partial"
+    assert result.is_partial
+
+
+def test_twogis_client_marks_partial_when_max_pages_is_reached() -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"result": {"total": 10, "items": [{"product": {"id": "same-page-size"}}]}},
+        )
+
+    client = TwogisClient(client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+    result = client.fetch_branch_items(branch_id="branch-1", page_size=1, max_pages=2)
+
+    assert len(result.pages) == 2
+    assert len(result.items) == 2
+    assert result.stop_reason == "max_pages_reached"
+    assert result.completeness == "partial"
+
+
+def test_twogis_client_rejects_invalid_pagination_options() -> None:
+    client = TwogisClient(
+        client=httpx.Client(transport=httpx.MockTransport(lambda _: httpx.Response(200)))
+    )
+
+    with pytest.raises(ValueError, match="page_size"):
+        client.fetch_branch_items(branch_id="branch-1", page_size=0)
+
+    with pytest.raises(ValueError, match="max_pages"):
+        client.fetch_branch_items(branch_id="branch-1", max_pages=0)
