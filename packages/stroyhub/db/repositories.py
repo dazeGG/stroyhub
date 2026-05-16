@@ -95,13 +95,18 @@ class SourceProductRepository:
         self._session = session
 
     def get_for_upsert(self, data: SourceProductUpsert) -> SourceProduct | None:
+        if data.source_product_id is None and data.fingerprint is None:
+            raise ValueError("source products require source_product_id or fingerprint for upsert")
+
         if data.source_product_id is not None:
             statement = select(SourceProduct).where(
                 SourceProduct.source == data.source,
                 SourceProduct.shop_id == data.shop_id,
                 SourceProduct.source_product_id == data.source_product_id,
             )
-            return self._session.scalar(statement)
+            product = self._session.scalar(statement)
+            if product is not None:
+                return product
 
         if data.fingerprint is not None:
             statement = select(SourceProduct).where(
@@ -111,7 +116,7 @@ class SourceProductRepository:
             )
             return self._session.scalar(statement)
 
-        raise ValueError("source products require source_product_id or fingerprint for upsert")
+        return None
 
     def upsert(self, data: SourceProductUpsert) -> SourceProduct:
         product = self.get_for_upsert(data)

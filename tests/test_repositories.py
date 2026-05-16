@@ -163,9 +163,50 @@ def test_source_product_repository_falls_back_to_fingerprint(
     assert updated.raw == {"title": "Sand washed"}
 
 
-def test_source_product_repository_requires_stable_identity(db_session: Session) -> None:
+def test_source_product_repository_backfills_source_product_id_after_fingerprint_match(
+    db_session: Session,
+) -> None:
     shop = ShopRepository(db_session).upsert(
         ShopUpsert(source="2gis", source_id="branch-test-4", name="Shop")
+    )
+    repository = SourceProductRepository(db_session)
+
+    product = repository.upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            fingerprint="late-source-id-fingerprint",
+            title="Concrete mix",
+            normalized_title="concrete mix",
+            raw={"title": "Concrete mix"},
+        )
+    )
+
+    updated = repository.upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="late-source-product-id",
+            fingerprint="late-source-id-fingerprint",
+            title="Concrete mix M300",
+            normalized_title="concrete mix m300",
+            raw={"id": "late-source-product-id", "title": "Concrete mix M300"},
+        )
+    )
+
+    count = db_session.scalar(
+        select(func.count()).select_from(SourceProduct).where(SourceProduct.shop_id == shop.id)
+    )
+
+    assert updated.id == product.id
+    assert updated.source_product_id == "late-source-product-id"
+    assert updated.title == "Concrete mix M300"
+    assert count == 1
+
+
+def test_source_product_repository_requires_stable_identity(db_session: Session) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-test-5", name="Shop")
     )
 
     with pytest.raises(ValueError, match="source_product_id or fingerprint"):
@@ -181,7 +222,7 @@ def test_source_product_repository_requires_stable_identity(db_session: Session)
 
 def test_price_snapshot_repository_is_append_only(db_session: Session) -> None:
     shop = ShopRepository(db_session).upsert(
-        ShopUpsert(source="2gis", source_id="branch-test-5", name="Shop")
+        ShopUpsert(source="2gis", source_id="branch-test-6", name="Shop")
     )
     product = SourceProductRepository(db_session).upsert(
         SourceProductUpsert(
