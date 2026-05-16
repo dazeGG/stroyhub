@@ -29,12 +29,13 @@ packages/stroyhub/
 
 ## MVP Data Shape
 
-The first stable model should distinguish source product cards from future canonical products:
+The first stable model should distinguish source product cards from future canonical products. The detailed schema is documented in [database.md](database.md).
 
 - `shops`: stores source shop identity, such as a 2GIS branch id or source domain.
 - `source_products`: stores product cards as seen in one source and one shop.
 - `price_snapshots`: stores append-only price observations over time.
 - `categories`: stores the initial category tree and rule-based assignments.
+- `scrape_runs`: stores scrape attempt metadata and parser health signals.
 
 Canonical product matching is intentionally later. The MVP should first collect enough real data to understand naming variance, units, and duplicate patterns.
 

@@ -54,3 +54,25 @@ Model source product cards first. Add canonical products and product matching af
 
 Consequences:
 The initial API may show multiple cards that are semantically the same product. That is acceptable for the MVP because price history and source fidelity are the first priority.
+
+## 2026-05-16: Store Every Price Observation
+
+Context:
+If price history only records changed prices, the system cannot distinguish an unchanged price from a missing product or failed scrape.
+
+Decision:
+Write one `price_snapshots` row for every successful observed product price during scraping.
+
+Consequences:
+The table will grow faster, but the data will be easier to reason about during the MVP. Deduplication or separate observation tables can be considered later if volume becomes a real problem.
+
+## 2026-05-16: Match Source Products by Source ID First, Fingerprint Second
+
+Context:
+Sources may or may not provide stable product identifiers. HTML sources are especially likely to lack stable IDs.
+
+Decision:
+When `source_product_id` exists, match source products by `source`, `shop_id`, and `source_product_id`. When it does not, use a best-effort `fingerprint` built from normalized stable fields.
+
+Consequences:
+Stable source IDs give reliable updates. Fingerprints may create duplicates when product names change, which is acceptable until canonical product matching is introduced.
