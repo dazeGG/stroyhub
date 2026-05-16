@@ -26,6 +26,20 @@ Known useful fields:
 - photos
 - `updated_at`
 
+Observed response shape for the smoke-test branch on 2026-05-17:
+
+- top-level payload includes `meta` and `result`;
+- `result.total` contains the reported product count;
+- `result.updated_at` may be a Russian date string such as `Обновлено 13 января 2026`;
+- `result.items` contains regular product cards;
+- `result.pinned_items` contains promoted/pinned product cards and has the same item shape;
+- each item contains `product` and `offer`;
+- `product.id`, `product.name`, `product.description`, `product.images`, and
+  `product.categories[].label` are useful for `source_products`;
+- `offer.price`, `offer.currency`, and `offer.price_value.fixed` are useful for
+  `price_snapshots`;
+- products without a price may use `offer.price_value.empty`.
+
 Known smoke-test branch:
 
 - `70000001007229923`
