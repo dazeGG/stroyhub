@@ -6,8 +6,8 @@ StroyHub is a price aggregator for construction materials in Yakutsk. The MVP fo
 
 ```text
 apps/
-  api/                  FastAPI entrypoint
-  worker/               Celery worker entrypoint
+  api/                  FastAPI entrypoint: apps.api.main
+  worker/               Celery worker entrypoint: apps.worker.celery_app
 packages/
   stroyhub/             Reusable domain package
 docs/                   Architecture and source notes
@@ -31,6 +31,12 @@ Run the current smoke test:
 
 ```bash
 pytest
+```
+
+Run the API locally:
+
+```bash
+uvicorn apps.api.main:app --reload
 ```
 
 ## Tracker

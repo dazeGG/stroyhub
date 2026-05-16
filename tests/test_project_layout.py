@@ -1,5 +1,6 @@
 from stroyhub import __version__
-from stroyhub_api.main import create_app
+
+from apps.api.main import create_app
 
 
 def test_package_version_is_available() -> None:
