@@ -10,12 +10,14 @@ from stroyhub.core.config import settings
 from stroyhub.db import (
     PriceSnapshotCreate,
     PriceSnapshotRepository,
+    ScrapeRunCreate,
+    ScrapeRunRepository,
     ShopRepository,
     ShopUpsert,
     SourceProductRepository,
     SourceProductUpsert,
 )
-from stroyhub.models import PriceSnapshot, Shop, SourceProduct
+from stroyhub.models import PriceSnapshot, ScrapeRun, Shop, SourceProduct
 
 
 @pytest.fixture
@@ -260,3 +262,39 @@ def test_price_snapshot_repository_is_append_only(db_session: Session) -> None:
     assert first.raw == {"price": "10.50"}
     assert second.raw == {"price": "10.50"}
     assert count == 2
+
+
+def test_scrape_run_repository_tracks_run_lifecycle(db_session: Session) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-test-7", name="Shop")
+    )
+    repository = ScrapeRunRepository(db_session)
+    started_at = datetime(2026, 5, 17, 9, 0, tzinfo=UTC)
+    finished_at = datetime(2026, 5, 17, 9, 1, tzinfo=UTC)
+
+    scrape_run = repository.start(
+        ScrapeRunCreate(
+            source="2gis",
+            shop_id=shop.id,
+            started_at=started_at,
+            raw={"branch_id": "branch-test-7"},
+        )
+    )
+    repository.finish(
+        scrape_run,
+        status="success",
+        items_seen=3,
+        items_saved=3,
+        finished_at=finished_at,
+        raw={"branch_id": "branch-test-7", "complete": True},
+    )
+
+    stored = db_session.get(ScrapeRun, scrape_run.id)
+
+    assert stored is not None
+    assert stored.status == "success"
+    assert stored.items_seen == 3
+    assert stored.items_saved == 3
+    assert stored.started_at == started_at
+    assert stored.finished_at == finished_at
+    assert stored.raw == {"branch_id": "branch-test-7", "complete": True}

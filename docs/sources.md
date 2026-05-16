@@ -55,6 +55,19 @@ Known smoke-test branch:
 
 - `70000001007229923`
 
+Validated Yakutsk branches on 2026-05-17:
+
+| Branch ID | Shop | Result |
+| --- | --- | --- |
+| `70000001007229923` | Евролайн, Курнатовского 86 | `total=106`, `pages=3`, `items=106`, `parsed=106`, `complete` |
+| `7037402698774152` | Ондулин, Чернышевского 48 | `total=183`, `pages=4`, `items=183`, `parsed=183`, `complete` |
+| `70000001045942794` | Центрстрой, Лермонтова 63 | `total=56`, `pages=2`, `items=56`, `parsed=56`, `complete` |
+| `7037402698750719` | Ск-Строй, 50 лет Советской Армии 28 | `total=161`, `pages=4`, `items=161`, `parsed=161`, `complete` |
+| `70000001007356408` | Ск-Строй, Покровское шоссе 4 километр 1/2 | `total=170`, `pages=4`, `items=170`, `parsed=170`, `complete` |
+
+No validation failures were observed for these five branches. The branch list is a
+research sample, not yet a production scrape schedule.
+
 Notes:
 
 - Unofficial API.

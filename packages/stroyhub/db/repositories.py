@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from stroyhub.models import PriceSnapshot, Shop, SourceProduct
+from stroyhub.models.tables import PriceSnapshot, ScrapeRun, Shop, SourceProduct
 
 JsonObject = dict[str, Any]
 
@@ -52,6 +52,15 @@ class PriceSnapshotCreate:
     unit_raw: str | None = None
     source_updated_at: datetime | None = None
     parsed_at: datetime | None = None
+    raw: JsonObject | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class ScrapeRunCreate:
+    source: str
+    shop_id: int | None = None
+    status: str = "running"
+    started_at: datetime | None = None
     raw: JsonObject | None = None
 
 
@@ -173,3 +182,45 @@ class PriceSnapshotRepository:
         self._session.add(snapshot)
         self._session.flush()
         return snapshot
+
+
+class ScrapeRunRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def start(self, data: ScrapeRunCreate) -> ScrapeRun:
+        scrape_run = ScrapeRun(
+            source=data.source,
+            shop_id=data.shop_id,
+            status=data.status,
+            raw=data.raw,
+        )
+
+        if data.started_at is not None:
+            scrape_run.started_at = data.started_at
+
+        self._session.add(scrape_run)
+        self._session.flush()
+        return scrape_run
+
+    def finish(
+        self,
+        scrape_run: ScrapeRun,
+        *,
+        status: str,
+        items_seen: int,
+        items_saved: int,
+        finished_at: datetime,
+        error: str | None = None,
+        raw: JsonObject | None = None,
+    ) -> ScrapeRun:
+        scrape_run.status = status
+        scrape_run.items_seen = items_seen
+        scrape_run.items_saved = items_saved
+        scrape_run.finished_at = finished_at
+        scrape_run.error = error
+        if raw is not None:
+            scrape_run.raw = raw
+
+        self._session.flush()
+        return scrape_run
