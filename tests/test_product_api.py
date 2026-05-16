@@ -205,3 +205,73 @@ def test_products_endpoint_treats_search_wildcards_as_literal_text(
 
     assert response.status_code == 200
     assert [item["id"] for item in response.json()["items"]] == [matching_product.id]
+
+
+def test_product_price_history_endpoint_returns_ordered_snapshots(
+    client: TestClient, db_session: Session
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-api-5", name="History Shop")
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="history-api-1",
+            title="Concrete Mix",
+            normalized_title="concrete mix",
+        )
+    )
+    repository = PriceSnapshotRepository(db_session)
+    later = repository.add(
+        PriceSnapshotCreate(
+            source_product_id=product.id,
+            price=Decimal("420.00"),
+            unit_raw="bag",
+            parsed_at=datetime(2026, 5, 17, 11, 0, tzinfo=UTC),
+            source_updated_at=datetime(2026, 5, 17, 10, 50, tzinfo=UTC),
+        )
+    )
+    earlier = repository.add(
+        PriceSnapshotCreate(
+            source_product_id=product.id,
+            price=Decimal("400.00"),
+            unit_raw="bag",
+            parsed_at=datetime(2026, 5, 17, 10, 0, tzinfo=UTC),
+            source_updated_at=datetime(2026, 5, 17, 9, 50, tzinfo=UTC),
+        )
+    )
+
+    response = client.get(f"/products/{product.id}/prices")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["product_id"] == product.id
+    assert [item["id"] for item in payload["items"]] == [earlier.id, later.id]
+    assert payload["items"] == [
+        {
+            "id": earlier.id,
+            "price": "400.00",
+            "currency": "RUB",
+            "unit_raw": "bag",
+            "source_updated_at": "2026-05-17T09:50:00Z",
+            "parsed_at": "2026-05-17T10:00:00Z",
+        },
+        {
+            "id": later.id,
+            "price": "420.00",
+            "currency": "RUB",
+            "unit_raw": "bag",
+            "source_updated_at": "2026-05-17T10:50:00Z",
+            "parsed_at": "2026-05-17T11:00:00Z",
+        },
+    ]
+
+
+def test_product_price_history_endpoint_returns_404_for_missing_product(
+    client: TestClient,
+) -> None:
+    response = client.get("/products/999999999/prices")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Source product not found"}
