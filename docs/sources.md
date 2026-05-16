@@ -68,6 +68,88 @@ Validated Yakutsk branches on 2026-05-17:
 No validation failures were observed for these five branches. The branch list is a
 research sample, not yet a production scrape schedule.
 
+### 2GIS shop discovery for scheduled scraping
+
+Discovery research for M3 was run on 2026-05-17 for Yakutsk construction-material
+shops.
+
+Discovery paths checked:
+
+- Official Catalog API: `GET https://catalog.api.2gis.com/3.0/items`.
+- Query shape: `q=стройматериалы`, `type=branch`, `location=129.732,62.027`,
+  `locale=ru_RU`, paginated by `page` and `page_size`.
+- The official endpoint returned `400 Incorrect values of params: 'key'` without
+  an API key. Do not wire scheduled scraping to this endpoint unless a 2GIS
+  Catalog API key is explicitly configured.
+- Browser search pages may show captcha to automated clients. Text-indexed 2GIS
+  search pages were usable for candidate discovery, but should be treated as
+  research input rather than a stable machine API.
+
+Observed search counts:
+
+- The issue expectation was about `117` website results for `стройматериалы`.
+- The indexed page for related query `Строительные материалы крепёж` showed
+  `105` places.
+- The indexed page for broad query `Строительные материалы` showed `624` places.
+- The official API count for exact `стройматериалы` was not observed because the
+  endpoint requires an API key.
+
+Validation method:
+
+- Candidate branch IDs were collected from 2GIS text-indexed search and firm
+  pages.
+- Each branch was validated with the existing `items_by_branch` scrape flow.
+- No persistence was used.
+- Validation command:
+
+```bash
+uv run python scripts/discover_twogis_shops.py --page-size 50 --max-pages 20
+```
+
+Classification rules:
+
+- `active`: product endpoint returned at least one parsed product with price.
+- `no_prices`: product endpoint completed but returned no priced products.
+- `failed`: product endpoint request or parsing failed.
+- `irrelevant`: search candidate is not a construction-material shop and should
+  not enter the schedule. No candidates in the current validated seed were marked
+  irrelevant.
+
+Validated candidates on 2026-05-17:
+
+| Branch ID | Shop | Address | Classification | Total | Pages | Items | Priced | Completeness | Notes |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
+| `7037402698889811` | Металл Торг | Проспект Михаила Николаева, 1 | `active` | 18 | 1 | 18 | 18 | `complete` | Small catalog; good schedule candidate. |
+| `70000001007229923` | Евролайн | Улица Курнатовского, 86 | `active` | 106 | 3 | 106 | 82 | `complete` | Existing smoke branch; good schedule candidate. |
+| `7037402698746785` | Юником | Вилюйский тракт 3 километр, 1/4 | `active` | 18214 | 20 | 1000 | 1000 | `partial` | Very large catalog; needs special pagination/rate-limit decision before schedule. |
+| `7037402698836780` | Пирамида | Переулок Космачёва, 2 | `active` | 48 | 1 | 48 | 45 | `complete` | Good schedule candidate. |
+| `7037402698755240` | Космос | Улица Космонавтов, 23 | `no_prices` | 0 | 1 | 0 | 0 | `empty` | Keep out of initial schedule. |
+| `70000001038286835` | ЛидерСтрой | Улица Жорницкого, 50а | `no_prices` | 0 | 1 | 0 | 0 | `empty` | Keep out of initial schedule. |
+| `70000001065271367` | СибНорд | Улица Челюскина, 37/7в | `no_prices` | 0 | 1 | 0 | 0 | `empty` | Keep out of initial schedule. |
+| `7037402698774152` | Ондулин | Улица Чернышевского, 48 | `active` | 183 | 4 | 183 | 149 | `complete` | Existing validated branch; good schedule candidate. |
+| `7037402698745664` | Интехстрой | Улица Леваневского, 3 | `active` | 213 | 5 | 213 | 187 | `complete` | Good schedule candidate. |
+| `70000001062470950` | Востоктехторг | Проспект Михаила Николаева, 25/5 | `active` | 18521 | 20 | 1000 | 1000 | `partial` | Very large catalog; needs special pagination/rate-limit decision before schedule. |
+| `70000001021201334` | Строительный мир | Улица Чернышевского, 105 | `active` | 83 | 2 | 83 | 71 | `complete` | Good schedule candidate. |
+
+Recommended initial whitelist for scheduled scraping:
+
+- `7037402698889811` — Металл Торг, Проспект Михаила Николаева, 1.
+- `70000001007229923` — Евролайн, Улица Курнатовского, 86.
+- `7037402698836780` — Пирамида, Переулок Космачёва, 2.
+- `7037402698774152` — Ондулин, Улица Чернышевского, 48.
+- `7037402698745664` — Интехстрой, Улица Леваневского, 3.
+- `70000001021201334` — Строительный мир, Улица Чернышевского, 105.
+
+Hold out of the initial schedule:
+
+- `7037402698746785` — Юником: active, but the product endpoint reports more
+  than 18k products and requires a separate completeness/rate-limit decision.
+- `70000001062470950` — Востоктехторг: active, but similarly reports more than
+  18k products.
+- `7037402698755240` — Космос: no product prices observed.
+- `70000001038286835` — ЛидерСтрой: no product prices observed.
+- `70000001065271367` — СибНорд: no product prices observed.
+
 Notes:
 
 - Unofficial API.
