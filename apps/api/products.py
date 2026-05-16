@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from stroyhub.catalog.products import ProductCatalog, ProductSearchFilters
@@ -55,6 +55,22 @@ class ProductSearchResponse(BaseModel):
     offset: int
 
 
+class ProductPriceSnapshotResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    price: Decimal | None
+    currency: str
+    unit_raw: str | None
+    source_updated_at: datetime | None
+    parsed_at: datetime
+
+
+class ProductPriceHistoryResponse(BaseModel):
+    product_id: int
+    items: list[ProductPriceSnapshotResponse]
+
+
 @router.get("", response_model=ProductSearchResponse)
 def search_products(
     session: Annotated[Session, Depends(get_session)],
@@ -76,3 +92,19 @@ def search_products(
         for item in ProductCatalog(session).search_products(filters)
     ]
     return ProductSearchResponse(items=items, limit=limit, offset=offset)
+
+
+@router.get("/{product_id}/prices", response_model=ProductPriceHistoryResponse)
+def list_product_prices(
+    product_id: int,
+    session: Annotated[Session, Depends(get_session)],
+) -> ProductPriceHistoryResponse:
+    catalog = ProductCatalog(session)
+    if not catalog.source_product_exists(product_id):
+        raise HTTPException(status_code=404, detail="Source product not found")
+
+    items = [
+        ProductPriceSnapshotResponse.model_validate(item)
+        for item in catalog.list_price_history(product_id)
+    ]
+    return ProductPriceHistoryResponse(product_id=product_id, items=items)

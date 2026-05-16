@@ -56,6 +56,16 @@ class ProductSearchItem:
     latest_price: ProductLatestPrice | None
 
 
+@dataclass(frozen=True, kw_only=True)
+class ProductPriceSnapshot:
+    id: int
+    price: Decimal | None
+    currency: str
+    unit_raw: str | None
+    source_updated_at: datetime | None
+    parsed_at: datetime
+
+
 class ProductCatalog:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -165,3 +175,26 @@ class ProductCatalog:
             )
 
         return items
+
+    def source_product_exists(self, product_id: int) -> bool:
+        statement = select(SourceProduct.id).where(SourceProduct.id == product_id)
+        return self._session.scalar(statement) is not None
+
+    def list_price_history(self, product_id: int) -> list[ProductPriceSnapshot]:
+        statement = (
+            select(PriceSnapshot)
+            .where(PriceSnapshot.source_product_id == product_id)
+            .order_by(PriceSnapshot.parsed_at.asc(), PriceSnapshot.id.asc())
+        )
+
+        return [
+            ProductPriceSnapshot(
+                id=snapshot.id,
+                price=snapshot.price,
+                currency=snapshot.currency,
+                unit_raw=snapshot.unit_raw,
+                source_updated_at=snapshot.source_updated_at,
+                parsed_at=snapshot.parsed_at,
+            )
+            for snapshot in self._session.scalars(statement)
+        ]
