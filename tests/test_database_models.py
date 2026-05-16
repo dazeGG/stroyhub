@@ -32,3 +32,13 @@ def test_models_match_expected_table_names() -> None:
     assert SourceProduct.__tablename__ == "source_products"
     assert PriceSnapshot.__tablename__ == "price_snapshots"
     assert ScrapeRun.__tablename__ == "scrape_runs"
+
+
+def test_shop_has_scheduling_columns() -> None:
+    columns = Shop.__table__.columns
+
+    assert "last_scraped_at" in columns
+    assert "next_scrape_at" in columns
+    assert "scrape_interval" in columns
+    assert "scrape_status" in columns
+    assert "error_count" in columns

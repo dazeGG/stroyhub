@@ -61,6 +61,25 @@ Run the API locally:
 uv run uvicorn apps.api.main:app --reload
 ```
 
+Run the Celery worker locally:
+
+```bash
+uv run celery -A apps.worker.celery_app:celery_app worker --loglevel=info
+```
+
+Run Celery Beat in a second terminal to dispatch due shops every day at
+`00:00 Asia/Yakutsk`:
+
+```bash
+uv run celery -A apps.worker.celery_app:celery_app beat --loglevel=info
+```
+
+Seed the initial 2GIS whitelist into `shops`:
+
+```bash
+uv run python scripts/seed_twogis_whitelist.py
+```
+
 ## Tracker
 
 Project tasks are tracked in GitHub Issues and the [StroyHub MVP project](https://github.com/users/dazeGG/projects/1).

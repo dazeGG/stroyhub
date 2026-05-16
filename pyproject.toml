@@ -49,5 +49,5 @@ packages = ["stroyhub"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["celery"]
+module = ["celery", "celery.*"]
 ignore_missing_imports = true

@@ -21,6 +21,7 @@ class ShopUpsert:
     raw: JsonObject | None = None
     last_scraped_at: datetime | None = None
     next_scrape_at: datetime | None = None
+    scrape_interval: int | None = None
     scrape_status: str | None = None
     error_count: int | None = None
 
@@ -90,6 +91,8 @@ class ShopRepository:
         shop.last_scraped_at = data.last_scraped_at
         shop.next_scrape_at = data.next_scrape_at
 
+        if data.scrape_interval is not None:
+            shop.scrape_interval = data.scrape_interval
         if data.scrape_status is not None:
             shop.scrape_status = data.scrape_status
         if data.error_count is not None:
@@ -97,6 +100,25 @@ class ShopRepository:
 
         self._session.flush()
         return shop
+
+    def list_due_for_scraping(
+        self,
+        *,
+        now: datetime,
+        source: str | None = None,
+        limit: int | None = None,
+    ) -> list[Shop]:
+        statement = select(Shop).where(
+            Shop.scrape_status != "disabled",
+            (Shop.next_scrape_at.is_(None) | (Shop.next_scrape_at <= now)),
+        )
+        if source is not None:
+            statement = statement.where(Shop.source == source)
+        statement = statement.order_by(Shop.next_scrape_at.asc().nullsfirst(), Shop.id.asc())
+        if limit is not None:
+            statement = statement.limit(limit)
+
+        return list(self._session.scalars(statement))
 
 
 class SourceProductRepository:

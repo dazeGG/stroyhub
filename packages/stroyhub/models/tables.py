@@ -51,6 +51,9 @@ class Shop(TimestampMixin, Base):
     raw: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     last_scraped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     next_scrape_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scrape_interval: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("86400")
+    )
     scrape_status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'new'"))
     error_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
 
