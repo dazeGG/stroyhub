@@ -20,23 +20,31 @@ The reusable logic lives in `packages/stroyhub`. Applications in `apps/` should 
 
 ## Local Setup
 
+Install `uv` first if it is not available:
+
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[dev]"
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then sync the project environment:
+
+```bash
+uv sync --all-extras
 cp .env.example .env
 ```
+
+This creates a local `.venv` using the Python version pinned in `.python-version`. The virtual environment is not committed; dependency versions are committed in `uv.lock`.
 
 Run the current smoke test:
 
 ```bash
-pytest
+uv run pytest
 ```
 
 Run the API locally:
 
 ```bash
-uvicorn apps.api.main:app --reload
+uv run uvicorn apps.api.main:app --reload
 ```
 
 ## Tracker
