@@ -1,0 +1,14 @@
+from stroyhub import __version__
+from stroyhub_api.main import create_app
+
+
+def test_package_version_is_available() -> None:
+    assert __version__
+
+
+def test_api_health_route_is_registered() -> None:
+    app = create_app()
+
+    routes = {route.path for route in app.routes}
+
+    assert "/health" in routes
