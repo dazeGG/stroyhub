@@ -40,6 +40,17 @@ Observed response shape for the smoke-test branch on 2026-05-17:
   `price_snapshots`;
 - products without a price may use `offer.price_value.empty`.
 
+Pagination notes:
+
+- collect pages with configurable `page_size`;
+- `page_size=50` works for the smoke-test branch; `page_size=100` returned `400`
+  during a live check on 2026-05-17;
+- stop as complete when the number of regular `items` reaches `result.total`;
+- a first page with zero regular items is treated as an empty result;
+- an empty page before `result.total` is reached is treated as partial;
+- a safety page limit should mark the scrape as partial when it is reached before
+  `result.total`.
+
 Known smoke-test branch:
 
 - `70000001007229923`
