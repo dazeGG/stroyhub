@@ -170,7 +170,7 @@ Then run Docker Compose as above.
 
 ## Database Design
 
-`docs/database.md` is the source of truth for the current M1 database design.
+`docs/database.md` is the source of truth for the current database design.
 
 Initial MVP tables:
 
@@ -180,7 +180,7 @@ Initial MVP tables:
 - `price_snapshots`
 - `scrape_runs`
 
-Current out-of-scope items for M1:
+Current out-of-scope items for the database design:
 
 - `canonical_products`
 - cross-shop product matching
@@ -284,15 +284,7 @@ If an issue discussion creates a lasting architectural or data-model decision, u
 
 Tasks are tracked in GitHub Issues and the StroyHub MVP GitHub Project.
 
-Milestones:
-
-- `M0: Project Setup` is closed.
-- `M1: Database Schema` is current.
-- `M2: 2GIS Parser`
-- `M3: Scheduled Scraping`
-- `M4: Product API`
-- `M5: Categorization`
-- `M6: Product Matching`
+Use GitHub Issues, milestones, and the StroyHub MVP GitHub Project as the source of truth for current milestone status, task priority, backlog, acceptance criteria, and implementation notes.
 
 For each implementation task:
 
@@ -311,7 +303,7 @@ Current agreed approach:
 
 - `main` should stay working.
 - Small setup/docs changes may go directly to `main`.
-- Larger M1+ implementation tasks should use issue-based feature branches.
+- Larger implementation tasks should use issue-based feature branches.
 
 Branch naming examples:
 
@@ -452,9 +444,3 @@ Health endpoint:
 ```text
 GET /health
 ```
-
-## Current Active Direction
-
-The current milestone is `M1: Database Schema`.
-
-The immediate schema-design source of truth is `docs/database.md`. Future SQLAlchemy models and Alembic migrations should implement that document unless the design is updated first.
