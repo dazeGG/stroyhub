@@ -1,9 +1,16 @@
 #!/usr/bin/env python
 import argparse
+import importlib
+import sys
 from collections.abc import Sequence
+from pathlib import Path
 
-from scripts.seed_categories import main as seed_categories
-from scripts.seed_twogis_whitelist import main as seed_twogis_whitelist
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+seed_categories = importlib.import_module("seed_categories").main
+seed_twogis_whitelist = importlib.import_module("seed_twogis_whitelist").main
 
 
 def main(argv: Sequence[str] | None = None) -> int:
