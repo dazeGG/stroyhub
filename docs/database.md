@@ -252,3 +252,6 @@ These questions should not block M1:
 - Whether `source_products.normalized_title` needs full-text search indexes or trigram indexes for API search.
 - Whether snapshots should eventually be compressed or split into price changes plus product observations.
 - Whether status text values should become PostgreSQL enums.
+- Whether the proposed `canonical_products` and `product_matches` design in
+  [product-matching.md](product-matching.md) should be accepted as the M6
+  implementation schema.
