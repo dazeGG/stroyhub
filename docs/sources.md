@@ -350,6 +350,54 @@ Notes:
 
 Secondary HTML source.
 
+Research date: 2026-05-17.
+
+Base URL:
+
+```text
+https://metalltorg.biz
+```
+
+Sample pages:
+
+| Page | URL | Observed notes |
+| --- | --- | --- |
+| Catalog root | `https://metalltorg.biz/catalog/` | Category navigation page. |
+| Construction materials category | `https://metalltorg.biz/catalog/stroitelnye_materialy_1/` | Product listing page, 20 product cards on page 1, `data-all_count="1185"`, pagination to `?PAGEN_1=60`. |
+| Gypsum board category | `https://metalltorg.biz/catalog/stroitelnye_materialy_1/gipsokarton_i_komplektuyushchie/` | Product listing page with 20 product cards and pagination. |
+| Brick category | `https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/` | Product listing page with 1 product card and no multi-page pagination. |
+| Brick product | `https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/120420/` | Product detail page for article `24407`. |
+
+Observed listing selectors:
+
+| Field | Selector or extraction hint |
+| --- | --- |
+| Product card | `div.item_block[data-id]` |
+| Source product id | `div.item_block[data-id]` |
+| Product detail URL | `.item-title a[href]` or `a.thumb[href]` inside the card |
+| Title | `.item-title a span` |
+| Price | `.price[data-currency][data-value]` |
+| Currency | `.price[data-currency]` |
+| Unit | `.price_measure`, for example `/шт` |
+| Image URL | `img[data-src]`; ignore 1x1 lazy placeholder `src` data URLs |
+| Stock text | `.item-stock .value` |
+| Article/vendor code | `.article_block[data-value]` or detail `.article__value` |
+| Pagination next page | `.module-pagination a[href*="PAGEN_1="]` |
+| Total count hint | `.bottom_nav[data-all_count]` |
+
+Observed product detail selectors:
+
+| Field | Selector or extraction hint |
+| --- | --- |
+| Canonical URL | `link[rel="canonical"]` |
+| Title | `h1`, with `<title>` as fallback |
+| Description | `meta[name="description"]` |
+| Breadcrumb/category path | `.breadcrumbs a` |
+| Article/vendor code | `.product-info-headnote__article .article__value` |
+| Price/currency/unit | same `.price[data-currency][data-value]` and `.price_measure` pattern as listing pages |
+| Availability | `link[itemprop="availability"]` or `.item-stock .value` |
+| Image URL | product gallery `img[data-src]` |
+
 Notes:
 
 - Bitrix-based site.
@@ -360,7 +408,22 @@ Notes:
   `Крепеж`, `Окна и двери`, `Отопление, водоснабжение, вентиляция`,
   `Сантехника`, and `Электротовары`.
 - Parsing will likely use HTML extraction and should be treated as brittle.
-- CSS selectors and sample pages should be documented before implementation.
+- Listing pages include large duplicated UI/header/footer HTML. Parser fixtures
+  should use focused fragments around product cards and pagination.
+- Lazy image placeholders use `src="data:image/gif..."`; prefer `data-src`.
+- Product URLs contain a numeric source id segment such as `120420`, and listing
+  cards also expose the same id through `data-id`.
+- Price values are available in machine-readable `data-value` attributes; parse
+  those before falling back to text.
+- Pagination uses `PAGEN_1` query parameters and may also expose a "Показать
+  еще" button. Use plain pagination links for the first parser version.
+- Failure risks: Bitrix theme class names may change; lazy-loading markup may
+  omit images; category pages can include no-image placeholders; some categories
+  may have no prices or non-product content; broad categories may span many
+  pages and require pacing.
+- Focused fixtures:
+  - `tests/fixtures/metalltorg/category-kirpich-page1.html`;
+  - `tests/fixtures/metalltorg/product-kirpich-120420.html`.
 
 ## General Source Rules
 
