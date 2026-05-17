@@ -150,6 +150,59 @@ Hold out of the initial schedule:
 - `70000001038286835` — ЛидерСтрой: no product prices observed.
 - `70000001065271367` — СибНорд: no product prices observed.
 
+### Large 2GIS catalog policy
+
+Decision date: 2026-05-17.
+
+Very large 2GIS catalogs must stay out of the scheduled whitelist until the
+project has a dedicated large-catalog mode. This applies at least to:
+
+- `7037402698746785` — Юником.
+- `70000001062470950` — Востоктехторг.
+
+Fresh measurement on 2026-05-17, using the debug CLI without persistence:
+
+```bash
+uv run python scripts/scrape_twogis_shop.py 7037402698746785 --page-size 50 --max-pages 3
+uv run python scripts/scrape_twogis_shop.py 70000001062470950 --page-size 50 --max-pages 3
+uv run python scripts/scrape_twogis_shop.py 7037402698746785 --page-size 50 --max-pages 20
+uv run python scripts/scrape_twogis_shop.py 70000001062470950 --page-size 50 --max-pages 20
+```
+
+Observed results:
+
+| Branch ID | Shop | Max pages | Total | Items fetched | Completeness | Stop reason | Wall time |
+| --- | --- | ---: | ---: | ---: | --- | --- | ---: |
+| `7037402698746785` | Юником | 3 | 18210 | 150 | `partial` | `max_pages_reached` | 3.51s |
+| `70000001062470950` | Востоктехторг | 3 | 18521 | 150 | `partial` | `max_pages_reached` | 5.03s |
+| `7037402698746785` | Юником | 20 | 18210 | 1000 | `partial` | `max_pages_reached` | 17.07s |
+| `70000001062470950` | Востоктехторг | 20 | 18521 | 1000 | `partial` | `max_pages_reached` | 20.24s |
+
+Risks:
+
+- A full scrape at `page_size=50` would require about 365-371 page requests per
+  shop before persistence work is counted.
+- `page_size=100` previously returned `400`, so the current safe page size is
+  still `50`.
+- A normal scheduled worker run would either produce long-running partial
+  scrapes or generate large request bursts against an unofficial API.
+- Persisting repeated partial slices would add many price snapshots while still
+  leaving most of the catalog unseen.
+
+Policy:
+
+- Keep the normal whitelist limited to shops that complete within the default
+  `page_size=50`, `max_pages=100` flow.
+- Keep Юником and Востоктехторг out of scheduled scraping for now.
+- Use `page_size=50`, `max_pages=20` only for explicit research/debug checks on
+  large catalogs, not for scheduled collection.
+- Before adding large catalogs to the whitelist, implement a separate
+  large-catalog mode with per-shop pagination caps, resumable cursor/state,
+  request pacing/backoff, and reporting that distinguishes partial slices from
+  complete shop observations.
+- Update `scripts/seed_twogis_whitelist.py` only after that policy is accepted
+  and implemented.
+
 Raw category sample collected on 2026-05-17 from the initial whitelist:
 
 - `Сухие смеси`
