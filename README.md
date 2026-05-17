@@ -87,6 +87,12 @@ Preview the setup without writing to the database:
 uv run python scripts/setup_data_collection.py --dry-run
 ```
 
+Run the initial 2GIS whitelist scrape and persist baseline product data:
+
+```bash
+uv run python scripts/scrape_twogis_whitelist.py
+```
+
 Seed the initial 2GIS whitelist into `shops`:
 
 ```bash
