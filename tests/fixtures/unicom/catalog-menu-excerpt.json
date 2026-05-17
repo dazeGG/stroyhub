@@ -1,0 +1,65 @@
+[
+  {
+    "id": "82",
+    "parent_id": "0",
+    "name": "Строительство конструкций",
+    "name_en": "stroitelstvo-konstruktsiy",
+    "level": "0",
+    "last": "0",
+    "uuid": "e6b7f2dc3d5511e8af077062b8b53ba3",
+    "childs": [
+      {
+        "id": "166",
+        "parent_id": "82",
+        "name": "Блоки строительные",
+        "name_en": "bloki-stroitelnye",
+        "level": "1",
+        "last": "1",
+        "uuid": "fac247f1ae6111eca255000c29d1f857",
+        "childs": []
+      },
+      {
+        "id": "562",
+        "parent_id": "82",
+        "name": "Древесно-плитные материалы",
+        "name_en": "drevesno-plitnye-materialy",
+        "level": "1",
+        "last": "0",
+        "uuid": "4c087edc38fe11efa2a0000c29d1f857",
+        "childs": [
+          {
+            "id": "563",
+            "parent_id": "562",
+            "name": "ОСП",
+            "name_en": "osp",
+            "level": "2",
+            "last": "1",
+            "uuid": "9ad35f1538fe11efa2a0000c29d1f857",
+            "childs": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "59",
+    "parent_id": "0",
+    "name": "Сухие строительные смеси",
+    "name_en": "suhie-stroitelnye-smesi",
+    "level": "0",
+    "last": "0",
+    "uuid": "9952fc533c6a11e8af077062b8b53ba3",
+    "childs": [
+      {
+        "id": "61",
+        "parent_id": "59",
+        "name": "Цемент",
+        "name_en": "cement",
+        "level": "1",
+        "last": "1",
+        "uuid": "d68e4fb83d4d11e8af077062b8b53ba3",
+        "childs": []
+      }
+    ]
+  }
+]
