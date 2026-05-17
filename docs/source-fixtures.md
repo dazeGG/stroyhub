@@ -1,0 +1,110 @@
+# Source Fixture Strategy
+
+This document defines how StroyHub stores and maintains source-specific test
+fixtures for brittle external catalog contracts.
+
+## Goals
+
+- Keep parser and client tests offline by default.
+- Preserve representative source response shapes without committing large dumps.
+- Make fixture updates deliberate when a source contract changes.
+- Keep parsers source-specific while mapping all products into the shared
+  `ParsedProduct` contract.
+
+## Folder Convention
+
+Store observed source fixtures under:
+
+```text
+tests/fixtures/<source>/
+```
+
+Use the source slug that appears in parser code and persisted records:
+
+- `tests/fixtures/unicom/`
+- `tests/fixtures/metalltorg/`
+- `tests/fixtures/twogis/` if future 2GIS tests need captured samples.
+
+Filename pattern:
+
+```text
+<contract-or-page>-<scenario>.<extension>
+```
+
+Examples:
+
+- `catalog-menu-excerpt.json`
+- `products-cement-page1.json`
+- `category-stroitelnye-materialy-page1.html`
+- `product-card-missing-price.html`
+
+Use `.json` for API payloads and `.html` for captured HTML pages or focused
+HTML fragments.
+
+## Fixture Size Rules
+
+Fixtures should be small and focused:
+
+- keep only the fields needed to prove parser/client behavior;
+- prefer one or two representative products over a full category dump;
+- include edge cases as separate fixtures instead of one oversized file;
+- avoid binary assets, screenshots, and downloaded images;
+- avoid personal data, cookies, tokens, analytics payloads, and session ids;
+- keep raw payload shape intact where possible, even when trimming unrelated
+  items.
+
+For JSON API fixtures, preserve source field names and string-vs-number behavior.
+For HTML fixtures, preserve the relevant DOM structure around selectors, prices,
+pagination, image references, and category breadcrumbs.
+
+## Inline Payloads vs Fixtures
+
+Inline payloads in tests are acceptable when they are synthetic and tiny, for
+example:
+
+- testing missing optional fields;
+- testing invalid JSON or HTTP status handling;
+- testing pagination stop conditions with minimal artificial pages;
+- testing normalization helpers.
+
+Use files under `tests/fixtures/<source>/` when a test depends on an observed
+external source contract, for example:
+
+- Unicom catalog menu tree shape;
+- Unicom product response fields;
+- Metalltorg product card selectors;
+- Metalltorg pagination or missing-price HTML cases.
+
+The existing 2GIS tests mostly use tiny inline payloads for unit behavior. That
+fits this convention. If future 2GIS tests rely on larger captured responses,
+move those samples into `tests/fixtures/twogis/`.
+
+## Update Process
+
+When a source contract changes:
+
+1. Reproduce the change with an explicit live/debug command or focused manual
+   request. Do not add live network calls to default tests.
+2. Update or add the smallest fixture that demonstrates the new behavior.
+3. Add or adjust parser/client tests that consume the fixture.
+4. Update `docs/sources.md` with any lasting source-contract decision or
+   assumption.
+5. Mention the fixture change in the issue or pull request, including the source
+   date and affected endpoint/page.
+
+If an old fixture no longer represents a supported contract, replace it instead
+of keeping stale variants around. Keep historical notes in docs or issue comments
+when the contract change matters for future debugging.
+
+## M8 Source Notes
+
+Unicom is the first M8 JSON source with focused fixtures:
+
+- `tests/fixtures/unicom/catalog-menu-excerpt.json`;
+- `tests/fixtures/unicom/products-cement-page1.json`.
+
+Metalltorg should use HTML fixtures before parser implementation. Start with:
+
+- one category page with product cards and pagination;
+- one product-card fragment with a normal price and image;
+- one product-card fragment for a missing or non-numeric price, if observed.
