@@ -1,0 +1,132 @@
+{
+  "from_cache": false,
+  "promo": [
+    {
+      "name": "Новинки",
+      "alias": "novelities",
+      "all_count": "0",
+      "count": "0",
+      "checked": false
+    },
+    {
+      "name": "Акции",
+      "alias": "sale",
+      "all_count": "0",
+      "count": "0",
+      "checked": false
+    }
+  ],
+  "stocks": [
+    {
+      "uuid": "cd6ce0cbee8911e682177062b8b53ba3",
+      "name": " Вилюйский тракт 3 км, 1/4",
+      "all_count": "2",
+      "count": "2",
+      "checked": false
+    },
+    {
+      "uuid": "3552e12c7b4911e8b70f7062b8b53ba3",
+      "name": "Хатын-Юряхское шоссе 9 км, 7 (склад)",
+      "all_count": "2",
+      "count": "2",
+      "checked": false
+    },
+    {
+      "uuid": "3552e10e7b4911e8b70f7062b8b53ba3",
+      "name": "Автострада 50 лет Октября, 1Б",
+      "all_count": "1",
+      "count": "1",
+      "checked": false
+    }
+  ],
+  "filters": [
+    {
+      "id": "426",
+      "name": "Марка цемента",
+      "number": "0",
+      "values": [
+        {
+          "name": "М400",
+          "name_en": "m400",
+          "all_count": "1",
+          "count_1": "1",
+          "count_2": "1",
+          "checked": false,
+          "visible": true
+        },
+        {
+          "name": "М500",
+          "name_en": "m500",
+          "all_count": "1",
+          "count_1": "1",
+          "count_2": "1",
+          "checked": false,
+          "visible": true
+        }
+      ],
+      "checked": false,
+      "visibleAll": false
+    }
+  ],
+  "products": [
+    {
+      "id": "1941",
+      "uuid": "7bc6787cedca11e682177062b8b53ba3",
+      "parent_uuid": "d68e4fb83d4d11e8af077062b8b53ba3",
+      "category": "Цемент",
+      "name": "Цемент М-400 50кг.",
+      "name_en": "cement-m-400-50-kg-40-sht",
+      "brand": "Якутцемент",
+      "price": "958.00",
+      "price_package": "1.000",
+      "images": "1",
+      "quantity": "729",
+      "offer_price": "0.00",
+      "sale": "0",
+      "hit": "0",
+      "new": "0",
+      "price_unit": "шт.",
+      "created_date": null,
+      "code": "57300041",
+      "pe_id": "0",
+      "lr_id": "0",
+      "on_order": "0",
+      "rating": "0.0",
+      "vendor_code": "57300041",
+      "offers": null
+    },
+    {
+      "id": "49115",
+      "uuid": "db52a852777911eda26c000c29d1f857",
+      "parent_uuid": "d68e4fb83d4d11e8af077062b8b53ba3",
+      "category": "Цемент",
+      "name": "Цемент М-500 20 кг. ",
+      "name_en": "cement-m-500-20-kg",
+      "brand": "Россия",
+      "price": "470.00",
+      "price_package": "1.000",
+      "images": "1",
+      "quantity": "253",
+      "offer_price": "0.00",
+      "sale": "0",
+      "hit": "0",
+      "new": "0",
+      "price_unit": "шт.",
+      "created_date": "1670627425",
+      "code": "",
+      "pe_id": "0",
+      "lr_id": "0",
+      "on_order": "0",
+      "rating": "0.0",
+      "vendor_code": "",
+      "offers": null
+    }
+  ],
+  "pages": 1,
+  "minPrice": "470.00",
+  "maxPrice": "958.00",
+  "from": "470.00",
+  "to": "958.00",
+  "uri": "/api2/v-catalog-beta/products/d68e4fb83d4d11e8af077062b8b53ba3?shop=uc&page=1&sort=popular&limit=3",
+  "productsCount": 2
+}

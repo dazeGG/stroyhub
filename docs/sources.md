@@ -244,6 +244,33 @@ Notes:
 
 Secondary JSON source.
 
+Research date: 2026-05-17.
+
+Base URL:
+
+```text
+https://unicom-ykt.ru
+```
+
+Catalog menu endpoint:
+
+```text
+GET  https://unicom-ykt.ru/api/catalog-menu-2.php
+POST https://unicom-ykt.ru/api/catalog-menu-2.php
+```
+
+Both methods returned the same JSON payload during research. The response is a
+recursive category tree. Useful category fields:
+
+- `id`: site-local numeric category id as a string;
+- `parent_id`: site-local parent id as a string;
+- `name`: display category name;
+- `name_en`: URL/transliteration slug;
+- `level`: tree depth as a string;
+- `last`: string flag where `1` means leaf category;
+- `uuid`: category UUID used by the product endpoint;
+- `childs`: nested child categories.
+
 Known endpoint pattern:
 
 ```text
@@ -257,20 +284,62 @@ Known query parameters:
 - `sort`
 - `limit`
 
+Observed product response fields:
+
+- top-level metadata: `from_cache`, `promo`, `stocks`, `filters`, `pages`,
+  `productsCount`, `minPrice`, `maxPrice`, `from`, `to`, and `uri`;
+- product identity: `id`, `uuid`, `parent_uuid`, `code`, `vendor_code`;
+- product display fields: `category`, `name`, `name_en`, `brand`;
+- price and quantity fields: `price`, `offer_price`, `price_package`,
+  `price_unit`, `quantity`;
+- boolean-like flags as string values: `sale`, `hit`, `new`, `on_order`;
+- additional fields observed: `images`, `created_date`, `pe_id`, `lr_id`,
+  `rating`, and `offers`.
+
+Observed pagination behavior:
+
+- `limit` controls products per page and `pages` changes accordingly;
+- `productsCount` contains the total product count for categories with products;
+- requesting a page beyond `pages` returns an empty `products` list while keeping
+  the category metadata;
+- parent categories such as `Строительство конструкций`,
+  `Сухие строительные смеси`, and `Крепежные изделия` returned no products
+  directly, so the scraper should walk leaf categories where `last = "1"`;
+- `limit=100` was accepted for small sample categories, but the production
+  client should keep the limit configurable until larger categories are tested.
+
+Representative category UUIDs:
+
+| Path | UUID | Notes |
+| --- | --- | --- |
+| `Строительство конструкций` | `e6b7f2dc3d5511e8af077062b8b53ba3` | Parent; direct product request returned empty results. |
+| `Строительство конструкций / Блоки строительные` | `fac247f1ae6111eca255000c29d1f857` | Leaf category. |
+| `Строительство конструкций / Древесно-плитные материалы` | `4c087edc38fe11efa2a0000c29d1f857` | Parent with leaf children such as `ОСП`. |
+| `Сухие строительные смеси` | `9952fc533c6a11e8af077062b8b53ba3` | Parent; direct product request returned empty results. |
+| `Сухие строительные смеси / Цемент` | `d68e4fb83d4d11e8af077062b8b53ba3` | Leaf sample with 2 products. |
+| `Сухие строительные смеси / Сухие клеевые смеси` | `a975a5d53d4d11e8af077062b8b53ba3` | Leaf sample with 18 products. |
+| `Изоляционные материалы` | `54fedbbf421c11e88b787062b8b53ba3` | Parent. |
+| `Кровля и водосток / Профнастил` | `46d377c7807811eaa229000c29d1f857` | Leaf category. |
+| `Лакокрасочные материалы / Краски для наружных работ` | `ef6197bd3e1911e886f37062b8b53ba3` | Leaf sample with 11 products. |
+| `Металлопрокат / Трубы металлические` | `c7d676b1bbcf11eca256000c29d1f857` | Leaf category. |
+
 Notes:
 
 - Custom JSON API.
-- No known authentication or rate limiting at the time of planning.
-- Exact category UUID discovery still needs research.
-- The public catalog menu endpoint `POST /api/catalog-menu-2.php` exposes
-  category names and UUIDs. A 2026-05-17 sample includes `Строительство
-  конструкций`, `Сухие строительные смеси`, `Изоляционные материалы`,
-  `Кровля и водосток`, `Крепежные изделия`, `Сантехника`,
-  `Электроустановочные изделия`, `Кабеленесущие системы и аксессуары`,
-  `Лакокрасочные материалы`, `Плитка, керамогранит`, `Металлопрокат`,
-  `Инструменты`, `Ручные инструменты`, and `Аксессуары для
-  электроинструмента`.
+- No authentication requirement was observed during research.
+- No rate limit response was observed during focused sample checks, but request
+  pacing should still be conservative.
+- `shop=uc` did not change the sampled cement response, but the `stocks` block
+  contains multiple Yakutsk stock locations. Availability semantics need parser
+  research before per-shop stock is modeled.
+- Product image URL construction is still unknown. The product response exposes
+  an `images` count-like field, not a direct image URL in the sampled payload.
+- `created_date` may be `null` or a Unix timestamp string. It should not be
+  treated as a reliable source update timestamp until validated.
 - Raw responses should be stored for replay and schema drift checks.
+- Focused fixtures:
+  - `tests/fixtures/unicom/catalog-menu-excerpt.json`;
+  - `tests/fixtures/unicom/products-cement-page1.json`.
 
 ## Metalltorg
 
