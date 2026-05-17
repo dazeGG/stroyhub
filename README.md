@@ -74,6 +74,19 @@ Run Celery Beat in a second terminal to dispatch due shops every day at
 uv run celery -A apps.worker.celery_app:celery_app beat --loglevel=info
 ```
 
+Before the first local scrape, seed the normalized category tree and the initial
+2GIS shop whitelist in one repeatable setup flow:
+
+```bash
+uv run python scripts/setup_data_collection.py
+```
+
+Preview the setup without writing to the database:
+
+```bash
+uv run python scripts/setup_data_collection.py --dry-run
+```
+
 Seed the initial 2GIS whitelist into `shops`:
 
 ```bash
