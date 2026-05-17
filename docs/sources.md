@@ -1,5 +1,9 @@
 # Data Sources
 
+M8 source expansion candidates are tracked in
+[`docs/source-candidates.md`](source-candidates.md). Keep this file focused on
+sources that have accepted implementation assumptions or parser behavior.
+
 ## 2GIS
 
 Primary MVP source. Expected to provide most initial product cards.
