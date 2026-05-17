@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
-from stroyhub.models import PriceSnapshot, ScrapeRun, Shop, SourceProduct
+from stroyhub.models import Category, PriceSnapshot, ScrapeRun, Shop, SourceProduct
 from stroyhub.parsers.twogis import TwogisClient
 from stroyhub.scraping import persist_twogis_scrape_result, scrape_twogis_branch
 
@@ -92,6 +92,10 @@ def test_persist_twogis_scrape_result_upserts_products_and_appends_price_snapsho
     )
     snapshot_count = db_session.scalar(select(func.count()).select_from(PriceSnapshot))
     scrape_run_count = db_session.scalar(select(func.count()).select_from(ScrapeRun))
+    cement_product = db_session.scalar(
+        select(SourceProduct).where(SourceProduct.source_product_id == "product-1")
+    )
+    cement_category = db_session.scalar(select(Category).where(Category.slug == "cement"))
 
     assert shop is not None
     assert shop.name == "Persist Test Shop"
@@ -104,6 +108,9 @@ def test_persist_twogis_scrape_result_upserts_products_and_appends_price_snapsho
     assert source_product_count == 3
     assert snapshot_count == 6
     assert scrape_run_count == 2
+    assert cement_category is not None
+    assert cement_product is not None
+    assert cement_product.category_id == cement_category.id
 
 
 def test_persist_twogis_scrape_result_marks_partial_run_but_failed_shop_status(

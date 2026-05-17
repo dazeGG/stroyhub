@@ -5,6 +5,8 @@ from stroyhub.db.session import SessionLocal, engine, get_session
 
 __all__ = [
     "Base",
+    "CategoryRepository",
+    "CategoryUpsert",
     "PriceSnapshotCreate",
     "PriceSnapshotRepository",
     "ScrapeRunCreate",
@@ -19,6 +21,8 @@ __all__ = [
 ]
 
 _REPOSITORY_EXPORTS = {
+    "CategoryRepository",
+    "CategoryUpsert",
     "PriceSnapshotCreate",
     "PriceSnapshotRepository",
     "ScrapeRunCreate",

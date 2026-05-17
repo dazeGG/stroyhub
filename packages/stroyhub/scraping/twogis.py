@@ -3,7 +3,10 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from stroyhub.catalog.categorization import RuleBasedCategorizer
 from stroyhub.db.repositories import (
+    CategoryRepository,
+    CategoryUpsert,
     PriceSnapshotCreate,
     PriceSnapshotRepository,
     ScrapeRunCreate,
@@ -114,10 +117,27 @@ def persist_twogis_scrape_result(
 
     product_repository = SourceProductRepository(session)
     price_repository = PriceSnapshotRepository(session)
+    category_repository = CategoryRepository(session)
+    categorizer = RuleBasedCategorizer()
     source_products_saved = 0
     price_snapshots_saved = 0
 
     for product in result.products:
+        category_id = None
+        prediction = categorizer.categorize(
+            title=product.title,
+            category_raw=product.category_raw,
+            description=product.description,
+        )
+        if prediction is not None:
+            category = category_repository.upsert(
+                CategoryUpsert(
+                    slug=prediction.category_slug,
+                    name=prediction.category_name,
+                )
+            )
+            category_id = category.id
+
         source_product = product_repository.upsert(
             SourceProductUpsert(
                 shop_id=shop.id,
@@ -127,6 +147,7 @@ def persist_twogis_scrape_result(
                 title=product.title,
                 normalized_title=product.normalized_title,
                 description=product.description,
+                category_id=category_id,
                 category_raw=product.category_raw,
                 unit_raw=product.unit_raw,
                 image_url=product.image_url,

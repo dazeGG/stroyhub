@@ -76,3 +76,16 @@ When `source_product_id` exists, match source products by `source`, `shop_id`, a
 
 Consequences:
 Stable source IDs give reliable updates. Fingerprints may create duplicates when product names change, which is acceptable until canonical product matching is introduced.
+
+## 2026-05-17: Start Categorization With Rules Before ML
+
+Context:
+The MVP needs category filtering before there is enough data for useful ML-based classification.
+
+Decision:
+Use a rule-based categorizer with explicit construction-material keyword dictionaries. The service returns a category slug, display name, confidence, matched keywords, and source. During scraping persistence, matched categories are upserted into `categories` and assigned to `source_products.category_id`.
+
+Manual category overrides are represented at the service level: a provided override takes precedence over rules and returns confidence `1.0` with source `manual_override`. A dedicated override table can be added later if an admin UI or audit trail needs it.
+
+Consequences:
+Initial categories are explainable and easy to adjust. Some products will remain uncategorized until rules are expanded from real scrape data.
