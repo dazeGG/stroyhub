@@ -96,6 +96,7 @@ def test_persist_twogis_scrape_result_upserts_products_and_appends_price_snapsho
         select(SourceProduct).where(SourceProduct.source_product_id == "product-1")
     )
     cement_category = db_session.scalar(select(Category).where(Category.slug == "cement"))
+    mixes_category = db_session.scalar(select(Category).where(Category.slug == "mixes_aggregates"))
 
     assert shop is not None
     assert shop.name == "Persist Test Shop"
@@ -108,7 +109,9 @@ def test_persist_twogis_scrape_result_upserts_products_and_appends_price_snapsho
     assert source_product_count == 3
     assert snapshot_count == 6
     assert scrape_run_count == 2
+    assert mixes_category is not None
     assert cement_category is not None
+    assert cement_category.parent_id == mixes_category.id
     assert cement_product is not None
     assert cement_product.category_id == cement_category.id
 

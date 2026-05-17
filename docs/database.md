@@ -56,6 +56,9 @@ Rules:
 - Categories are hierarchical through `parent_id`.
 - The schema must allow any number of nested levels.
 - The MVP will likely use 2-3 levels, but the database should not enforce that limit.
+- The initial normalized StroyHub category tree is defined in
+  `packages/stroyhub/catalog/taxonomy.py` and can be seeded with
+  `uv run python scripts/seed_categories.py`.
 
 Constraints and indexes:
 

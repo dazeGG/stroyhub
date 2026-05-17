@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from stroyhub.catalog.taxonomy import DEFAULT_NORMALIZED_CATEGORIES, get_normalized_category
 from stroyhub.parsers.common import normalize_title
 
 
@@ -7,6 +8,8 @@ from stroyhub.parsers.common import normalize_title
 class CategoryRule:
     slug: str
     name: str
+    parent_slug: str | None
+    parent_name: str | None
     keywords: tuple[str, ...]
 
 
@@ -14,69 +17,44 @@ class CategoryRule:
 class ManualCategoryOverride:
     category_slug: str
     category_name: str
+    parent_slug: str | None = None
+    parent_name: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
 class CategoryPrediction:
     category_slug: str
     category_name: str
+    parent_slug: str | None
+    parent_name: str | None
     confidence: float
     matched_keywords: tuple[str, ...]
     source: str
 
 
-DEFAULT_CATEGORY_RULES: tuple[CategoryRule, ...] = (
-    CategoryRule(
-        slug="cement",
-        name="Цемент",
-        keywords=("цемент", "портландцемент", "м500", "м400", "m500", "m400"),
-    ),
-    CategoryRule(
-        slug="dry_mixes",
-        name="Сухие смеси",
-        keywords=("сухая смесь", "штукатурка", "шпаклевка", "шпатлевка", "клей плиточный"),
-    ),
-    CategoryRule(
-        slug="aggregates",
-        name="Песок и щебень",
-        keywords=("песок", "щебень", "гравий", "пгс", "отсев"),
-    ),
-    CategoryRule(
-        slug="bricks_blocks",
-        name="Кирпич и блоки",
-        keywords=("кирпич", "газоблок", "пеноблок", "керамзитоблок", "блок строительный"),
-    ),
-    CategoryRule(
-        slug="lumber",
-        name="Пиломатериалы",
-        keywords=("доска", "брус", "рейка", "фанера", "osb", "осп", "дсп"),
-    ),
-    CategoryRule(
-        slug="metal",
-        name="Металлопрокат",
-        keywords=("арматура", "профнастил", "труба профильная", "уголок", "швеллер", "лист"),
-    ),
-    CategoryRule(
-        slug="roofing",
-        name="Кровля",
-        keywords=("кровля", "ондулин", "металлочерепица", "шифер", "рубероид", "водосток"),
-    ),
-    CategoryRule(
-        slug="insulation",
-        name="Утеплители",
-        keywords=("утеплитель", "минвата", "пеноплекс", "пенополистирол", "изовер", "вата"),
-    ),
-    CategoryRule(
-        slug="fasteners",
-        name="Крепеж",
-        keywords=("саморез", "гвозд", "дюбель", "анкера", "анкер", "болт", "гайка"),
-    ),
-    CategoryRule(
-        slug="paint_coatings",
-        name="Краски и покрытия",
-        keywords=("краска", "эмаль", "грунтовка", "лак", "пропитка", "антисептик"),
-    ),
-)
+def _default_category_rules() -> tuple[CategoryRule, ...]:
+    rules: list[CategoryRule] = []
+    for category in DEFAULT_NORMALIZED_CATEGORIES:
+        if not category.keywords:
+            continue
+        parent = (
+            get_normalized_category(category.parent_slug)
+            if category.parent_slug is not None
+            else None
+        )
+        rules.append(
+            CategoryRule(
+                slug=category.slug,
+                name=category.name,
+                parent_slug=category.parent_slug,
+                parent_name=parent.name if parent is not None else None,
+                keywords=category.keywords,
+            )
+        )
+    return tuple(rules)
+
+
+DEFAULT_CATEGORY_RULES: tuple[CategoryRule, ...] = _default_category_rules()
 
 
 class RuleBasedCategorizer:
@@ -95,6 +73,8 @@ class RuleBasedCategorizer:
             return CategoryPrediction(
                 category_slug=manual_override.category_slug,
                 category_name=manual_override.category_name,
+                parent_slug=manual_override.parent_slug,
+                parent_name=manual_override.parent_name,
                 confidence=1.0,
                 matched_keywords=(),
                 source="manual_override",
@@ -120,6 +100,8 @@ class RuleBasedCategorizer:
             best_prediction = CategoryPrediction(
                 category_slug=rule.slug,
                 category_name=rule.name,
+                parent_slug=rule.parent_slug,
+                parent_name=rule.parent_name,
                 confidence=_confidence(score),
                 matched_keywords=matched_keywords,
                 source="rules",
@@ -143,9 +125,13 @@ class RuleBasedCategorizer:
             matched = False
             if normalized_keyword in title_text:
                 score += 3
+                if " " in normalized_keyword or normalized_keyword == title_text:
+                    score += 6
                 matched = True
             if category_text and normalized_keyword in category_text:
                 score += 4
+                if " " in normalized_keyword or normalized_keyword == category_text:
+                    score += 4
                 matched = True
             if description_text and normalized_keyword in description_text:
                 score += 1

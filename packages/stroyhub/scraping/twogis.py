@@ -130,10 +130,21 @@ def persist_twogis_scrape_result(
             description=product.description,
         )
         if prediction is not None:
+            parent_id = None
+            if prediction.parent_slug is not None and prediction.parent_name is not None:
+                parent = category_repository.upsert(
+                    CategoryUpsert(
+                        slug=prediction.parent_slug,
+                        name=prediction.parent_name,
+                    )
+                )
+                parent_id = parent.id
+
             category = category_repository.upsert(
                 CategoryUpsert(
                     slug=prediction.category_slug,
                     name=prediction.category_name,
+                    parent_id=parent_id,
                 )
             )
             category_id = category.id
