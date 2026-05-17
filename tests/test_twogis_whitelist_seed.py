@@ -9,15 +9,15 @@ from stroyhub.core.config import settings
 from stroyhub.db import ShopRepository, ShopUpsert
 from stroyhub.models import Shop
 
-from scripts.seed_twogis_whitelist import INITIAL_WHITELIST, main
+import scripts.seed_twogis_whitelist as seed_twogis_whitelist
 
 
 def test_seed_twogis_whitelist_dry_run_lists_initial_schedule(capsys) -> None:  # type: ignore[no-untyped-def]
-    result = main(["--dry-run"])
+    result = seed_twogis_whitelist.main(["--dry-run"])
 
     output = capsys.readouterr().out
     assert result == 0
-    assert len(INITIAL_WHITELIST) == 6
+    assert len(seed_twogis_whitelist.INITIAL_WHITELIST) == 6
     assert "schedule shop: source=2gis" in output
     assert "scrape_interval=86400" in output
 
@@ -43,9 +43,15 @@ def db_session() -> Iterator[Session]:
 
 
 def test_seed_twogis_whitelist_preserves_existing_scrape_metadata(
+    monkeypatch: pytest.MonkeyPatch,
     db_session: Session,
 ) -> None:
-    existing_shop = INITIAL_WHITELIST[0]
+    existing_shop = seed_twogis_whitelist.WhitelistShop(
+        branch_id="branch-whitelist-seed-test",
+        name="Seed Test Shop",
+        address="Seed Test Address",
+    )
+    monkeypatch.setattr(seed_twogis_whitelist, "INITIAL_WHITELIST", [existing_shop])
     scraped_at = datetime(2026, 5, 17, 1, 0, tzinfo=UTC)
     next_scrape_at = datetime(2026, 5, 18, 0, 0, tzinfo=UTC)
     ShopRepository(db_session).upsert(
@@ -63,7 +69,7 @@ def test_seed_twogis_whitelist_preserves_existing_scrape_metadata(
     db_session.commit()
 
     try:
-        result = main([])
+        result = seed_twogis_whitelist.main([])
 
         seeded = db_session.scalar(
             select(Shop).where(Shop.source == "2gis", Shop.source_id == existing_shop.branch_id)
@@ -84,6 +90,6 @@ def test_seed_twogis_whitelist_preserves_existing_scrape_metadata(
     finally:
         db_session.query(Shop).filter(
             Shop.source == "2gis",
-            Shop.source_id.in_([shop.branch_id for shop in INITIAL_WHITELIST]),
+            Shop.source_id == existing_shop.branch_id,
         ).delete(synchronize_session=False)
         db_session.commit()

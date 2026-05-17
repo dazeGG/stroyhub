@@ -135,15 +135,19 @@ def test_source_product_repository_upserts_by_source_product_id(
 def test_category_repository_upserts_by_parent_and_slug(db_session: Session) -> None:
     repository = CategoryRepository(db_session)
 
-    parent = repository.upsert(CategoryUpsert(slug="materials", name="Materials"))
+    parent = repository.upsert(CategoryUpsert(slug="test-materials-parent", name="Materials"))
     category = repository.upsert(
-        CategoryUpsert(slug="cement", name="Cement", parent_id=parent.id)
+        CategoryUpsert(slug="test-cement-child", name="Cement", parent_id=parent.id)
     )
     updated = repository.upsert(
-        CategoryUpsert(slug="cement", name="Цемент", parent_id=parent.id)
+        CategoryUpsert(slug="test-cement-child", name="Цемент", parent_id=parent.id)
     )
 
-    count = db_session.scalar(select(func.count()).select_from(Category))
+    count = db_session.scalar(
+        select(func.count())
+        .select_from(Category)
+        .where(Category.slug.in_(["test-materials-parent", "test-cement-child"]))
+    )
 
     assert updated.id == category.id
     assert updated.parent_id == parent.id

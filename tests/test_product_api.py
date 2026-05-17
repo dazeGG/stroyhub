@@ -70,8 +70,8 @@ def test_products_endpoint_returns_latest_price_and_shop(
             shop_id=shop.id,
             source="2gis",
             source_product_id="cement-api-1",
-            title="Cement M500",
-            normalized_title="cement m500",
+            title="API Unique Cement M500",
+            normalized_title="api unique cement m500",
             category_raw="Catalog / Cement",
             unit_raw="bag",
             observed_at=datetime(2026, 5, 17, 8, 0, tzinfo=UTC),
@@ -94,7 +94,7 @@ def test_products_endpoint_returns_latest_price_and_shop(
         )
     )
 
-    response = client.get("/products")
+    response = client.get("/products", params={"q": "api unique cement"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -103,7 +103,7 @@ def test_products_endpoint_returns_latest_price_and_shop(
     assert len(payload["items"]) == 1
     item = payload["items"][0]
     assert item["id"] == product.id
-    assert item["title"] == "Cement M500"
+    assert item["title"] == "API Unique Cement M500"
     assert item["shop"] == {
         "id": shop.id,
         "source": "2gis",

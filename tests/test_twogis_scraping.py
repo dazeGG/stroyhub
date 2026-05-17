@@ -90,8 +90,15 @@ def test_persist_twogis_scrape_result_upserts_products_and_appends_price_snapsho
     source_product_count = db_session.scalar(
         select(func.count()).select_from(SourceProduct).where(SourceProduct.shop_id == shop.id)
     )
-    snapshot_count = db_session.scalar(select(func.count()).select_from(PriceSnapshot))
-    scrape_run_count = db_session.scalar(select(func.count()).select_from(ScrapeRun))
+    snapshot_count = db_session.scalar(
+        select(func.count())
+        .select_from(PriceSnapshot)
+        .join(SourceProduct)
+        .where(SourceProduct.shop_id == shop.id)
+    )
+    scrape_run_count = db_session.scalar(
+        select(func.count()).select_from(ScrapeRun).where(ScrapeRun.shop_id == shop.id)
+    )
     cement_product = db_session.scalar(
         select(SourceProduct).where(SourceProduct.source_product_id == "product-1")
     )
