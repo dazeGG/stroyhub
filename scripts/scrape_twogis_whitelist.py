@@ -17,6 +17,7 @@ TWOGIS_SOURCE = "2gis"
 class WhitelistScrapeTotals:
     shops_total: int
     shops_scraped: int
+    shops_partial: int
     shops_failed: int
     source_products_saved: int
     price_snapshots_saved: int
@@ -35,6 +36,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     totals = WhitelistScrapeTotals(
         shops_total=0,
         shops_scraped=0,
+        shops_partial=0,
         shops_failed=0,
         source_products_saved=0,
         price_snapshots_saved=0,
@@ -68,6 +70,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 totals = _replace_totals(
                     totals,
                     shops_scraped=totals.shops_scraped + 1,
+                    shops_partial=(
+                        totals.shops_partial + 1
+                        if persisted.scrape_status != "success"
+                        else totals.shops_partial
+                    ),
                     source_products_saved=(
                         totals.source_products_saved + persisted.source_products_saved
                     ),
@@ -94,7 +101,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
 
     _print_totals(totals)
-    return 1 if totals.shops_failed else 0
+    return 1 if totals.shops_failed or totals.shops_partial else 0
 
 
 def _list_whitelisted_twogis_shops(session, *, limit: int | None) -> list[Shop]:  # type: ignore[no-untyped-def]
@@ -113,6 +120,7 @@ def _replace_totals(totals: WhitelistScrapeTotals, **changes: int) -> WhitelistS
     values = {
         "shops_total": totals.shops_total,
         "shops_scraped": totals.shops_scraped,
+        "shops_partial": totals.shops_partial,
         "shops_failed": totals.shops_failed,
         "source_products_saved": totals.source_products_saved,
         "price_snapshots_saved": totals.price_snapshots_saved,
@@ -144,6 +152,7 @@ def _print_totals(totals: WhitelistScrapeTotals) -> None:
         "whitelist scrape summary: "
         f"shops_total={totals.shops_total} "
         f"shops_scraped={totals.shops_scraped} "
+        f"shops_partial={totals.shops_partial} "
         f"shops_failed={totals.shops_failed} "
         f"source_products_saved={totals.source_products_saved} "
         f"price_snapshots_saved={totals.price_snapshots_saved}"

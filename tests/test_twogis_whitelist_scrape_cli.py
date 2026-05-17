@@ -50,6 +50,7 @@ def test_twogis_whitelist_scrape_cli_persists_all_listed_shops(capsys) -> None: 
     assert "whitelist scrape summary:" in output
     assert "shops_total=2" in output
     assert "shops_scraped=2" in output
+    assert "shops_partial=0" in output
     assert "source_products_saved=4" in output
     assert "price_snapshots_saved=4" in output
 
@@ -103,7 +104,47 @@ def test_twogis_whitelist_scrape_cli_records_failures_and_continues(capsys) -> N
     assert "error=timeout" in output
     assert "shops_total=2" in output
     assert "shops_scraped=1" in output
+    assert "shops_partial=0" in output
     assert "shops_failed=1" in output
+
+
+def test_twogis_whitelist_scrape_cli_returns_failure_for_partial_scrapes(capsys) -> None:  # type: ignore[no-untyped-def]
+    module = _load_cli_module()
+    shops = [SimpleNamespace(id=1, source_id="branch-partial", name="Partial Shop")]
+
+    def fake_scrape_twogis_branch(**kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            branch_id=kwargs["branch_id"],
+            total=100,
+            pages_seen=1,
+            items_seen=50,
+            products=[object()],
+            completeness="partial",
+            stop_reason="max_pages_reached",
+        )
+
+    def fake_persist_twogis_scrape_result(*args: object, **kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            source_products_saved=1,
+            price_snapshots_saved=1,
+            scrape_status="partial",
+        )
+
+    module.SessionLocal = FakeSessionLocal
+    module._list_whitelisted_twogis_shops = lambda session, *, limit: shops
+    module.scrape_twogis_branch = fake_scrape_twogis_branch
+    module.persist_twogis_scrape_result = fake_persist_twogis_scrape_result
+    module.mark_shop_scrape_completion = lambda shop, **kwargs: None
+
+    exit_code = module.main([])
+
+    output = capsys.readouterr().out
+    assert exit_code == 1
+    assert "shop scrape summary:" in output
+    assert "scrape_status=partial" in output
+    assert "shops_scraped=1" in output
+    assert "shops_partial=1" in output
+    assert "shops_failed=0" in output
 
 
 class FakeSessionLocal:
