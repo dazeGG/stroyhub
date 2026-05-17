@@ -126,3 +126,7 @@ uv run python scripts/seed_categories.py
 ## Tracker
 
 Project tasks are tracked in GitHub Issues and the [StroyHub MVP project](https://github.com/users/dazeGG/projects/1).
+
+## Runbooks
+
+- [Local data collection](docs/local-data-collection.md)
