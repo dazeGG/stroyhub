@@ -93,6 +93,12 @@ Run the initial 2GIS whitelist scrape and persist baseline product data:
 uv run python scripts/scrape_twogis_whitelist.py
 ```
 
+Inspect recent scrape runs:
+
+```bash
+uv run python scripts/report_scrape_runs.py --source 2gis --days 7
+```
+
 Seed the initial 2GIS whitelist into `shops`:
 
 ```bash
