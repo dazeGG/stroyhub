@@ -99,6 +99,12 @@ Inspect recent scrape runs:
 uv run python scripts/report_scrape_runs.py --source 2gis --days 7
 ```
 
+Inspect uncategorized products by source shop and raw source category:
+
+```bash
+uv run python scripts/report_category_coverage.py --source 2gis
+```
+
 Seed the initial 2GIS whitelist into `shops`:
 
 ```bash
