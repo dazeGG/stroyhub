@@ -150,6 +150,31 @@ Hold out of the initial schedule:
 - `70000001038286835` — ЛидерСтрой: no product prices observed.
 - `70000001065271367` — СибНорд: no product prices observed.
 
+Raw category sample collected on 2026-05-17 from the initial whitelist:
+
+- `Сухие смеси`
+- `Гипсокартон и комплектующие`
+- `Древесно-плитные материалы`
+- `Фанера, ОСП`
+- `Кровля и фасад`
+- `Профлист, металлочерепица`
+- `Сайдинг, фасадные панели`
+- `Технониколь Водосточная система ПВХ`
+- `Гидропароизоляция`
+- `Геотекстиль`
+- `Утеплители`
+- `Пенополистирол`
+- `Экструдированный пенополистирол`
+- `Пена монтажная`
+- `Герметик`
+- `Дюбель`
+- `Саморезы стеновые`
+- `Саморезы кровельные`
+- `Окна VEKA ПВХ`
+- `Двери печные, каминные`
+- `Эмали, лаки,растворители`
+- `Краски düfa`
+
 Notes:
 
 - Unofficial API.
@@ -180,6 +205,14 @@ Notes:
 - Custom JSON API.
 - No known authentication or rate limiting at the time of planning.
 - Exact category UUID discovery still needs research.
+- The public catalog menu endpoint `POST /api/catalog-menu-2.php` exposes
+  category names and UUIDs. A 2026-05-17 sample includes `Строительство
+  конструкций`, `Сухие строительные смеси`, `Изоляционные материалы`,
+  `Кровля и водосток`, `Крепежные изделия`, `Сантехника`,
+  `Электроустановочные изделия`, `Кабеленесущие системы и аксессуары`,
+  `Лакокрасочные материалы`, `Плитка, керамогранит`, `Металлопрокат`,
+  `Инструменты`, `Ручные инструменты`, and `Аксессуары для
+  электроинструмента`.
 - Raw responses should be stored for replay and schema drift checks.
 
 ## Metalltorg
@@ -190,6 +223,11 @@ Notes:
 
 - Bitrix-based site.
 - No stable JSON API is known at the time of planning.
+- The public catalog page on 2026-05-17 exposes top-level groups and child
+  categories including `Строительные материалы`, `Лакокрасочные материалы,
+  пена, герметики`, `Инструменты, расходные материалы`, `Интерьер и отделка`,
+  `Крепеж`, `Окна и двери`, `Отопление, водоснабжение, вентиляция`,
+  `Сантехника`, and `Электротовары`.
 - Parsing will likely use HTML extraction and should be treated as brittle.
 - CSS selectors and sample pages should be documented before implementation.
 

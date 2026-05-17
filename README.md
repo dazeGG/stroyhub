@@ -80,6 +80,12 @@ Seed the initial 2GIS whitelist into `shops`:
 uv run python scripts/seed_twogis_whitelist.py
 ```
 
+Seed the normalized StroyHub category tree into `categories`:
+
+```bash
+uv run python scripts/seed_categories.py
+```
+
 ## Tracker
 
 Project tasks are tracked in GitHub Issues and the [StroyHub MVP project](https://github.com/users/dazeGG/projects/1).
