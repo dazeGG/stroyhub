@@ -336,8 +336,11 @@ Notes:
   research before per-shop stock is modeled.
 - Product image URL construction is still unknown. The product response exposes
   an `images` count-like field, not a direct image URL in the sampled payload.
-- `created_date` may be `null` or a Unix timestamp string. It should not be
-  treated as a reliable source update timestamp until validated.
+- `created_date` may be `null` or a Unix timestamp string. The initial parser
+  maps it to `ParsedProduct.source_updated_at` because it is the only observed
+  product-level source timestamp, but it may represent product creation rather
+  than the latest source update. Do not use it as a freshness guarantee until
+  validated.
 - Raw responses should be stored for replay and schema drift checks.
 - Focused fixtures:
   - `tests/fixtures/unicom/catalog-menu-excerpt.json`;
