@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from stroyhub.models.tables import PriceSnapshot, ScrapeRun, Shop, SourceProduct
+from stroyhub.models.tables import Category, PriceSnapshot, ScrapeRun, Shop, SourceProduct
 
 JsonObject = dict[str, Any]
 
@@ -24,6 +24,13 @@ class ShopUpsert:
     scrape_interval: int | None = None
     scrape_status: str | None = None
     error_count: int | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class CategoryUpsert:
+    slug: str
+    name: str
+    parent_id: int | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -119,6 +126,30 @@ class ShopRepository:
             statement = statement.limit(limit)
 
         return list(self._session.scalars(statement))
+
+
+class CategoryRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_by_slug(self, *, slug: str, parent_id: int | None = None) -> Category | None:
+        statement = select(Category).where(Category.slug == slug)
+        if parent_id is None:
+            statement = statement.where(Category.parent_id.is_(None))
+        else:
+            statement = statement.where(Category.parent_id == parent_id)
+
+        return self._session.scalar(statement)
+
+    def upsert(self, data: CategoryUpsert) -> Category:
+        category = self.get_by_slug(slug=data.slug, parent_id=data.parent_id)
+        if category is None:
+            category = Category(slug=data.slug, name=data.name, parent_id=data.parent_id)
+            self._session.add(category)
+
+        category.name = data.name
+        self._session.flush()
+        return category
 
 
 class SourceProductRepository:

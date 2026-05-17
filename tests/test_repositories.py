@@ -8,6 +8,8 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
 from stroyhub.db import (
+    CategoryRepository,
+    CategoryUpsert,
     PriceSnapshotCreate,
     PriceSnapshotRepository,
     ScrapeRunCreate,
@@ -17,7 +19,7 @@ from stroyhub.db import (
     SourceProductRepository,
     SourceProductUpsert,
 )
-from stroyhub.models import PriceSnapshot, ScrapeRun, Shop, SourceProduct
+from stroyhub.models import Category, PriceSnapshot, ScrapeRun, Shop, SourceProduct
 
 
 @pytest.fixture
@@ -128,6 +130,25 @@ def test_source_product_repository_upserts_by_source_product_id(
     assert updated.raw == {"id": "product-1", "price": "700"}
     assert updated.first_seen_at == observed_at
     assert count == 1
+
+
+def test_category_repository_upserts_by_parent_and_slug(db_session: Session) -> None:
+    repository = CategoryRepository(db_session)
+
+    parent = repository.upsert(CategoryUpsert(slug="materials", name="Materials"))
+    category = repository.upsert(
+        CategoryUpsert(slug="cement", name="Cement", parent_id=parent.id)
+    )
+    updated = repository.upsert(
+        CategoryUpsert(slug="cement", name="Цемент", parent_id=parent.id)
+    )
+
+    count = db_session.scalar(select(func.count()).select_from(Category))
+
+    assert updated.id == category.id
+    assert updated.parent_id == parent.id
+    assert updated.name == "Цемент"
+    assert count == 2
 
 
 def test_source_product_repository_falls_back_to_fingerprint(
