@@ -93,6 +93,12 @@ Run the initial 2GIS whitelist scrape and persist baseline product data:
 uv run python scripts/scrape_twogis_whitelist.py
 ```
 
+Run an explicit live 2GIS smoke check for one branch without persisting data:
+
+```bash
+uv run python scripts/scrape_twogis_shop.py 70000001007229923 --page-size 50 --max-pages 3
+```
+
 Inspect recent scrape runs:
 
 ```bash

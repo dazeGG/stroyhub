@@ -12,7 +12,11 @@ def test_twogis_cli_prints_scrape_summary(capsys) -> None:  # type: ignore[no-un
             total=3,
             pages_seen=2,
             items_seen=3,
-            products=[object(), object(), object()],
+            products=[
+                SimpleNamespace(price=100),
+                SimpleNamespace(price=None),
+                SimpleNamespace(price=200),
+            ],
             pinned_items_seen=1,
             completeness="complete",
             stop_reason="source_total_reached",
@@ -28,6 +32,7 @@ def test_twogis_cli_prints_scrape_summary(capsys) -> None:  # type: ignore[no-un
     assert "branch_id=branch-1" in output
     assert "items=3" in output
     assert "parsed=3" in output
+    assert "priced=2" in output
     assert "completeness=complete" in output
 
 
@@ -40,7 +45,7 @@ def test_twogis_cli_can_optionally_persist(capsys) -> None:  # type: ignore[no-u
             total=1,
             pages_seen=1,
             items_seen=1,
-            products=[object()],
+            products=[SimpleNamespace(price=100)],
             pinned_items_seen=0,
             completeness="complete",
             stop_reason="source_total_reached",

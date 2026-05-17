@@ -24,6 +24,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         max_pages=args.max_pages,
         locale=args.locale,
     )
+    priced_products = sum(1 for product in result.products if product.price is not None)
 
     print(
         "scrape summary: "
@@ -32,6 +33,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"pages={result.pages_seen} "
         f"items={result.items_seen} "
         f"parsed={len(result.products)} "
+        f"priced={priced_products} "
         f"pinned={result.pinned_items_seen} "
         f"completeness={result.completeness} "
         f"stop_reason={result.stop_reason}"
