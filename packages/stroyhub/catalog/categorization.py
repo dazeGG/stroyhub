@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 
 from stroyhub.catalog.taxonomy import DEFAULT_NORMALIZED_CATEGORIES, get_normalized_category
@@ -213,6 +214,9 @@ class RuleBasedCategorizer:
         title_text = normalize_title(title)
         category_text = normalize_title(category_raw or "")
         description_text = normalize_title(description or "")
+        title_tokens = _tokenize_normalized_text(title_text)
+        category_tokens = _tokenize_normalized_text(category_text)
+        description_tokens = _tokenize_normalized_text(description_text)
 
         best_prediction: CategoryPrediction | None = None
         best_score = 0
@@ -220,8 +224,11 @@ class RuleBasedCategorizer:
             score, matched_keywords = self._score_rule(
                 rule,
                 title_text=title_text,
+                title_tokens=title_tokens,
                 category_text=category_text,
+                category_tokens=category_tokens,
                 description_text=description_text,
+                description_tokens=description_tokens,
             )
             if score == 0 or score <= best_score:
                 continue
@@ -244,26 +251,48 @@ class RuleBasedCategorizer:
         rule: CategoryRule,
         *,
         title_text: str,
+        title_tokens: tuple[str, ...],
         category_text: str,
+        category_tokens: tuple[str, ...],
         description_text: str,
+        description_tokens: tuple[str, ...],
     ) -> tuple[int, tuple[str, ...]]:
         score = 0
         matched_keywords: list[str] = []
 
         for keyword in rule.keywords:
             normalized_keyword = normalize_title(keyword)
+            keyword_tokens = _tokenize_normalized_text(normalized_keyword)
             matched = False
-            if normalized_keyword in title_text:
+            title_match, title_phrase = _keyword_matches_text(
+                normalized_keyword,
+                keyword_tokens,
+                title_text,
+                title_tokens,
+            )
+            if title_match:
                 score += 3
-                if " " in normalized_keyword or normalized_keyword == title_text:
+                if title_phrase or normalized_keyword == title_text:
                     score += 6
                 matched = True
-            if category_text and normalized_keyword in category_text:
+            category_match, category_phrase = _keyword_matches_text(
+                normalized_keyword,
+                keyword_tokens,
+                category_text,
+                category_tokens,
+            )
+            if category_match:
                 score += 4
-                if " " in normalized_keyword or normalized_keyword == category_text:
+                if category_phrase or normalized_keyword == category_text:
                     score += 4
                 matched = True
-            if description_text and normalized_keyword in description_text:
+            description_match, _ = _keyword_matches_text(
+                normalized_keyword,
+                keyword_tokens,
+                description_text,
+                description_tokens,
+            )
+            if description_match:
                 score += 1
                 matched = True
             if matched:
@@ -312,3 +341,39 @@ def _confidence(score: int) -> float:
 
 def _normalize_source(source: str) -> str:
     return source.strip().lower()
+
+
+def _tokenize_normalized_text(text: str) -> tuple[str, ...]:
+    return tuple(re.findall(r"[0-9a-zа-яё]+", text))
+
+
+def _keyword_matches_text(
+    normalized_keyword: str,
+    keyword_tokens: tuple[str, ...],
+    text: str,
+    text_tokens: tuple[str, ...],
+) -> tuple[bool, bool]:
+    if not normalized_keyword or not keyword_tokens or not text:
+        return False, False
+
+    if len(keyword_tokens) == 1:
+        return keyword_tokens[0] in text_tokens, False
+
+    if normalized_keyword in text:
+        return True, True
+
+    return _contains_token_sequence(text_tokens, keyword_tokens), True
+
+
+def _contains_token_sequence(
+    text_tokens: tuple[str, ...],
+    keyword_tokens: tuple[str, ...],
+) -> bool:
+    if len(keyword_tokens) > len(text_tokens):
+        return False
+
+    last_start = len(text_tokens) - len(keyword_tokens)
+    for start in range(last_start + 1):
+        if text_tokens[start : start + len(keyword_tokens)] == keyword_tokens:
+            return True
+    return False
