@@ -98,13 +98,18 @@ when the contract change matters for future debugging.
 
 ## M8 Source Notes
 
+M8 is complete as of 2026-05-18. Unicom and Metalltorg are the implemented
+secondary sources from that milestone.
+
 Unicom is the first M8 JSON source with focused fixtures:
 
 - `tests/fixtures/unicom/catalog-menu-excerpt.json`;
 - `tests/fixtures/unicom/products-cement-page1.json`.
 
-Metalltorg should use HTML fixtures before parser implementation. Start with:
+Metalltorg uses focused HTML fixtures for parser and CLI tests:
 
-- one category page with product cards and pagination;
-- one product-card fragment with a normal price and image;
-- one product-card fragment for a missing or non-numeric price, if observed.
+- `tests/fixtures/metalltorg/category-kirpich-page1.html`;
+- `tests/fixtures/metalltorg/product-kirpich-120420.html`.
+
+Add smaller edge-case fixtures later when Metalltorg exposes missing prices,
+pagination changes, or selector changes that need regression coverage.

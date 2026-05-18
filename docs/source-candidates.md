@@ -3,6 +3,14 @@
 This document records Yakutsk construction-material shops found during M8 source
 expansion research on 2026-05-17.
 
+M8 is complete as of 2026-05-18. It promoted two sources from research into
+implemented source support:
+
+- `Юником`: JSON API client, parser normalization, and scrape persistence flow.
+- `Металл Торг`: HTML catalog research, parser, and debug scrape CLI.
+
+The remaining sites below are future expansion input, not active M8 work.
+
 The lists are implementation planning input only. Before adding a parser, inspect
 the source contract, capture focused fixtures, and update `docs/sources.md` with
 source-specific details.
@@ -14,8 +22,8 @@ parsing strategy research issue.
 
 | Shop | Site or catalog | Why it is ready | Likely strategy | Notes |
 | --- | --- | --- | --- | --- |
-| Юником | <https://unicom-ykt.ru/> | Public catalog exists and product pages are backed by a known JSON API. | JSON API client. | Best first M8 source. Existing notes mention `GET /api2/v-catalog-beta/products/{UUID}` and catalog menu discovery through `POST /api/catalog-menu-2.php`. |
-| Металл Торг | <https://metalltorg.biz/catalog/> | Public catalog exists with construction-material categories and product cards. | HTML parsing, possibly Bitrix patterns. | Best first HTML source. Treat selectors as brittle and document sample category pages before implementation. |
+| Юником | <https://unicom-ykt.ru/> | Public catalog exists and product pages are backed by a known JSON API. | Implemented JSON API client and persistence flow. | M8 implemented source. Details live in `docs/sources.md`; focused fixtures live under `tests/fixtures/unicom/`. |
+| Металл Торг | <https://metalltorg.biz/catalog/> | Public catalog exists with construction-material categories and product cards. | Implemented HTML parser and debug CLI. | M8 implemented source. Treat selectors as brittle; focused fixtures live under `tests/fixtures/metalltorg/`. |
 | СибНорд | <https://sibnord.ru/> | Public catalog exists with construction categories such as dry mixes and construction materials. | Research JSON endpoints first, fall back to HTML parsing. | Good follow-up source after Юником and Металл Торг. |
 | Востоктехторг | <https://vtt14.ru/catalog/> | Public catalog exists with construction and technical product categories. | Research JSON endpoints first, fall back to HTML parsing. | Large catalog; avoid scheduled scraping until pagination and pacing are understood. |
 | Строительный мир / Орион-Экспрессия | <https://orion-expressiya.ru/> | Site exposes a store/catalog section and product cards. | HTML parsing. | Likely narrower than the main construction-material stores. Validate category coverage before prioritizing. |
@@ -47,5 +55,6 @@ research, but should not be parsed until the stated blocker is resolved.
   product listing was observed.
 - Advertising links, messenger links, and pure business-card pages are not enough
   to qualify a source for parsing.
-- For M8, prioritize one structured JSON source and one HTML source before adding
-  more candidate parsers.
+- M8 prioritized one structured JSON source and one HTML source before adding
+  more candidate parsers. Future parser work should start from the remaining
+  candidates rather than reopening the completed M8 milestone.

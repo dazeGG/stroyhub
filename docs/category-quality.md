@@ -2,6 +2,16 @@
 
 This document records category coverage audits from real persisted source data.
 
+M9 is complete as of 2026-05-18. The milestone added source category aliases,
+token-aware keyword matching, title token helpers, attribute extraction,
+category quality reporting, category backfill tooling, taxonomy maintenance
+docs, and follow-up rules from the 2GIS audit.
+
+After the M9 rule updates, local backfill dry-run coverage for the 2026-05-17
+2GIS sample is expected to improve from `614 / 649` categorized (`94.61%`) to
+`636 / 649` categorized (`98.00%`), with `13` products intentionally or still
+unmatched.
+
 ## 2026-05-17 2GIS Baseline Audit
 
 Source data:
@@ -78,17 +88,18 @@ Potential false positives or coarse matches:
   that product family matters later.
 - Some `Сухие смеси` products map to broad `dry_mixes` even when a more specific
   category exists, for example cement, putty, tile adhesive, and floor mix
-  titles. This is usable for M7, but M9 should improve specificity.
+  titles. This is usable for M7 and remains a future specificity improvement
+  after M9.
 - Generic raw categories such as `Материалы` can still map correctly when the
   title has strong signals, for example paint-related titles mapping to
   `paints_enamels`. They also leave several unmatched products, so fallback
   rules should remain title-led rather than raw-category-led.
 
-Follow-up issues:
+M9 follow-up issues from this audit:
 
-- [#91](https://github.com/dazeGG/stroyhub/issues/91): Improve insulation category coverage from 2GIS audit.
-- [#92](https://github.com/dazeGG/stroyhub/issues/92): Classify SIP panel products from 2GIS audit.
-- [#93](https://github.com/dazeGG/stroyhub/issues/93): Handle generic and non-product 2GIS categories from audit.
+- [#91](https://github.com/dazeGG/stroyhub/issues/91): Improve insulation category coverage from 2GIS audit — closed.
+- [#92](https://github.com/dazeGG/stroyhub/issues/92): Classify SIP panel products from 2GIS audit — closed.
+- [#93](https://github.com/dazeGG/stroyhub/issues/93): Handle generic and non-product 2GIS categories from audit — closed.
 
 ## 2026-05-18 M9 Insulation Rule Update
 

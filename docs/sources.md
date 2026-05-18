@@ -1,8 +1,10 @@
 # Data Sources
 
-M8 source expansion candidates are tracked in
-[`docs/source-candidates.md`](source-candidates.md). Keep this file focused on
-sources that have accepted implementation assumptions or parser behavior.
+M8 source expansion is complete. Implemented secondary-source details for
+Unicom and Metalltorg live in this file; remaining expansion candidates are
+tracked in [`docs/source-candidates.md`](source-candidates.md). Keep this file
+focused on sources that have accepted implementation assumptions or parser
+behavior.
 Source fixture conventions are tracked in
 [`docs/source-fixtures.md`](source-fixtures.md).
 
