@@ -217,4 +217,6 @@ uv run python scripts/report_category_coverage.py --source 2gis
 ```
 
 Use the output to update category aliases, rules, or follow-up issues. The
-first baseline audit is recorded in `docs/category-quality.md`.
+first baseline audit is recorded in `docs/category-quality.md`. Use
+`docs/category-taxonomy-maintenance.md` for the taxonomy update workflow and
+review checklist.
