@@ -1,7 +1,7 @@
-import re
 from dataclasses import dataclass
 
 from stroyhub.catalog.taxonomy import DEFAULT_NORMALIZED_CATEGORIES, get_normalized_category
+from stroyhub.catalog.tokenization import tokenize_normalized_text
 from stroyhub.parsers.common import normalize_title
 
 
@@ -214,9 +214,9 @@ class RuleBasedCategorizer:
         title_text = normalize_title(title)
         category_text = normalize_title(category_raw or "")
         description_text = normalize_title(description or "")
-        title_tokens = _tokenize_normalized_text(title_text)
-        category_tokens = _tokenize_normalized_text(category_text)
-        description_tokens = _tokenize_normalized_text(description_text)
+        title_tokens = tokenize_normalized_text(title_text)
+        category_tokens = tokenize_normalized_text(category_text)
+        description_tokens = tokenize_normalized_text(description_text)
 
         best_prediction: CategoryPrediction | None = None
         best_score = 0
@@ -262,7 +262,7 @@ class RuleBasedCategorizer:
 
         for keyword in rule.keywords:
             normalized_keyword = normalize_title(keyword)
-            keyword_tokens = _tokenize_normalized_text(normalized_keyword)
+            keyword_tokens = tokenize_normalized_text(normalized_keyword)
             matched = False
             title_match, title_phrase = _keyword_matches_text(
                 normalized_keyword,
@@ -341,10 +341,6 @@ def _confidence(score: int) -> float:
 
 def _normalize_source(source: str) -> str:
     return source.strip().lower()
-
-
-def _tokenize_normalized_text(text: str) -> tuple[str, ...]:
-    return tuple(re.findall(r"[0-9a-zа-яё]+", text))
 
 
 def _keyword_matches_text(
