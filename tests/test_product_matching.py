@@ -116,6 +116,76 @@ def test_generate_product_match_candidates_blocks_different_categories() -> None
     assert candidates == ()
 
 
+def test_generate_product_match_candidates_blocks_different_weights() -> None:
+    candidates = generate_product_match_candidates(
+        [
+            ProductRecord(id=1, shop_id=10, title="Цемент М500 50кг"),
+            ProductRecord(id=2, shop_id=20, title="Цемент М500 25кг"),
+        ],
+        min_confidence=0,
+    )
+
+    assert candidates == ()
+
+
+def test_generate_product_match_candidates_blocks_different_package_counts() -> None:
+    candidates = generate_product_match_candidates(
+        [
+            ProductRecord(id=1, shop_id=10, title="Сайдинг графит 238х3000мм 22шт. упак"),
+            ProductRecord(id=2, shop_id=20, title="Сайдинг графит 238х3000мм 10шт. упак"),
+        ],
+        min_confidence=0,
+    )
+
+    assert candidates == ()
+
+
+def test_generate_product_match_candidates_blocks_different_dimensions() -> None:
+    candidates = generate_product_match_candidates(
+        [
+            ProductRecord(id=1, shop_id=10, title="Гипсокартон KNAUF 2500мм*1200мм*9,5мм"),
+            ProductRecord(id=2, shop_id=20, title="Гипсокартон KNAUF 2500мм*1200мм*12,5мм"),
+        ],
+        min_confidence=0,
+    )
+
+    assert candidates == ()
+
+
+def test_generate_product_match_candidates_blocks_different_grades() -> None:
+    candidates = generate_product_match_candidates(
+        [
+            ProductRecord(id=1, shop_id=10, title="Цемент М400 50кг"),
+            ProductRecord(id=2, shop_id=20, title="Цемент М500 50кг"),
+        ],
+        min_confidence=0,
+    )
+
+    assert candidates == ()
+
+
+def test_generate_product_match_candidates_blocks_different_finish_colors() -> None:
+    candidates = generate_product_match_candidates(
+        [
+            ProductRecord(
+                id=1,
+                shop_id=10,
+                title="Сайдинг графит 238х3000мм",
+                category_raw="Сайдинг, фасадные панели",
+            ),
+            ProductRecord(
+                id=2,
+                shop_id=20,
+                title="Сайдинг белый 238х3000мм",
+                category_raw="Сайдинг, фасадные панели",
+            ),
+        ],
+        min_confidence=0,
+    )
+
+    assert candidates == ()
+
+
 def test_generate_product_match_candidates_can_allow_exact_category_mismatch() -> None:
     candidates = generate_product_match_candidates(
         [
