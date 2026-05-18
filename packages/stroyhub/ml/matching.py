@@ -5,6 +5,33 @@ from typing import Protocol
 from stroyhub.catalog.tokenization import tokenize_normalized_text
 from stroyhub.parsers.common import normalize_title
 
+_LOW_VALUE_TOKENS = frozenset(
+    {
+        "в",
+        "для",
+        "до",
+        "и",
+        "из",
+        "на",
+        "от",
+        "по",
+        "под",
+        "с",
+        "со",
+        "материал",
+        "материалы",
+        "строительный",
+        "универсальная",
+        "универсальное",
+        "универсальный",
+    }
+)
+_TOKEN_ALIASES = {
+    "плитки": "плиточный",
+    "плиточная": "плиточный",
+    "плиточное": "плиточный",
+}
+
 
 class SourceProductLike(Protocol):
     id: int
@@ -26,6 +53,7 @@ class MatchProduct:
     category_id: int | None
     category_raw: str | None
     tokens: tuple[str, ...]
+    ignored_tokens: tuple[str, ...]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -36,6 +64,7 @@ class ProductMatchReason:
     token_overlap: tuple[str, ...]
     left_only_tokens: tuple[str, ...]
     right_only_tokens: tuple[str, ...]
+    ignored_tokens: tuple[str, ...]
     token_similarity: float
     same_category: bool | None
 
@@ -73,6 +102,7 @@ def generate_product_match_candidates(
 
 def _prepare_product(product: SourceProductLike) -> MatchProduct:
     normalized_title = product.normalized_title or normalize_title(product.title)
+    tokens, ignored_tokens = _matching_tokens(normalized_title)
     return MatchProduct(
         id=product.id,
         source=product.source,
@@ -81,7 +111,8 @@ def _prepare_product(product: SourceProductLike) -> MatchProduct:
         normalized_title=normalized_title,
         category_id=product.category_id,
         category_raw=product.category_raw,
-        tokens=tokenize_normalized_text(normalized_title),
+        tokens=tokens,
+        ignored_tokens=ignored_tokens,
     )
 
 
@@ -98,6 +129,7 @@ def _candidate_for_pair(
     exact_title = left.normalized_title == right.normalized_title
     left_tokens = set(left.tokens)
     right_tokens = set(right.tokens)
+    ignored_tokens = tuple(sorted(set(left.ignored_tokens) | set(right.ignored_tokens)))
     token_overlap = tuple(sorted(left_tokens & right_tokens))
     left_only_tokens = tuple(sorted(left_tokens - right_tokens))
     right_only_tokens = tuple(sorted(right_tokens - left_tokens))
@@ -122,6 +154,7 @@ def _candidate_for_pair(
         token_overlap=token_overlap,
         left_only_tokens=left_only_tokens,
         right_only_tokens=right_only_tokens,
+        ignored_tokens=ignored_tokens,
         token_similarity=round(token_similarity, 3),
         same_category=same_category,
     )
@@ -141,6 +174,20 @@ def _same_category(left: MatchProduct, right: MatchProduct) -> bool | None:
         return normalize_title(left.category_raw) == normalize_title(right.category_raw)
 
     return None
+
+
+def _matching_tokens(normalized_title: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    tokens: list[str] = []
+    ignored_tokens: list[str] = []
+
+    for token in tokenize_normalized_text(normalized_title):
+        normalized_token = _TOKEN_ALIASES.get(token, token)
+        if normalized_token in _LOW_VALUE_TOKENS:
+            ignored_tokens.append(token)
+            continue
+        tokens.append(normalized_token)
+
+    return tuple(tokens), tuple(ignored_tokens)
 
 
 def _jaccard(left_tokens: set[str], right_tokens: set[str]) -> float:
