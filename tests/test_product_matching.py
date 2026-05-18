@@ -58,6 +58,42 @@ def test_generate_product_match_candidates_matches_near_titles_by_tokens() -> No
     assert candidate.reason.right_only_tokens == ()
 
 
+def test_generate_product_match_candidates_handles_stopwords_and_minor_variation() -> None:
+    candidates = generate_product_match_candidates(
+        [
+            ProductRecord(id=1, shop_id=10, title="Клей плиточный КНАУФ Флизен 25кг"),
+            ProductRecord(id=2, shop_id=20, title="КНАУФ Флизен клей для плитки 25 кг"),
+        ]
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.confidence == 1.0
+    assert candidate.reason.method == "token_similarity"
+    assert candidate.reason.token_overlap == ("25кг", "клей", "кнауф", "плиточный", "флизен")
+    assert candidate.reason.left_only_tokens == ()
+    assert candidate.reason.right_only_tokens == ()
+    assert candidate.reason.ignored_tokens == ("для",)
+
+
+def test_generate_product_match_candidates_returns_review_candidate_reason_metadata() -> None:
+    candidates = generate_product_match_candidates(
+        [
+            ProductRecord(id=1, shop_id=10, title="Штукатурка гипсовая Ротбанд KNAUF 30кг"),
+            ProductRecord(id=2, shop_id=20, title="Штукатурка Ротбанд KNAUF 30кг белая"),
+        ],
+        min_confidence=0.66,
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.confidence == 0.667
+    assert candidate.reason.method == "token_similarity"
+    assert candidate.reason.token_overlap == ("30кг", "knauf", "ротбанд", "штукатурка")
+    assert candidate.reason.left_only_tokens == ("гипсовая",)
+    assert candidate.reason.right_only_tokens == ("белая",)
+
+
 def test_generate_product_match_candidates_omits_low_confidence_pairs() -> None:
     candidates = generate_product_match_candidates(
         [
