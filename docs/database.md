@@ -214,6 +214,100 @@ Constraints and indexes:
 - Index: `source`, `started_at`
 - Index: `status`
 
+### `canonical_products`
+
+Stores StroyHub's source-neutral grouped product identity for accepted product
+matches.
+
+M10 schema decision:
+
+- The product matching prototype supports exact title matches, token-similarity
+  candidates, attribute blockers, and candidate reporting without persistence.
+- Based on that prototype, M10 accepts adding canonical product tables as an
+  additive matching layer.
+- `source_products` remains the source-of-truth table. Matching must not delete,
+  rewrite, or collapse source product cards.
+
+Core fields:
+
+- `id`: `bigint` primary key
+- `category_id`: `bigint`, nullable reference to `categories.id`
+- `title`: `text`, required
+- `normalized_title`: `text`, required
+- `brand`: `text`, nullable
+- `model`: `text`, nullable
+- `unit_raw`: `text`, nullable
+- `attributes`: `jsonb`, nullable
+- `match_status`: `text`, required, default `active`
+- `created_at`: `timestamp with time zone`, required
+- `updated_at`: `timestamp with time zone`, required
+
+Rules:
+
+- A canonical product should describe the grouped product identity, not a shop
+  listing.
+- `title` is the StroyHub display title for the group.
+- `attributes` stores extracted matching attributes when useful, such as
+  dimensions, weight, grade, color, or package data.
+- `category_id` may be nullable while candidates are being reviewed.
+
+Constraints and indexes:
+
+- Index: `category_id`
+- Index: `normalized_title`
+- Optional future index: trigram or full-text index on `normalized_title` after
+  real query patterns justify it.
+
+### `product_matches`
+
+Links source product cards to canonical products and records how the match was
+created or reviewed.
+
+Core fields:
+
+- `id`: `bigint` primary key
+- `canonical_product_id`: `bigint`, required reference to `canonical_products.id`
+- `source_product_id`: `bigint`, required reference to `source_products.id`
+- `confidence`: `numeric(4, 3)`, required
+- `status`: `text`, required
+- `method`: `text`, required
+- `matched_at`: `timestamp with time zone`, required
+- `reviewed_at`: `timestamp with time zone`, nullable
+- `reviewed_by`: `text`, nullable
+- `reason`: `jsonb`, nullable
+
+Status values:
+
+- `candidate`: generated but not accepted.
+- `accepted`: active match.
+- `rejected`: reviewed and rejected.
+- `superseded`: replaced by a newer match decision.
+
+Method values:
+
+- `exact_title`
+- `token_similarity`
+- `attribute_rules`
+- `manual`
+- `embedding`
+
+Rules:
+
+- At most one accepted canonical match should exist for a source product.
+- Candidate and rejected rows may be retained for audit and review context.
+- `reason` stores explainable matching metadata such as matched normalized title,
+  token overlap, missing tokens, ignored tokens, blockers, and source/category
+  compatibility.
+- Auto-acceptance should be limited to very high-confidence exact or near-exact
+  matches. Medium-confidence candidates should remain reviewable.
+
+Constraints and indexes:
+
+- Unique partial index: `source_product_id` where `status = 'accepted'`.
+- Index: `canonical_product_id`.
+- Index: `source_product_id`.
+- Index: `status`, `confidence`.
+
 ## PostgreSQL Type Rules
 
 Use these defaults unless a later decision changes them:
@@ -289,6 +383,15 @@ Use these defaults in the first schema implementation:
 
 These will be designed after enough real source data has been collected.
 
+## Out of Scope for M10 Matching Persistence
+
+- Destructive merging or rewriting of `source_products`.
+- Embedding/ML similarity as a required matching method.
+- Automatic acceptance of medium-confidence candidates.
+- Admin UI accept/reject workflows.
+- Price normalization or unit conversion across matched products.
+- Cross-shop canonical price aggregation in the API.
+
 ## Deferred Questions
 
 These questions should not block M1:
@@ -298,6 +401,5 @@ These questions should not block M1:
 - Whether `source_products.normalized_title` needs full-text search indexes or trigram indexes for API search.
 - Whether snapshots should eventually be compressed or split into price changes plus product observations.
 - Whether status text values should become PostgreSQL enums.
-- Whether the proposed `canonical_products` and `product_matches` design in
-  [product-matching.md](product-matching.md) should be accepted as the M6
-  implementation schema.
+- Whether accepted canonical matches should later power aggregate API responses
+  by default or remain a separate opt-in view.
