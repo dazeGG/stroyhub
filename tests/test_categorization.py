@@ -1,6 +1,8 @@
 from stroyhub.catalog.categorization import (
+    DEFAULT_NON_PRODUCT_SOURCE_CATEGORIES,
     DEFAULT_SOURCE_CATEGORY_ALIASES,
     ManualCategoryOverride,
+    NonProductSourceCategory,
     RuleBasedCategorizer,
     SourceCategoryAlias,
 )
@@ -117,6 +119,54 @@ def test_rule_based_categorizer_aliases_cover_known_sources() -> None:
 def test_default_source_category_aliases_point_to_known_categories() -> None:
     for alias in DEFAULT_SOURCE_CATEGORY_ALIASES:
         assert get_normalized_category(alias.category_slug) is not None
+
+
+def test_rule_based_categorizer_leaves_non_product_work_cards_uncategorized() -> None:
+    categorizer = RuleBasedCategorizer()
+    examples = [
+        "Кладовщик",
+        "Продавец-консультант",
+        "Инструмент строительный",
+    ]
+
+    for title in examples:
+        prediction = categorizer.categorize(
+            title=title,
+            source="2gis",
+            category_raw="Работа",
+        )
+
+        assert prediction is None
+
+
+def test_rule_based_categorizer_non_product_categories_can_be_customized() -> None:
+    categorizer = RuleBasedCategorizer(
+        non_product_source_categories=(
+            NonProductSourceCategory(source="example", raw_category="Services"),
+        ),
+    )
+
+    prediction = categorizer.categorize(
+        title="Краскопульт",
+        source="2gis",
+        category_raw="Материалы",
+    )
+
+    assert prediction is not None
+    assert prediction.category_slug == "painting_plastering_tools"
+
+
+def test_default_non_product_source_categories_are_normalized() -> None:
+    assert DEFAULT_NON_PRODUCT_SOURCE_CATEGORIES
+
+    categorizer = RuleBasedCategorizer()
+    prediction = categorizer.categorize(
+        title="Инструмент строительный",
+        source=" 2GIS ",
+        category_raw=" работа ",
+    )
+
+    assert prediction is None
 
 
 def test_rule_based_categorizer_returns_none_for_unmatched_products() -> None:
@@ -244,6 +294,46 @@ def test_rule_based_categorizer_covers_sip_panel_audit_examples() -> None:
         assert prediction.category_name == "СИП-панели"
         assert prediction.parent_slug == "sheet_board_materials"
         assert prediction.source == "source_category_alias"
+
+
+def test_rule_based_categorizer_handles_generic_materials_by_title_signal() -> None:
+    examples = [
+        ("Звонки электрические", "wiring_devices"),
+        ("Инструмент строительный", "hand_tools"),
+        ("Краскопульт", "painting_plastering_tools"),
+        ('Потолок подвесной "Оазис" Байкал,Ритейл 600*600*12мм', "ceilings"),
+    ]
+
+    categorizer = RuleBasedCategorizer()
+    for title, expected_slug in examples:
+        prediction = categorizer.categorize(
+            title=title,
+            source="2gis",
+            category_raw="Материалы",
+        )
+
+        assert prediction is not None
+        assert prediction.category_slug == expected_slug
+        assert prediction.source == "rules"
+
+
+def test_rule_based_categorizer_handles_special_purpose_by_title_signal() -> None:
+    examples = [
+        "Покрытие финиш. полиур. д\\пола Graspolimer 20м2",
+        "Пол налив. полиурет. DGENERX FR 111 30кг",
+    ]
+
+    categorizer = RuleBasedCategorizer()
+    for title in examples:
+        prediction = categorizer.categorize(
+            title=title,
+            source="2gis",
+            category_raw="Специального назначения",
+        )
+
+        assert prediction is not None
+        assert prediction.category_slug == "floor_mixes"
+        assert prediction.source == "rules"
 
 
 def test_default_taxonomy_has_parent_categories_before_leaves() -> None:

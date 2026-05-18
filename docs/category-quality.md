@@ -146,3 +146,42 @@ Observed local dry-run delta after the SIP rule update:
 - Backfill dry-run with current rules: `630 / 649` would be categorized,
   `97.07%` expected coverage, `19` unmatched.
 - Dry-run summary: `products_seen=649 changed=34 unchanged=596 unmatched=19`.
+
+## 2026-05-18 M9 Generic and Non-Product Rule Update
+
+Issue [#93](https://github.com/dazeGG/stroyhub/issues/93) defined the handling
+for broad and noisy 2GIS source categories:
+
+- `Работа` cards are treated as non-product source data and remain
+  uncategorized. The MVP does not add a material category or database status
+  for job/service cards yet.
+- Broad raw categories such as `Материалы` and `Специального назначения` should
+  not receive source-category aliases. They can classify only when the title has
+  a known material/product signal.
+- `Мебель` bathroom vanity titles remain uncategorized for now; add a dedicated
+  plumbing furniture decision later if that product family becomes in-scope.
+
+Added title-led coverage for observed generic-category examples:
+
+- `Звонки электрические` -> `wiring_devices`.
+- `Инструмент строительный` -> `hand_tools`.
+- `Краскопульт` -> `painting_plastering_tools`.
+- `Потолок подвесной "Оазис" ...` -> `ceilings`.
+- Polyurethane floor coating / self-leveling floor titles under
+  `Специального назначения` -> `floor_mixes`.
+
+Validation:
+
+```bash
+uv run pytest tests/test_categorization.py tests/test_category_seed.py
+uv run python scripts/report_category_coverage.py --source 2gis --limit-groups 8 --limit-raw-categories 5
+uv run python scripts/backfill_category_ids.py --source 2gis --dry-run
+```
+
+Observed local dry-run delta after the generic/non-product rule update:
+
+- Persisted baseline before backfill: `614 / 649` categorized, `94.61%`
+  coverage, `35` unmatched.
+- Backfill dry-run with current rules: `636 / 649` would be categorized,
+  `98.00%` expected coverage, `13` unmatched.
+- Dry-run summary: `products_seen=649 changed=40 unchanged=596 unmatched=13`.

@@ -30,6 +30,12 @@ class SourceCategoryAlias:
 
 
 @dataclass(frozen=True, kw_only=True)
+class NonProductSourceCategory:
+    source: str
+    raw_category: str
+
+
+@dataclass(frozen=True, kw_only=True)
 class CategoryPrediction:
     category_slug: str
     category_name: str
@@ -174,6 +180,9 @@ DEFAULT_SOURCE_CATEGORY_ALIASES: tuple[SourceCategoryAlias, ...] = (
         category_slug="drywall",
     ),
 )
+DEFAULT_NON_PRODUCT_SOURCE_CATEGORIES: tuple[NonProductSourceCategory, ...] = (
+    NonProductSourceCategory(source="2gis", raw_category="Работа"),
+)
 
 
 def _source_category_alias_index(
@@ -185,14 +194,27 @@ def _source_category_alias_index(
     }
 
 
+def _source_category_set(
+    categories: tuple[NonProductSourceCategory, ...],
+) -> set[tuple[str, str]]:
+    return {
+        (_normalize_source(category.source), normalize_title(category.raw_category))
+        for category in categories
+    }
+
+
 class RuleBasedCategorizer:
     def __init__(
         self,
         rules: tuple[CategoryRule, ...] = DEFAULT_CATEGORY_RULES,
         source_category_aliases: tuple[SourceCategoryAlias, ...] = DEFAULT_SOURCE_CATEGORY_ALIASES,
+        non_product_source_categories: tuple[
+            NonProductSourceCategory, ...
+        ] = DEFAULT_NON_PRODUCT_SOURCE_CATEGORIES,
     ) -> None:
         self._rules = rules
         self._source_category_aliases = _source_category_alias_index(source_category_aliases)
+        self._non_product_source_categories = _source_category_set(non_product_source_categories)
 
     def categorize(
         self,
@@ -213,6 +235,9 @@ class RuleBasedCategorizer:
                 matched_keywords=(),
                 source="manual_override",
             )
+
+        if self._is_non_product_source_category(source=source, category_raw=category_raw):
+            return None
 
         alias_prediction = self._source_category_alias_prediction(
             source=source,
@@ -255,6 +280,19 @@ class RuleBasedCategorizer:
             )
 
         return best_prediction
+
+    def _is_non_product_source_category(
+        self,
+        *,
+        source: str | None,
+        category_raw: str | None,
+    ) -> bool:
+        if source is None or category_raw is None:
+            return False
+
+        return (_normalize_source(source), normalize_title(category_raw)) in (
+            self._non_product_source_categories
+        )
 
     def _score_rule(
         self,

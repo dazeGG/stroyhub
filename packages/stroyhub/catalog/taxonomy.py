@@ -97,9 +97,14 @@ DEFAULT_NORMALIZED_CATEGORIES: tuple[NormalizedCategory, ...] = (
         parent_slug="mixes_aggregates",
         keywords=(
             "наливной пол",
+            "пол наливной",
+            "пол налив",
             "ровнитель",
             "стяжка",
             "смеси для пола",
+            "покрытие для пола",
+            "покрытие финиш",
+            "полиуретановый пол",
         ),
     ),
     category(
@@ -644,6 +649,7 @@ DEFAULT_NORMALIZED_CATEGORIES: tuple[NormalizedCategory, ...] = (
         parent_slug="interior_finishing",
         keywords=(
             "потолки",
+            "потолок подвесной",
             "подвесной потолок",
             "подвесные потолки",
         ),
@@ -894,6 +900,8 @@ DEFAULT_NORMALIZED_CATEGORIES: tuple[NormalizedCategory, ...] = (
         keywords=(
             "розетки",
             "выключатели",
+            "звонок электрический",
+            "звонки электрические",
             "подрозетники",
             "монтажные коробки",
             "электроустановочные изделия",
@@ -974,6 +982,8 @@ DEFAULT_NORMALIZED_CATEGORIES: tuple[NormalizedCategory, ...] = (
         parent_slug="tools_consumables",
         keywords=(
             "ручные инструменты",
+            "строительный инструмент",
+            "инструмент строительный",
             "отвертки",
             "ножи",
             "молотки",
@@ -1004,6 +1014,8 @@ DEFAULT_NORMALIZED_CATEGORIES: tuple[NormalizedCategory, ...] = (
         keywords=(
             "малярный инструмент",
             "штукатурный инструмент",
+            "краскопульт",
+            "краскопульты",
             "валики",
             "кисти",
             "шпатели",
