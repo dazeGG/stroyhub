@@ -118,3 +118,31 @@ Observed local dry-run delta after the rule update:
 
 The broad raw category `Утеплители` remains title-led rather than aliased so it
 can classify mineral wool, XPS, and other insulation families separately.
+
+## 2026-05-18 M9 SIP Panel Rule Update
+
+Issue [#92](https://github.com/dazeGG/stroyhub/issues/92) added a dedicated
+`sip_panels` leaf category under `sheet_board_materials`.
+
+Rationale:
+
+- SIP panels are construction panels with board-like dimensions and should stay
+  separate from facade panels, generic insulation, and raw structural blocks.
+- The observed 2GIS titles are generic `Панель ...` strings, so the raw source
+  category `СИП ПАНЕЛИ` is the reliable signal for this batch.
+
+Validation:
+
+```bash
+uv run pytest tests/test_categorization.py tests/test_category_seed.py
+uv run python scripts/report_category_coverage.py --source 2gis --limit-groups 5 --limit-raw-categories 5
+uv run python scripts/backfill_category_ids.py --source 2gis --dry-run
+```
+
+Observed local dry-run delta after the SIP rule update:
+
+- Persisted baseline before backfill: `614 / 649` categorized, `94.61%`
+  coverage, `35` unmatched.
+- Backfill dry-run with current rules: `630 / 649` would be categorized,
+  `97.07%` expected coverage, `19` unmatched.
+- Dry-run summary: `products_seen=649 changed=34 unchanged=596 unmatched=19`.
