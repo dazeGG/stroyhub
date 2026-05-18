@@ -1,8 +1,13 @@
 # Product Matching Research
 
 This document records the M6 research direction for merging similar source
-products across shops. It is a proposal only: do not implement these tables or
-matching workflows until the schema decision is accepted.
+products across shops.
+
+M10 update, 2026-05-18: the pure matching prototype and candidate report are
+implemented. The conservative `canonical_products` and `product_matches` schema
+is accepted for migration work in issue
+[#63](https://github.com/dazeGG/stroyhub/issues/63). The database source of
+truth now lives in [database.md](database.md).
 
 ## Goal
 
@@ -175,7 +180,11 @@ Suggested hard blockers:
 - different color for finish materials;
 - different source category family.
 
-## Proposed Schema
+## Accepted Schema
+
+The original proposed schema below was accepted in M10 after prototype review.
+Implementation details and future adjustments should be kept aligned with
+[database.md](database.md).
 
 ### `canonical_products`
 
@@ -282,16 +291,23 @@ create index ix_product_matches_status_confidence
   on product_matches(status, confidence);
 ```
 
-## Next Implementation Step
+## M10 Prototype Findings
 
-Before adding migrations, implement a pure matching prototype under
-`packages/stroyhub/ml/` or `packages/stroyhub/catalog/` that accepts
-`SourceProduct`-like records and returns candidate pairs with reason metadata.
+Implemented findings:
 
-Recommended first tests:
+- Exact normalized-title matches are high-confidence candidates inside
+  compatible categories.
+- Token overlap handles reordered words, punctuation differences, low-value
+  tokens, and a small set of word-form aliases.
+- Attribute blockers prevent dangerous false positives for different dimensions,
+  weights, package counts, grades such as `М400` vs `М500`, and finish colors.
+- Candidate reporting can print confidence, method, product context, shared
+  tokens, missing tokens, ignored tokens, and category compatibility before
+  persistence exists.
 
-- exact same normalized title matches with high confidence;
-- different package weights do not match;
-- different dimensions do not match;
-- same brand/model with punctuation differences becomes a review candidate;
-- color variants for finish materials do not auto-match.
+Remaining out of scope:
+
+- Embedding similarity before reviewed positive/negative examples exist.
+- Destructive source-product merging.
+- Automatic acceptance of medium-confidence candidates.
+- Admin UI review actions.

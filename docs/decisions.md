@@ -110,3 +110,29 @@ Manual decisions are auditable and reversible. Source data remains intact, and
 rules/aliases can still improve general coverage without hiding reviewer-made
 exceptions. A schema migration and repository/API implementation should be done
 in follow-up issue [#109](https://github.com/dazeGG/stroyhub/issues/109).
+
+## 2026-05-18: Accept Conservative Product Matching Schema
+
+Context:
+M10 implemented a pure in-memory product matching prototype before adding
+database tables. The prototype accepts `SourceProduct`-like records and returns
+candidate pairs with confidence and explainable reason metadata. It supports
+exact normalized-title matches, token-similarity review candidates, and hard
+blockers for conflicting weights, package counts, dimensions, grades, and finish
+colors. A report CLI can list candidate pairs before any persistence is added.
+
+Decision:
+Accept the `canonical_products` and `product_matches` schema described in
+`docs/database.md` for M10 implementation. `canonical_products` represents a
+source-neutral grouped product identity. `product_matches` links source product
+cards to canonical products and stores confidence, status, method, review
+metadata, and reason JSON.
+
+Consequences:
+Source product cards remain the immutable source-of-truth records. Matching is
+additive and reviewable; it must not delete, rewrite, or merge
+`source_products`. Medium-confidence candidates stay reviewable instead of being
+accepted automatically. Embeddings, destructive cross-shop merges, automatic
+price-unit normalization, and admin accept/reject workflows remain out of scope
+for this schema step. Migration implementation is tracked in
+[#63](https://github.com/dazeGG/stroyhub/issues/63).
