@@ -188,6 +188,42 @@ def test_rule_based_categorizer_covers_raw_source_categories() -> None:
         assert prediction.category_slug == expected_slug
 
 
+def test_rule_based_categorizer_covers_insulation_audit_examples() -> None:
+    examples = [
+        (
+            "ISOVER СТАНДАРТ (600*1000*50) 0,24 куб. 4,8 кв.м.(8 плит)",
+            "Утеплители",
+            "mineral_wool",
+        ),
+        (
+            "ТЕХНОБЛОК СТАНДАРТ (1200*600*50)",
+            "Утеплители",
+            "mineral_wool",
+        ),
+        (
+            "Межвенцовый утеплитель ЭКОСТЕН Sintex ПЭ 100мм*20м",
+            "Утеплитель межвенцовый",
+            "natural_fiber_insulation",
+        ),
+        (
+            "Пакля джутовая 10 кг/тюк",
+            "Утеплитель межвенцовый",
+            "natural_fiber_insulation",
+        ),
+    ]
+
+    categorizer = RuleBasedCategorizer()
+    for title, category_raw, expected_slug in examples:
+        prediction = categorizer.categorize(
+            title=title,
+            source="2gis",
+            category_raw=category_raw,
+        )
+
+        assert prediction is not None
+        assert prediction.category_slug == expected_slug
+
+
 def test_default_taxonomy_has_parent_categories_before_leaves() -> None:
     seen_slugs: set[str] = set()
 

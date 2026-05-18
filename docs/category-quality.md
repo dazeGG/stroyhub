@@ -89,3 +89,32 @@ Follow-up issues:
 - [#91](https://github.com/dazeGG/stroyhub/issues/91): Improve insulation category coverage from 2GIS audit.
 - [#92](https://github.com/dazeGG/stroyhub/issues/92): Classify SIP panel products from 2GIS audit.
 - [#93](https://github.com/dazeGG/stroyhub/issues/93): Handle generic and non-product 2GIS categories from audit.
+
+## 2026-05-18 M9 Insulation Rule Update
+
+Issue [#91](https://github.com/dazeGG/stroyhub/issues/91) added coverage for
+the insulation false negatives from the baseline audit:
+
+- `ISOVER СТАНДАРТ ...` and `ТЕХНОБЛОК СТАНДАРТ ...` now map to
+  `mineral_wool`.
+- `Межвенцовый утеплитель ЭКОСТЕН ...` and `Пакля джутовая ...` now map to
+  `natural_fiber_insulation`.
+
+Validation:
+
+```bash
+uv run pytest tests/test_categorization.py tests/test_category_seed.py
+uv run python scripts/report_category_coverage.py --source 2gis --limit-groups 5 --limit-raw-categories 5
+uv run python scripts/backfill_category_ids.py --source 2gis --dry-run
+```
+
+Observed local dry-run delta after the rule update:
+
+- Persisted baseline before backfill: `614 / 649` categorized, `94.61%`
+  coverage, `35` unmatched.
+- Backfill dry-run with current rules: `623 / 649` would be categorized,
+  `95.99%` expected coverage, `26` unmatched.
+- Dry-run summary: `products_seen=649 changed=27 unchanged=596 unmatched=26`.
+
+The broad raw category `Утеплители` remains title-led rather than aliased so it
+can classify mineral wool, XPS, and other insulation families separately.

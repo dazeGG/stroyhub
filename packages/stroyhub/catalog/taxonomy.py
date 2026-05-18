@@ -412,6 +412,8 @@ DEFAULT_NORMALIZED_CATEGORIES: tuple[NormalizedCategory, ...] = (
             "минплита",
             "минераловатный утеплитель",
             "изовер",
+            "isover",
+            "техноблок",
         ),
     ),
     category(
@@ -424,6 +426,20 @@ DEFAULT_NORMALIZED_CATEGORIES: tuple[NormalizedCategory, ...] = (
             "пеноплекс",
             "xps",
             "теплый дом",
+        ),
+    ),
+    category(
+        "natural_fiber_insulation",
+        "Межвенцовые и натуральные утеплители",
+        parent_slug="insulation_waterproofing",
+        keywords=(
+            "межвенцовый утеплитель",
+            "утеплитель межвенцовый",
+            "пакля",
+            "пакля джутовая",
+            "джутовая пакля",
+            "джут",
+            "экостен",
         ),
     ),
     category(

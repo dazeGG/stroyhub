@@ -114,6 +114,11 @@ DEFAULT_SOURCE_CATEGORY_ALIASES: tuple[SourceCategoryAlias, ...] = (
         raw_category="Экструдированный пенополистирол",
         category_slug="foam_insulation",
     ),
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Утеплитель межвенцовый",
+        category_slug="natural_fiber_insulation",
+    ),
     SourceCategoryAlias(source="2gis", raw_category="Пена монтажная", category_slug="foams"),
     SourceCategoryAlias(source="2gis", raw_category="Герметик", category_slug="sealants"),
     SourceCategoryAlias(source="2gis", raw_category="Дюбель", category_slug="dowels"),
