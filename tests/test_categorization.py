@@ -1,4 +1,9 @@
-from stroyhub.catalog.categorization import ManualCategoryOverride, RuleBasedCategorizer
+from stroyhub.catalog.categorization import (
+    DEFAULT_SOURCE_CATEGORY_ALIASES,
+    ManualCategoryOverride,
+    RuleBasedCategorizer,
+    SourceCategoryAlias,
+)
 from stroyhub.catalog.taxonomy import (
     DEFAULT_NORMALIZED_CATEGORIES,
     get_normalized_category,
@@ -50,6 +55,68 @@ def test_rule_based_categorizer_manual_override_takes_precedence() -> None:
     assert prediction.confidence == 1.0
     assert prediction.source == "manual_override"
     assert prediction.matched_keywords == ()
+
+
+def test_rule_based_categorizer_source_category_alias_takes_precedence() -> None:
+    prediction = RuleBasedCategorizer().categorize(
+        title="Цемент М500 50 кг",
+        category_raw="Профлист, металлочерепица",
+        source="2gis",
+    )
+
+    assert prediction is not None
+    assert prediction.category_slug == "profiled_sheet"
+    assert prediction.category_name == "Профлист и металлочерепица"
+    assert prediction.parent_slug == "roofing_facade"
+    assert prediction.confidence == 0.98
+    assert prediction.source == "source_category_alias"
+    assert prediction.matched_keywords == ("Профлист, металлочерепица",)
+
+
+def test_rule_based_categorizer_alias_requires_matching_source() -> None:
+    categorizer = RuleBasedCategorizer(
+        rules=(),
+        source_category_aliases=(
+            SourceCategoryAlias(
+                source="2gis",
+                raw_category="Профлист, металлочерепица",
+                category_slug="profiled_sheet",
+            ),
+        ),
+    )
+
+    prediction = categorizer.categorize(
+        title="Без сильных ключевых слов",
+        category_raw="Профлист, металлочерепица",
+        source="unknown",
+    )
+
+    assert prediction is None
+
+
+def test_rule_based_categorizer_aliases_cover_known_sources() -> None:
+    examples = [
+        ("2gis", "Гипсокартон и комплектующие", "drywall"),
+        ("unicom", "Сухие клеевые смеси", "tile_adhesives"),
+        ("metalltorg", "Кирпич", "bricks_blocks"),
+    ]
+
+    categorizer = RuleBasedCategorizer()
+    for source, category_raw, expected_slug in examples:
+        prediction = categorizer.categorize(
+            title="Без сильных ключевых слов",
+            category_raw=category_raw,
+            source=source,
+        )
+
+        assert prediction is not None
+        assert prediction.category_slug == expected_slug
+        assert prediction.source == "source_category_alias"
+
+
+def test_default_source_category_aliases_point_to_known_categories() -> None:
+    for alias in DEFAULT_SOURCE_CATEGORY_ALIASES:
+        assert get_normalized_category(alias.category_slug) is not None
 
 
 def test_rule_based_categorizer_returns_none_for_unmatched_products() -> None:

@@ -196,6 +196,7 @@ def _category_id(
 ) -> int | None:
     prediction = categorizer.categorize(
         title=product.title,
+        source=product.source,
         category_raw=product.category_raw,
         description=product.description,
     )

@@ -126,6 +126,7 @@ def persist_twogis_scrape_result(
         category_id = None
         prediction = categorizer.categorize(
             title=product.title,
+            source=product.source,
             category_raw=product.category_raw,
             description=product.description,
         )

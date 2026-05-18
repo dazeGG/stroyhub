@@ -22,6 +22,13 @@ class ManualCategoryOverride:
 
 
 @dataclass(frozen=True, kw_only=True)
+class SourceCategoryAlias:
+    source: str
+    raw_category: str
+    category_slug: str
+
+
+@dataclass(frozen=True, kw_only=True)
 class CategoryPrediction:
     category_slug: str
     category_name: str
@@ -55,16 +62,132 @@ def _default_category_rules() -> tuple[CategoryRule, ...]:
 
 
 DEFAULT_CATEGORY_RULES: tuple[CategoryRule, ...] = _default_category_rules()
+DEFAULT_SOURCE_CATEGORY_ALIASES: tuple[SourceCategoryAlias, ...] = (
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Гипсокартон и комплектующие",
+        category_slug="drywall",
+    ),
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Древесно-плитные материалы",
+        category_slug="osb_plywood_dsp",
+    ),
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Фанера, ОСП",
+        category_slug="osb_plywood_dsp",
+    ),
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Профлист, металлочерепица",
+        category_slug="profiled_sheet",
+    ),
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Сайдинг, фасадные панели",
+        category_slug="siding_facade_panels",
+    ),
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Технониколь Водосточная система ПВХ",
+        category_slug="drainage_systems",
+    ),
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Гидропароизоляция",
+        category_slug="vapor_barrier_membranes",
+    ),
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Геотекстиль",
+        category_slug="geotextiles_fabrics",
+    ),
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Пенополистирол",
+        category_slug="foam_insulation",
+    ),
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Экструдированный пенополистирол",
+        category_slug="foam_insulation",
+    ),
+    SourceCategoryAlias(source="2gis", raw_category="Пена монтажная", category_slug="foams"),
+    SourceCategoryAlias(source="2gis", raw_category="Герметик", category_slug="sealants"),
+    SourceCategoryAlias(source="2gis", raw_category="Дюбель", category_slug="dowels"),
+    SourceCategoryAlias(source="2gis", raw_category="Саморезы стеновые", category_slug="screws"),
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Саморезы кровельные",
+        category_slug="roofing_accessories",
+    ),
+    SourceCategoryAlias(source="2gis", raw_category="Окна VEKA ПВХ", category_slug="windows"),
+    SourceCategoryAlias(
+        source="2gis",
+        raw_category="Двери печные, каминные",
+        category_slug="doors",
+    ),
+    SourceCategoryAlias(source="2gis", raw_category="Краски düfa", category_slug="paints_enamels"),
+    SourceCategoryAlias(source="unicom", raw_category="Цемент", category_slug="cement"),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Сухие клеевые смеси",
+        category_slug="tile_adhesives",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Блоки строительные",
+        category_slug="bricks_blocks",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Древесно-плитные материалы",
+        category_slug="osb_plywood_dsp",
+    ),
+    SourceCategoryAlias(source="unicom", raw_category="Профнастил", category_slug="profiled_sheet"),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Краски для наружных работ",
+        category_slug="paints_enamels",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Трубы металлические",
+        category_slug="metal_pipes",
+    ),
+    SourceCategoryAlias(source="metalltorg", raw_category="Кирпич", category_slug="bricks_blocks"),
+    SourceCategoryAlias(
+        source="metalltorg",
+        raw_category="Гипсокартон и комплектующие",
+        category_slug="drywall",
+    ),
+)
+
+
+def _source_category_alias_index(
+    aliases: tuple[SourceCategoryAlias, ...],
+) -> dict[tuple[str, str], SourceCategoryAlias]:
+    return {
+        (_normalize_source(alias.source), normalize_title(alias.raw_category)): alias
+        for alias in aliases
+    }
 
 
 class RuleBasedCategorizer:
-    def __init__(self, rules: tuple[CategoryRule, ...] = DEFAULT_CATEGORY_RULES) -> None:
+    def __init__(
+        self,
+        rules: tuple[CategoryRule, ...] = DEFAULT_CATEGORY_RULES,
+        source_category_aliases: tuple[SourceCategoryAlias, ...] = DEFAULT_SOURCE_CATEGORY_ALIASES,
+    ) -> None:
         self._rules = rules
+        self._source_category_aliases = _source_category_alias_index(source_category_aliases)
 
     def categorize(
         self,
         *,
         title: str,
+        source: str | None = None,
         category_raw: str | None = None,
         description: str | None = None,
         manual_override: ManualCategoryOverride | None = None,
@@ -79,6 +202,13 @@ class RuleBasedCategorizer:
                 matched_keywords=(),
                 source="manual_override",
             )
+
+        alias_prediction = self._source_category_alias_prediction(
+            source=source,
+            category_raw=category_raw,
+        )
+        if alias_prediction is not None:
+            return alias_prediction
 
         title_text = normalize_title(title)
         category_text = normalize_title(category_raw or "")
@@ -141,6 +271,44 @@ class RuleBasedCategorizer:
 
         return score, tuple(matched_keywords)
 
+    def _source_category_alias_prediction(
+        self,
+        *,
+        source: str | None,
+        category_raw: str | None,
+    ) -> CategoryPrediction | None:
+        if source is None or category_raw is None:
+            return None
+
+        alias = self._source_category_aliases.get(
+            (_normalize_source(source), normalize_title(category_raw))
+        )
+        if alias is None:
+            return None
+
+        category = get_normalized_category(alias.category_slug)
+        if category is None:
+            return None
+
+        parent = (
+            get_normalized_category(category.parent_slug)
+            if category.parent_slug is not None
+            else None
+        )
+        return CategoryPrediction(
+            category_slug=category.slug,
+            category_name=category.name,
+            parent_slug=category.parent_slug,
+            parent_name=parent.name if parent is not None else None,
+            confidence=0.98,
+            matched_keywords=(alias.raw_category,),
+            source="source_category_alias",
+        )
+
 
 def _confidence(score: int) -> float:
     return min(0.95, 0.45 + (score * 0.08))
+
+
+def _normalize_source(source: str) -> str:
+    return source.strip().lower()
