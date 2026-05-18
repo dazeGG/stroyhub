@@ -32,6 +32,7 @@ class MatchProduct:
 class ProductMatchReason:
     method: str
     exact_title: bool
+    matched_normalized_title: str | None
     token_overlap: tuple[str, ...]
     left_only_tokens: tuple[str, ...]
     right_only_tokens: tuple[str, ...]
@@ -51,6 +52,7 @@ def generate_product_match_candidates(
     products: Iterable[SourceProductLike],
     *,
     min_confidence: float = 0.75,
+    allow_category_mismatch: bool = False,
 ) -> tuple[ProductMatchCandidate, ...]:
     """Generate conservative in-memory match candidates without persistence."""
     prepared_products = tuple(_prepare_product(product) for product in products)
@@ -58,7 +60,11 @@ def generate_product_match_candidates(
 
     for left_index, left in enumerate(prepared_products):
         for right in prepared_products[left_index + 1 :]:
-            candidate = _candidate_for_pair(left, right)
+            candidate = _candidate_for_pair(
+                left,
+                right,
+                allow_category_mismatch=allow_category_mismatch,
+            )
             if candidate is not None and candidate.confidence >= min_confidence:
                 candidates.append(candidate)
 
@@ -80,10 +86,13 @@ def _prepare_product(product: SourceProductLike) -> MatchProduct:
 
 
 def _candidate_for_pair(
-    left: MatchProduct, right: MatchProduct
+    left: MatchProduct,
+    right: MatchProduct,
+    *,
+    allow_category_mismatch: bool,
 ) -> ProductMatchCandidate | None:
     same_category = _same_category(left, right)
-    if same_category is False:
+    if same_category is False and not allow_category_mismatch:
         return None
 
     exact_title = left.normalized_title == right.normalized_title
@@ -103,10 +112,13 @@ def _candidate_for_pair(
 
     if same_category is None:
         confidence *= 0.95
+    elif same_category is False:
+        confidence *= 0.9
 
     reason = ProductMatchReason(
         method=method,
         exact_title=exact_title,
+        matched_normalized_title=left.normalized_title if exact_title else None,
         token_overlap=token_overlap,
         left_only_tokens=left_only_tokens,
         right_only_tokens=right_only_tokens,
