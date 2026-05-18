@@ -213,6 +213,20 @@ DEFAULT_NORMALIZED_CATEGORIES: tuple[NormalizedCategory, ...] = (
         ),
     ),
     category(
+        "sip_panels",
+        "СИП-панели",
+        parent_slug="sheet_board_materials",
+        keywords=(
+            "сип панели",
+            "сип-панели",
+            "сип панель",
+            "sip панели",
+            "sip panel",
+            "сэндвич панели",
+            "сэндвич-панели",
+        ),
+    ),
+    category(
         "osb_plywood_dsp",
         "Фанера, ОСП, ДВП и ДСП",
         parent_slug="sheet_board_materials",

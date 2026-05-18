@@ -91,6 +91,11 @@ DEFAULT_SOURCE_CATEGORY_ALIASES: tuple[SourceCategoryAlias, ...] = (
     ),
     SourceCategoryAlias(
         source="2gis",
+        raw_category="СИП ПАНЕЛИ",
+        category_slug="sip_panels",
+    ),
+    SourceCategoryAlias(
+        source="2gis",
         raw_category="Технониколь Водосточная система ПВХ",
         category_slug="drainage_systems",
     ),

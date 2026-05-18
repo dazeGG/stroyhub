@@ -224,6 +224,28 @@ def test_rule_based_categorizer_covers_insulation_audit_examples() -> None:
         assert prediction.category_slug == expected_slug
 
 
+def test_rule_based_categorizer_covers_sip_panel_audit_examples() -> None:
+    examples = [
+        "Панель 1250*2500*109 (0/9) потолочный",
+        "Панель 1250*2500*118 (9/9)",
+        "Панель 1250*2500*174 (12/12)",
+    ]
+
+    categorizer = RuleBasedCategorizer()
+    for title in examples:
+        prediction = categorizer.categorize(
+            title=title,
+            source="2gis",
+            category_raw="СИП ПАНЕЛИ",
+        )
+
+        assert prediction is not None
+        assert prediction.category_slug == "sip_panels"
+        assert prediction.category_name == "СИП-панели"
+        assert prediction.parent_slug == "sheet_board_materials"
+        assert prediction.source == "source_category_alias"
+
+
 def test_default_taxonomy_has_parent_categories_before_leaves() -> None:
     seen_slugs: set[str] = set()
 
