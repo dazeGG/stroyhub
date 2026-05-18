@@ -4,14 +4,18 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine, func, select
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
 from stroyhub.db import (
+    CanonicalProductCreate,
+    CanonicalProductRepository,
     CategoryRepository,
     CategoryUpsert,
     PriceSnapshotCreate,
     PriceSnapshotRepository,
+    ProductMatchCreate,
+    ProductMatchRepository,
     ScrapeRunCreate,
     ScrapeRunRepository,
     ShopRepository,
@@ -19,7 +23,7 @@ from stroyhub.db import (
     SourceProductRepository,
     SourceProductUpsert,
 )
-from stroyhub.models import Category, PriceSnapshot, ScrapeRun, Shop, SourceProduct
+from stroyhub.models import Category, PriceSnapshot, ProductMatch, ScrapeRun, Shop, SourceProduct
 
 
 @pytest.fixture
@@ -323,3 +327,172 @@ def test_scrape_run_repository_tracks_run_lifecycle(db_session: Session) -> None
     assert stored.started_at == started_at
     assert stored.finished_at == finished_at
     assert stored.raw == {"branch_id": "branch-test-7", "complete": True}
+
+
+def test_canonical_product_repository_creates_and_lists_by_normalized_title(
+    db_session: Session,
+) -> None:
+    category = CategoryRepository(db_session).upsert(
+        CategoryUpsert(slug="test-match-cement", name="Cement")
+    )
+    repository = CanonicalProductRepository(db_session)
+
+    product = repository.create(
+        CanonicalProductCreate(
+            category_id=category.id,
+            title="Цемент М500 50кг",
+            normalized_title="цемент м500 50кг",
+            brand="Test Brand",
+            unit_raw="50кг",
+            attributes={"weight": {"value": "50", "unit": "kg"}},
+        )
+    )
+
+    matches = repository.list_by_normalized_title("цемент м500 50кг")
+
+    assert product.id is not None
+    assert product.category_id == category.id
+    assert product.match_status == "active"
+    assert product.attributes == {"weight": {"value": "50", "unit": "kg"}}
+    assert matches == [product]
+
+
+def test_product_match_repository_creates_lists_and_updates_status(
+    db_session: Session,
+) -> None:
+    source_product = _source_product(db_session, source_id="match-product-1")
+    canonical_product = CanonicalProductRepository(db_session).create(
+        CanonicalProductCreate(
+            title="Цемент М500 50кг",
+            normalized_title="цемент м500 50кг",
+        )
+    )
+    repository = ProductMatchRepository(db_session)
+    matched_at = datetime(2026, 5, 18, 9, 0, tzinfo=UTC)
+
+    match = repository.create(
+        ProductMatchCreate(
+            canonical_product_id=canonical_product.id,
+            source_product_id=source_product.id,
+            confidence=Decimal("0.950"),
+            method="exact_title",
+            matched_at=matched_at,
+            reason={"matched_normalized_title": "цемент м500 50кг"},
+        )
+    )
+
+    listed = repository.list(status="candidate", source_product_id=source_product.id)
+    reviewed_at = datetime(2026, 5, 18, 9, 5, tzinfo=UTC)
+    updated = repository.update_status(
+        match,
+        status="accepted",
+        reviewed_at=reviewed_at,
+        reviewed_by="local_script",
+    )
+
+    assert listed == [match]
+    assert updated.status == "accepted"
+    assert updated.reviewed_at == reviewed_at
+    assert updated.reviewed_by == "local_script"
+    assert updated.reason == {"matched_normalized_title": "цемент м500 50кг"}
+
+
+def test_product_match_repository_supports_rejected_and_superseded_statuses(
+    db_session: Session,
+) -> None:
+    match = _product_match(db_session, status="candidate")
+    repository = ProductMatchRepository(db_session)
+
+    repository.update_status(match, status="rejected", reason={"review_note": "variant"})
+    repository.update_status(match, status="superseded")
+
+    assert match.status == "superseded"
+    assert match.reason == {"review_note": "variant"}
+
+
+def test_product_match_repository_rejects_unknown_status(db_session: Session) -> None:
+    canonical_product = CanonicalProductRepository(db_session).create(
+        CanonicalProductCreate(title="Цемент", normalized_title="цемент")
+    )
+    source_product = _source_product(db_session, source_id="match-product-unknown-status")
+
+    with pytest.raises(ValueError, match="unknown product match status"):
+        ProductMatchRepository(db_session).create(
+            ProductMatchCreate(
+                canonical_product_id=canonical_product.id,
+                source_product_id=source_product.id,
+                confidence=Decimal("0.900"),
+                method="token_similarity",
+                status="needs_review",
+            )
+        )
+
+
+def test_product_match_repository_enforces_one_accepted_match_per_source_product(
+    db_session: Session,
+) -> None:
+    source_product = _source_product(db_session, source_id="match-product-accepted")
+    canonical_repository = CanonicalProductRepository(db_session)
+    first_canonical = canonical_repository.create(
+        CanonicalProductCreate(title="Цемент М500", normalized_title="цемент м500")
+    )
+    second_canonical = canonical_repository.create(
+        CanonicalProductCreate(title="Цемент М500 50кг", normalized_title="цемент м500 50кг")
+    )
+    repository = ProductMatchRepository(db_session)
+    repository.create(
+        ProductMatchCreate(
+            canonical_product_id=first_canonical.id,
+            source_product_id=source_product.id,
+            confidence=Decimal("0.990"),
+            method="exact_title",
+            status="accepted",
+        )
+    )
+
+    with pytest.raises(IntegrityError):
+        with db_session.begin_nested():
+            repository.create(
+                ProductMatchCreate(
+                    canonical_product_id=second_canonical.id,
+                    source_product_id=source_product.id,
+                    confidence=Decimal("0.980"),
+                    method="manual",
+                    status="accepted",
+                )
+            )
+
+
+def _source_product(
+    session: Session,
+    *,
+    source_id: str,
+) -> SourceProduct:
+    shop = ShopRepository(session).upsert(
+        ShopUpsert(source="2gis", source_id=f"branch-{source_id}", name="Shop")
+    )
+    return SourceProductRepository(session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id=source_id,
+            title="Цемент М500 50кг",
+            normalized_title="цемент м500 50кг",
+        )
+    )
+
+
+def _product_match(session: Session, *, status: str) -> ProductMatch:
+    source_product = _source_product(session, source_id=f"match-product-{status}")
+    canonical_product = CanonicalProductRepository(session).create(
+        CanonicalProductCreate(title="Цемент М500 50кг", normalized_title="цемент м500 50кг")
+    )
+    return ProductMatchRepository(session).create(
+        ProductMatchCreate(
+            canonical_product_id=canonical_product.id,
+            source_product_id=source_product.id,
+            confidence=Decimal("0.850"),
+            method="token_similarity",
+            status=status,
+        )
+    )

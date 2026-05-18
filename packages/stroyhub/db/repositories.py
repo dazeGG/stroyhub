@@ -6,9 +6,18 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from stroyhub.models.tables import Category, PriceSnapshot, ScrapeRun, Shop, SourceProduct
+from stroyhub.models.tables import (
+    CanonicalProduct,
+    Category,
+    PriceSnapshot,
+    ProductMatch,
+    ScrapeRun,
+    Shop,
+    SourceProduct,
+)
 
 JsonObject = dict[str, Any]
+PRODUCT_MATCH_STATUSES = frozenset({"accepted", "candidate", "rejected", "superseded"})
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -70,6 +79,31 @@ class ScrapeRunCreate:
     status: str = "running"
     started_at: datetime | None = None
     raw: JsonObject | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class CanonicalProductCreate:
+    title: str
+    normalized_title: str
+    category_id: int | None = None
+    brand: str | None = None
+    model: str | None = None
+    unit_raw: str | None = None
+    attributes: JsonObject | None = None
+    match_status: str = "active"
+
+
+@dataclass(frozen=True, kw_only=True)
+class ProductMatchCreate:
+    canonical_product_id: int
+    source_product_id: int
+    confidence: Decimal
+    method: str
+    status: str = "candidate"
+    matched_at: datetime | None = None
+    reviewed_at: datetime | None = None
+    reviewed_by: str | None = None
+    reason: JsonObject | None = None
 
 
 class ShopRepository:
@@ -277,3 +311,114 @@ class ScrapeRunRepository:
 
         self._session.flush()
         return scrape_run
+
+
+class CanonicalProductRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def create(self, data: CanonicalProductCreate) -> CanonicalProduct:
+        product = CanonicalProduct(
+            title=data.title,
+            normalized_title=data.normalized_title,
+            category_id=data.category_id,
+            brand=data.brand,
+            model=data.model,
+            unit_raw=data.unit_raw,
+            attributes=data.attributes,
+            match_status=data.match_status,
+        )
+        self._session.add(product)
+        self._session.flush()
+        return product
+
+    def get(self, product_id: int) -> CanonicalProduct | None:
+        return self._session.get(CanonicalProduct, product_id)
+
+    def list_by_normalized_title(self, normalized_title: str) -> list[CanonicalProduct]:
+        statement = (
+            select(CanonicalProduct)
+            .where(CanonicalProduct.normalized_title == normalized_title)
+            .order_by(CanonicalProduct.id.asc())
+        )
+        return list(self._session.scalars(statement))
+
+
+class ProductMatchRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def create(self, data: ProductMatchCreate) -> ProductMatch:
+        _validate_product_match_status(data.status)
+        match = ProductMatch(
+            canonical_product_id=data.canonical_product_id,
+            source_product_id=data.source_product_id,
+            confidence=data.confidence,
+            status=data.status,
+            method=data.method,
+            reviewed_at=data.reviewed_at,
+            reviewed_by=data.reviewed_by,
+            reason=data.reason,
+        )
+        if data.matched_at is not None:
+            match.matched_at = data.matched_at
+
+        self._session.add(match)
+        self._session.flush()
+        return match
+
+    def get(self, match_id: int) -> ProductMatch | None:
+        return self._session.get(ProductMatch, match_id)
+
+    def list(
+        self,
+        *,
+        status: str | None = None,
+        canonical_product_id: int | None = None,
+        source_product_id: int | None = None,
+        limit: int | None = None,
+    ) -> list[ProductMatch]:
+        if status is not None:
+            _validate_product_match_status(status)
+
+        statement = select(ProductMatch).order_by(
+            ProductMatch.confidence.desc(),
+            ProductMatch.id.asc(),
+        )
+        if status is not None:
+            statement = statement.where(ProductMatch.status == status)
+        if canonical_product_id is not None:
+            statement = statement.where(ProductMatch.canonical_product_id == canonical_product_id)
+        if source_product_id is not None:
+            statement = statement.where(ProductMatch.source_product_id == source_product_id)
+        if limit is not None:
+            statement = statement.limit(limit)
+
+        return list(self._session.scalars(statement))
+
+    def update_status(
+        self,
+        match: ProductMatch,
+        *,
+        status: str,
+        reviewed_at: datetime | None = None,
+        reviewed_by: str | None = None,
+        reason: JsonObject | None = None,
+    ) -> ProductMatch:
+        _validate_product_match_status(status)
+        match.status = status
+        if reviewed_at is not None:
+            match.reviewed_at = reviewed_at
+        if reviewed_by is not None:
+            match.reviewed_by = reviewed_by
+        if reason is not None:
+            match.reason = reason
+
+        self._session.flush()
+        return match
+
+
+def _validate_product_match_status(status: str) -> None:
+    if status not in PRODUCT_MATCH_STATUSES:
+        allowed = ", ".join(sorted(PRODUCT_MATCH_STATUSES))
+        raise ValueError(f"unknown product match status {status!r}; expected one of: {allowed}")

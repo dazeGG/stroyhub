@@ -5,10 +5,14 @@ from stroyhub.db.session import SessionLocal, engine, get_session
 
 __all__ = [
     "Base",
+    "CanonicalProductCreate",
+    "CanonicalProductRepository",
     "CategoryRepository",
     "CategoryUpsert",
     "PriceSnapshotCreate",
     "PriceSnapshotRepository",
+    "ProductMatchCreate",
+    "ProductMatchRepository",
     "ScrapeRunCreate",
     "ScrapeRunRepository",
     "SessionLocal",
@@ -21,10 +25,14 @@ __all__ = [
 ]
 
 _REPOSITORY_EXPORTS = {
+    "CanonicalProductCreate",
+    "CanonicalProductRepository",
     "CategoryRepository",
     "CategoryUpsert",
     "PriceSnapshotCreate",
     "PriceSnapshotRepository",
+    "ProductMatchCreate",
+    "ProductMatchRepository",
     "ScrapeRunCreate",
     "ScrapeRunRepository",
     "ShopRepository",
