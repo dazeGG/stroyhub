@@ -98,6 +98,49 @@ Category fields:
 
 Both fields are needed. `category_raw` preserves source context and supports reprocessing/debugging. `category_id` gives stable filtering for API and UI.
 
+Manual category overrides:
+
+- Store reviewer corrections separately in a future `category_overrides` table
+  instead of mutating source payloads or encoding one-off exceptions in rules.
+- When an active override exists for a source product, it should take
+  precedence over source category aliases and rule-based categorization.
+- `source_products.category_id` can continue to store the current effective
+  category for filtering, but the override row is the audit source of truth.
+- Rescraping a product should preserve active overrides and reapply them when
+  calculating the effective `category_id`.
+
+Proposed `category_overrides` table:
+
+- `id`: `bigint` primary key
+- `source_product_id`: `bigint`, required reference to `source_products.id`
+- `category_id`: `bigint`, required reference to `categories.id`
+- `previous_category_id`: `bigint`, nullable reference to `categories.id`
+- `reason`: `text`, nullable
+- `status`: `text`, required, default `active`
+- `created_by`: `text`, nullable
+- `created_at`: `timestamp with time zone`, required
+- `updated_by`: `text`, nullable
+- `updated_at`: `timestamp with time zone`, required
+- `deactivated_by`: `text`, nullable
+- `deactivated_at`: `timestamp with time zone`, nullable
+
+Proposed status values:
+
+- `active`: override is the current manual category decision.
+- `replaced`: override was superseded by a newer manual decision.
+- `reverted`: override was intentionally removed and rules/aliases should apply again.
+
+Proposed constraints and indexes:
+
+- Unique partial index: `source_product_id` where `status = 'active'`.
+- Index: `category_id`.
+- Index: `status`.
+- Index: `created_at`.
+
+Audit metadata should be kept even when the actor is a local script rather than
+a future admin user. Use stable actor strings such as `local_script`,
+`admin:<username>`, or `system:<job-name>`.
+
 Matching rules:
 
 1. If `source_product_id` exists, match by `source`, `shop_id`, `source_product_id`.

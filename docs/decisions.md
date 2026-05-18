@@ -89,3 +89,24 @@ Manual category overrides are represented at the service level: a provided overr
 
 Consequences:
 Initial categories are explainable and easy to adjust. Some products will remain uncategorized until rules are expanded from real scrape data.
+
+## 2026-05-18: Persist Manual Category Overrides Separately
+
+Context:
+M9 adds source category aliases, safer keyword matching, and category quality
+reports. Once an admin/review workflow exists, reviewers need manual category
+corrections that survive rescrapes without rewriting source product cards or
+hard-coding every exception into rule dictionaries.
+
+Decision:
+Store manual category corrections in a dedicated `category_overrides` table
+linked to `source_products` and `categories`. During categorization,
+persisted manual overrides take precedence over source category aliases and
+rule-based predictions. The existing in-memory `ManualCategoryOverride` service
+object remains the runtime representation of that highest-precedence decision.
+
+Consequences:
+Manual decisions are auditable and reversible. Source data remains intact, and
+rules/aliases can still improve general coverage without hiding reviewer-made
+exceptions. A schema migration and repository/API implementation should be done
+in follow-up issue [#109](https://github.com/dazeGG/stroyhub/issues/109).
