@@ -34,6 +34,7 @@ def test_generate_product_match_candidates_matches_exact_normalized_titles() -> 
     assert candidate.confidence == 1.0
     assert candidate.reason.method == "exact_normalized_title"
     assert candidate.reason.exact_title is True
+    assert candidate.reason.matched_normalized_title == "цемент м500 50кг"
     assert candidate.reason.token_overlap == ("50кг", "м500", "цемент")
 
 
@@ -77,3 +78,34 @@ def test_generate_product_match_candidates_blocks_different_categories() -> None
     )
 
     assert candidates == ()
+
+
+def test_generate_product_match_candidates_can_allow_exact_category_mismatch() -> None:
+    candidates = generate_product_match_candidates(
+        [
+            ProductRecord(id=1, shop_id=10, title="Цемент М500 50кг", category_id=1),
+            ProductRecord(id=2, shop_id=20, title="Цемент М500 50кг", category_id=2),
+        ],
+        allow_category_mismatch=True,
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.confidence == 0.9
+    assert candidate.reason.method == "exact_normalized_title"
+    assert candidate.reason.same_category is False
+
+
+def test_generate_product_match_candidates_matches_exact_title_within_same_shop() -> None:
+    candidates = generate_product_match_candidates(
+        [
+            ProductRecord(id=1, shop_id=10, title="Пескобетон М300 30кг"),
+            ProductRecord(id=2, shop_id=10, title=" пескобетон  м300 30кг "),
+        ]
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.left.shop_id == candidate.right.shop_id
+    assert candidate.confidence == 1.0
+    assert candidate.reason.matched_normalized_title == "пескобетон м300 30кг"
