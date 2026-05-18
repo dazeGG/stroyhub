@@ -128,6 +128,46 @@ def test_rule_based_categorizer_returns_none_for_unmatched_products() -> None:
     assert prediction is None
 
 
+def test_rule_based_categorizer_does_not_match_short_keyword_inside_word() -> None:
+    prediction = RuleBasedCategorizer().categorize(
+        title="Шлакоблок полнотелый",
+        category_raw=None,
+    )
+
+    assert prediction is None
+
+
+def test_rule_based_categorizer_does_not_match_keyword_inside_prefix_word() -> None:
+    prediction = RuleBasedCategorizer().categorize(
+        title="Наклейка декоративная",
+        category_raw=None,
+    )
+
+    assert prediction is None
+
+
+def test_rule_based_categorizer_still_matches_single_token_keyword() -> None:
+    prediction = RuleBasedCategorizer().categorize(
+        title="Клей монтажный универсальный",
+        category_raw=None,
+    )
+
+    assert prediction is not None
+    assert prediction.category_slug == "construction_adhesives"
+    assert "клей" in prediction.matched_keywords
+
+
+def test_rule_based_categorizer_still_matches_multi_word_phrase() -> None:
+    prediction = RuleBasedCategorizer().categorize(
+        title="Сухая смесь универсальная 25 кг",
+        category_raw=None,
+    )
+
+    assert prediction is not None
+    assert prediction.category_slug == "dry_mixes"
+    assert "сухая смесь" in prediction.matched_keywords
+
+
 def test_rule_based_categorizer_covers_raw_source_categories() -> None:
     examples = [
         ("Сухая смесь универсальная", "Сухие строительные смеси", "dry_mixes"),
