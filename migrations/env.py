@@ -4,7 +4,15 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from stroyhub.core.config import settings
 from stroyhub.db.base import Base
-from stroyhub.models import Category, PriceSnapshot, ScrapeRun, Shop, SourceProduct
+from stroyhub.models import (
+    CanonicalProduct,
+    Category,
+    PriceSnapshot,
+    ProductMatch,
+    ScrapeRun,
+    Shop,
+    SourceProduct,
+)
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
@@ -15,7 +23,7 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Keep model imports visible to static analysis and ensure metadata is populated.
-_MODELS = (Category, PriceSnapshot, ScrapeRun, Shop, SourceProduct)
+_MODELS = (CanonicalProduct, Category, PriceSnapshot, ProductMatch, ScrapeRun, Shop, SourceProduct)
 
 
 def run_migrations_offline() -> None:

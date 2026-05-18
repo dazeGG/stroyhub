@@ -83,6 +83,7 @@ class Category(TimestampMixin, Base):
     )
     children: Mapped[list["Category"]] = relationship(back_populates="parent")
     source_products: Mapped[list["SourceProduct"]] = relationship(back_populates="category")
+    canonical_products: Mapped[list["CanonicalProduct"]] = relationship(back_populates="category")
 
 
 class SourceProduct(TimestampMixin, Base):
@@ -135,6 +136,67 @@ class SourceProduct(TimestampMixin, Base):
     shop: Mapped[Shop] = relationship(back_populates="source_products")
     category: Mapped[Category | None] = relationship(back_populates="source_products")
     price_snapshots: Mapped[list["PriceSnapshot"]] = relationship(back_populates="source_product")
+    product_matches: Mapped[list["ProductMatch"]] = relationship(back_populates="source_product")
+
+
+class CanonicalProduct(TimestampMixin, Base):
+    __tablename__ = "canonical_products"
+    __table_args__: Any = (
+        Index("ix_canonical_products_category_id", "category_id"),
+        Index("ix_canonical_products_normalized_title", "normalized_title"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"))
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    normalized_title: Mapped[str] = mapped_column(Text, nullable=False)
+    brand: Mapped[str | None] = mapped_column(Text)
+    model: Mapped[str | None] = mapped_column(Text)
+    unit_raw: Mapped[str | None] = mapped_column(Text)
+    attributes: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    match_status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'active'")
+    )
+
+    category: Mapped[Category | None] = relationship(back_populates="canonical_products")
+    product_matches: Mapped[list["ProductMatch"]] = relationship(back_populates="canonical_product")
+
+
+class ProductMatch(Base):
+    __tablename__ = "product_matches"
+    __table_args__: Any = (
+        Index("ix_product_matches_canonical_product_id", "canonical_product_id"),
+        Index("ix_product_matches_source_product_id", "source_product_id"),
+        Index("ix_product_matches_status_confidence", "status", "confidence"),
+        Index(
+            "uq_product_matches_source_product_accepted",
+            "source_product_id",
+            unique=True,
+            postgresql_where=text("status = 'accepted'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    canonical_product_id: Mapped[int] = mapped_column(
+        ForeignKey("canonical_products.id"), nullable=False
+    )
+    source_product_id: Mapped[int] = mapped_column(
+        ForeignKey("source_products.id"), nullable=False
+    )
+    confidence: Mapped[Decimal] = mapped_column(Numeric(4, 3), nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    method: Mapped[str] = mapped_column(Text, nullable=False)
+    matched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[str | None] = mapped_column(Text)
+    reason: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+
+    canonical_product: Mapped[CanonicalProduct] = relationship(
+        back_populates="product_matches"
+    )
+    source_product: Mapped[SourceProduct] = relationship(back_populates="product_matches")
 
 
 class PriceSnapshot(Base):
