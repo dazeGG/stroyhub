@@ -11,7 +11,6 @@ const navItems = [
   { label: 'Скрейпы', to: '/scrapes', icon: icons.activity },
   { label: 'Категории', to: '/categories', icon: icons.category },
   { label: 'Матчинг', to: '/matches', icon: icons.gitCompare },
-  { label: 'Помощь', to: '/help', icon: icons.helpCircle },
 ]
 
 const route = useRoute()
