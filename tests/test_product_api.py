@@ -415,6 +415,53 @@ def test_products_endpoint_treats_search_wildcards_as_literal_text(
     assert [item["id"] for item in response.json()["items"]] == [matching_product.id]
 
 
+def test_product_detail_endpoint_returns_source_product(
+    client: TestClient, db_session: Session
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-api-detail", name="Detail Shop")
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="detail-api-1",
+            title="Detail Cement M400",
+            normalized_title="detail cement m400",
+            category_raw="Catalog / Cement",
+            unit_raw="bag",
+            observed_at=datetime(2026, 5, 18, 8, 0, tzinfo=UTC),
+        )
+    )
+    PriceSnapshotRepository(db_session).add(
+        PriceSnapshotCreate(
+            source_product_id=product.id,
+            price=Decimal("560.00"),
+            unit_raw="bag",
+            parsed_at=datetime(2026, 5, 18, 8, 5, tzinfo=UTC),
+        )
+    )
+
+    response = client.get(f"/products/{product.id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == product.id
+    assert payload["title"] == "Detail Cement M400"
+    assert payload["shop"]["name"] == "Detail Shop"
+    assert payload["latest_price"]["price"] == "560.00"
+    assert payload["latest_price"]["unit_raw"] == "bag"
+
+
+def test_product_detail_endpoint_returns_404_for_missing_product(
+    client: TestClient,
+) -> None:
+    response = client.get("/products/999999999")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Source product not found"}
+
+
 def test_product_price_history_endpoint_returns_ordered_snapshots(
     client: TestClient, db_session: Session
 ) -> None:

@@ -245,6 +245,13 @@ export function fetchProducts(
   return fetchJson<ProductSearchResponse>(`/products?${params.toString()}`, signal)
 }
 
+export function fetchProduct(
+  productId: number,
+  signal?: AbortSignal,
+): Promise<ProductSearchItem> {
+  return fetchJson<ProductSearchItem>(`/products/${productId}`, signal)
+}
+
 export function fetchCategories(signal?: AbortSignal): Promise<CategoryTreeResponse> {
   return fetchJson<CategoryTreeResponse>('/categories', signal)
 }
