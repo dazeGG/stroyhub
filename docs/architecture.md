@@ -5,12 +5,17 @@ StroyHub starts as a Python monorepo with thin applications and one reusable dom
 ## Boundaries
 
 - `apps/api` owns the HTTP entrypoint and API composition.
+- `apps/admin` owns the Vue-based admin/review UI.
 - `apps/worker` owns Celery startup and background task registration.
 - `packages/stroyhub` owns reusable parsing, catalog, persistence, and scraping logic.
 - `infra` owns local infrastructure definitions.
 - `docs` owns long-lived decisions and source notes, not task tracking.
 
-The API and worker are intentionally thin modules, not separate installable packages. They should depend on `stroyhub`, while `stroyhub` should not depend on either application.
+The API and worker are intentionally thin Python modules, not separate
+installable packages. They should depend on `stroyhub`, while `stroyhub` should
+not depend on any application module. The admin UI is a separate frontend app
+under `apps/admin`; it should talk to `apps/api` over HTTP instead of importing
+Python domain code directly.
 
 ## Package Layout
 
@@ -48,6 +53,9 @@ Development is managed with `uv`:
 - `.venv` is local and ignored by git.
 
 The API can be run with `uv run uvicorn apps.api.main:app --reload`.
+
+The admin UI can be run from `apps/admin` with its Vite development server once
+M12 implementation adds the app.
 
 The worker can be run with:
 
