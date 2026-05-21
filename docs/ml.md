@@ -69,6 +69,12 @@ Labels do not directly mutate `source_products.category_id`. They train models.
 Operational category changes still go through manual category overrides or
 accepted suggestions.
 
+The queue generator is deterministic for tests and repeatable CLI sessions. It
+prefers the current product category when it is a leaf, then rule/text signals,
+then nearby categories with the same parent, then stable fallback leaf
+categories. Product/category pairs already present in `labels.jsonl` are skipped
+when selecting candidates.
+
 ## Live Labels and Snapshots
 
 `labels.jsonl` is the live append-only label log. Dataset snapshots are frozen

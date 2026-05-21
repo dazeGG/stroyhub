@@ -1,5 +1,11 @@
 """Classification and matching experiments."""
 
+from stroyhub.ml.category_queue import (
+    CategoryLabelCandidate,
+    CategoryLabelProduct,
+    CategoryLabelQueue,
+    CategoryLabelQueueItem,
+)
 from stroyhub.ml.labels import (
     CategoryLabelRecord,
     CategoryLabelStore,
@@ -19,6 +25,10 @@ __all__ = [
     "ProductMatchCandidate",
     "ProductMatchReason",
     "CategoryLabelRecord",
+    "CategoryLabelCandidate",
+    "CategoryLabelProduct",
+    "CategoryLabelQueue",
+    "CategoryLabelQueueItem",
     "CategoryLabelStore",
     "PredictorTarget",
     "SourceProductLike",
