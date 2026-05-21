@@ -264,3 +264,68 @@ Example response:
   ]
 }
 ```
+
+## Matches
+
+### `GET /matches/candidates`
+
+Returns read-only in-memory product match candidates for review. M12 does not
+persist accept/reject actions through this endpoint.
+
+Query params:
+
+- `source`: optional source filter.
+- `shop`: optional shop id filter.
+- `category_id`: optional normalized category filter.
+- `category_raw`: optional raw source category filter.
+- `min_confidence`: 0-1, default `0.75`.
+- `max_confidence`: optional 0-1 upper bound.
+- `limit`: 1-100, default `50`.
+- `allow_category_mismatch`: default `false`.
+
+Example response:
+
+```json
+{
+  "products_considered": 2,
+  "candidates": [
+    {
+      "left": {
+        "id": 10,
+        "source": "2gis",
+        "shop_id": 3,
+        "shop_name": "Build Shop",
+        "shop_source_id": "70000001007229923",
+        "title": "Cement M500 50kg",
+        "normalized_title": "cement m500 50kg",
+        "category_id": 1,
+        "category_raw": "Cement"
+      },
+      "right": {
+        "id": 11,
+        "source": "2gis",
+        "shop_id": 4,
+        "shop_name": "Other Shop",
+        "shop_source_id": "70000001000000000",
+        "title": "Cement M500 50kg",
+        "normalized_title": "cement m500 50kg",
+        "category_id": 1,
+        "category_raw": "Cement"
+      },
+      "confidence": 1.0,
+      "reason": {
+        "method": "exact_normalized_title",
+        "exact_title": true,
+        "matched_normalized_title": "cement m500 50kg",
+        "token_overlap": ["50kg", "cement", "m500"],
+        "left_only_tokens": [],
+        "right_only_tokens": [],
+        "ignored_tokens": [],
+        "blocked_by": [],
+        "token_similarity": 1.0,
+        "same_category": true
+      }
+    }
+  ]
+}
+```
