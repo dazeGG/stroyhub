@@ -69,14 +69,142 @@ terminal commands:
 - Which future product-match candidates need human review, if matching
   persistence and API support are ready by then?
 
-## Initial Screens
+## M12 Screens
 
-- Product catalog inspection: searchable/filterable table with title, shop,
-  normalized category, raw category, latest price, and last-seen metadata.
-- Product detail: source payload summary, latest price, and price history.
-- Scrape status dashboard: shop scrape status, next/last scrape metadata,
-  recent runs, and visible failed/partial runs.
-- Category quality review: unmatched or suspicious groups by `category_raw`,
-  representative titles, and copy/export support for follow-up issues.
-- Match candidate review: read-only candidate comparison or postponed until the
-  matching persistence/API surface is ready.
+- `/`: product catalog inspection with search, shop/category filters,
+  normalized category, raw category, latest price, last-seen metadata, and
+  links into price history.
+- `/prices`: selected source-product detail plus ordered price snapshots from
+  `GET /products/{product_id}/prices`. Repeated same-price observations stay
+  visible because snapshots are observations, not only price changes.
+- `/scrapes`: scrape health dashboard backed by `GET /shops` and
+  `GET /scrapes/health`. It shows shop scrape status, next/last scrape times,
+  recent runs, and failed/partial counts.
+- `/categories`: category quality review backed by `GET /categories/quality`.
+  It groups uncategorized products by source, shop, and `category_raw`, shows
+  representative titles, and provides copyable issue-comment text.
+- `/matches`: read-only product match candidate review backed by
+  `GET /matches/candidates`. It shows side-by-side source product comparisons,
+  confidence, method, and reason tokens. Accept/reject actions are intentionally
+  deferred.
+
+## Review Workflows
+
+### Product Catalog Inspection
+
+Use `/` when checking whether source cards look sane after scraping or
+categorization work.
+
+Review steps:
+
+1. Filter by source shop or normalized category.
+2. Search for a known material name from a source sample or issue.
+3. Confirm title, shop, raw source category, normalized category, latest price,
+   and last seen timestamp.
+4. Open price history when a latest price looks wrong or stale.
+
+Create an issue when:
+
+- a source repeatedly produces missing or malformed titles, categories, units,
+  or prices;
+- a normalized category is clearly wrong for several similar products;
+- a source card is duplicated because source IDs or fingerprints are unstable.
+
+Use a quick fix when:
+
+- the problem is a narrow parser field extraction bug with a representative
+  fixture;
+- a category rule or alias can be updated from a small, obvious pattern.
+
+### Price History
+
+Use `/prices` when checking whether the scraper is collecting observations
+properly for one source product.
+
+Review steps:
+
+1. Select a product from the picker or open it from the catalog row.
+2. Check the ordered snapshot list.
+3. Treat repeated same-price rows as expected; they prove the product was seen
+   again.
+4. Investigate null prices separately from unchanged prices.
+
+Create an issue when:
+
+- price snapshots stop appearing for an active shop;
+- null prices cluster under one source, parser, or raw category;
+- prices parse into the wrong unit, currency, or magnitude.
+
+### Scrape Health
+
+Use `/scrapes` before and after running scraper jobs.
+
+Review steps:
+
+1. Filter by source or status.
+2. Check failed/partial counts first.
+3. Scan shops for stale `last_scraped_at`, overdue `next_scrape_at`, or
+   disabled status.
+4. Read recent runs for item counts, duration, and error text.
+
+Create an issue when:
+
+- a source or shop has repeated failed/partial runs;
+- `items_seen` or `items_saved` drops unexpectedly;
+- `next_scrape_at` is missing or clearly wrong for an active shop.
+
+Use a quick fix when:
+
+- the issue is a known transient local service problem;
+- a seed/schedule value is wrong for one shop and can be corrected directly.
+
+### Category Quality
+
+Use `/categories` to turn uncategorized product groups into taxonomy or rule
+work.
+
+Review steps:
+
+1. Filter by source or shop when a scraper/parser change is under review.
+2. Sort attention by largest unmatched groups.
+3. Read representative titles before changing taxonomy.
+4. Use the copied report text in GitHub issues or PR notes.
+
+Create an issue when:
+
+- the group implies a new taxonomy leaf or broader category decision;
+- several sources disagree on raw category structure;
+- titles are too ambiguous and need product-level examples or manual override
+  design.
+
+Use a quick fix when:
+
+- a source category alias maps cleanly to an existing category;
+- a title keyword rule covers a narrow, obvious group without harming existing
+  tests.
+
+### Match Candidates
+
+Use `/matches` as a read-only review aid for the in-memory matcher. It does not
+persist reviewer decisions in M12.
+
+Review steps:
+
+1. Start at high confidence, such as `95%+`.
+2. Compare titles, shops, categories, normalized titles, overlap tokens, and
+   left/right-only tokens.
+3. Record examples of true positives and false positives in issues or PRs.
+4. Do not treat a visible candidate as an accepted match until persistence and
+   review actions exist.
+
+Create an issue when:
+
+- a false positive needs a new blocker for weight, dimensions, color, grade, or
+  packaging;
+- true positives are common enough to justify persistence or workflow changes;
+- reviewers need accept/reject actions, audit fields, or candidate queues.
+
+Use a quick fix when:
+
+- token aliases or low-value tokens can safely improve obvious examples;
+- a blocker already exists conceptually and only needs a focused rule/test.
