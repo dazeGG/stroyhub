@@ -186,7 +186,8 @@ Example response:
       "name": "Build Shop",
       "address": "Yakutsk",
       "scrape_status": "ok",
-      "last_scraped_at": "2026-05-17T09:00:00Z"
+      "last_scraped_at": "2026-05-17T09:00:00Z",
+      "next_scrape_at": "2026-05-18T00:00:00Z"
     }
   ]
 }

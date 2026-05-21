@@ -89,6 +89,7 @@ export interface ShopListItem {
   address: string | null
   scrape_status: string
   last_scraped_at: string | null
+  next_scrape_at: string | null
 }
 
 export interface ShopListResponse {
@@ -102,6 +103,40 @@ export interface ProductSearchParams {
   sort?: ProductSort
   limit?: number
   offset?: number
+}
+
+export interface ScrapeStatusCount {
+  status: string
+  count: number
+}
+
+export interface RecentScrapeRun {
+  id: number
+  source: string
+  shop_id: number | null
+  status: string
+  started_at: string
+  finished_at: string | null
+  items_seen: number
+  items_saved: number
+  error: string | null
+}
+
+export interface ScrapeHealthResponse {
+  status_counts: ScrapeStatusCount[]
+  recent_runs: RecentScrapeRun[]
+}
+
+export interface ScrapeHealthParams {
+  source?: string
+  shopId?: number
+  status?: string
+  limit?: number
+}
+
+export interface ShopListParams {
+  source?: string
+  status?: string
 }
 
 async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -142,8 +177,16 @@ export function fetchCategories(signal?: AbortSignal): Promise<CategoryTreeRespo
   return fetchJson<CategoryTreeResponse>('/categories', signal)
 }
 
-export function fetchShops(signal?: AbortSignal): Promise<ShopListResponse> {
-  return fetchJson<ShopListResponse>('/shops', signal)
+export function fetchShops(
+  filters: ShopListParams = {},
+  signal?: AbortSignal,
+): Promise<ShopListResponse> {
+  const params = new URLSearchParams()
+  appendOptionalParam(params, 'source', filters.source)
+  appendOptionalParam(params, 'status', filters.status)
+  const query = params.toString()
+
+  return fetchJson<ShopListResponse>(query ? `/shops?${query}` : '/shops', signal)
 }
 
 export function fetchProductPriceHistory(
@@ -151,4 +194,18 @@ export function fetchProductPriceHistory(
   signal?: AbortSignal,
 ): Promise<ProductPriceHistoryResponse> {
   return fetchJson<ProductPriceHistoryResponse>(`/products/${productId}/prices`, signal)
+}
+
+export function fetchScrapeHealth(
+  filters: ScrapeHealthParams = {},
+  signal?: AbortSignal,
+): Promise<ScrapeHealthResponse> {
+  const params = new URLSearchParams()
+  appendOptionalParam(params, 'source', filters.source)
+  appendOptionalParam(params, 'shop', filters.shopId)
+  appendOptionalParam(params, 'status', filters.status)
+  appendOptionalParam(params, 'limit', filters.limit)
+  const query = params.toString()
+
+  return fetchJson<ScrapeHealthResponse>(query ? `/scrapes/health?${query}` : '/scrapes/health', signal)
 }

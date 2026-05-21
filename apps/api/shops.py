@@ -20,6 +20,7 @@ class ShopListItemResponse(BaseModel):
     address: str | None
     scrape_status: str
     last_scraped_at: datetime | None
+    next_scrape_at: datetime | None
 
 
 class ShopListResponse(BaseModel):

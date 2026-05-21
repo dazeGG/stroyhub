@@ -22,6 +22,7 @@ class ShopListItem:
     address: str | None
     scrape_status: str
     last_scraped_at: datetime | None
+    next_scrape_at: datetime | None
 
 
 class ShopCatalog:
@@ -50,6 +51,7 @@ class ShopCatalog:
                 address=shop.address,
                 scrape_status=shop.scrape_status,
                 last_scraped_at=shop.last_scraped_at,
+                next_scrape_at=shop.next_scrape_at,
             )
             for shop in self._session.scalars(statement)
         ]
