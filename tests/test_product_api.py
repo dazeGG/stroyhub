@@ -279,6 +279,104 @@ def test_products_endpoint_filters_leaf_category_by_slug(
     assert [item["id"] for item in response.json()["items"]] == [matching_product.id]
 
 
+@pytest.mark.parametrize(
+    ("sort", "expected_keys"),
+    [
+        ("latest_price", ["cheap", "expensive", "unpriced"]),
+        ("-latest_price", ["expensive", "cheap", "unpriced"]),
+        ("title", ["alpha", "bravo", "charlie"]),
+        ("-title", ["charlie", "bravo", "alpha"]),
+        ("shop", ["alpha", "charlie", "bravo"]),
+        ("-shop", ["bravo", "charlie", "alpha"]),
+        ("last_seen_at", ["bravo", "alpha", "charlie"]),
+        ("-last_seen_at", ["charlie", "alpha", "bravo"]),
+    ],
+)
+def test_products_endpoint_supports_sort_modes(
+    client: TestClient,
+    db_session: Session,
+    sort: str,
+    expected_keys: list[str],
+) -> None:
+    alpha_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="sort-shop-alpha", name="Alpha Shop")
+    )
+    beta_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="sort-shop-beta", name="Beta Shop")
+    )
+    gamma_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="sort-shop-gamma", name="Gamma Shop")
+    )
+    products = SourceProductRepository(db_session)
+    alpha = products.upsert(
+        SourceProductUpsert(
+            shop_id=alpha_shop.id,
+            source="2gis",
+            source_product_id="sort-product-alpha",
+            title="Sort Mode Alpha",
+            normalized_title="sort mode alpha",
+            observed_at=datetime(2026, 5, 17, 9, 0, tzinfo=UTC),
+        )
+    )
+    bravo = products.upsert(
+        SourceProductUpsert(
+            shop_id=gamma_shop.id,
+            source="2gis",
+            source_product_id="sort-product-bravo",
+            title="Sort Mode Bravo",
+            normalized_title="sort mode bravo",
+            observed_at=datetime(2026, 5, 17, 8, 0, tzinfo=UTC),
+        )
+    )
+    charlie = products.upsert(
+        SourceProductUpsert(
+            shop_id=beta_shop.id,
+            source="2gis",
+            source_product_id="sort-product-charlie",
+            title="Sort Mode Charlie",
+            normalized_title="sort mode charlie",
+            observed_at=datetime(2026, 5, 17, 10, 0, tzinfo=UTC),
+        )
+    )
+    prices = PriceSnapshotRepository(db_session)
+    prices.add(
+        PriceSnapshotCreate(
+            source_product_id=alpha.id,
+            price=Decimal("10.00"),
+            parsed_at=datetime(2026, 5, 17, 9, 5, tzinfo=UTC),
+        )
+    )
+    prices.add(
+        PriceSnapshotCreate(
+            source_product_id=charlie.id,
+            price=Decimal("20.00"),
+            parsed_at=datetime(2026, 5, 17, 10, 5, tzinfo=UTC),
+        )
+    )
+
+    response = client.get("/products", params={"q": "sort mode", "sort": sort})
+
+    assert response.status_code == 200
+    key_by_id = {
+        alpha.id: "alpha",
+        bravo.id: "bravo",
+        charlie.id: "charlie",
+    }
+    price_key_by_id = {
+        alpha.id: "cheap",
+        bravo.id: "unpriced",
+        charlie.id: "expensive",
+    }
+    key_map = price_key_by_id if "price" in sort else key_by_id
+    assert [key_map[item["id"]] for item in response.json()["items"]] == expected_keys
+
+
+def test_products_endpoint_rejects_invalid_sort(client: TestClient) -> None:
+    response = client.get("/products", params={"sort": "not-a-sort"})
+
+    assert response.status_code == 422
+
+
 def test_products_endpoint_handles_empty_results(client: TestClient) -> None:
     response = client.get("/products", params={"q": "nothing-here"})
 

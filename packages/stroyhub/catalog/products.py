@@ -1,11 +1,23 @@
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, Literal
 
 from sqlalchemy import and_, false, func, or_, select
 from sqlalchemy.orm import Session
 
 from stroyhub.models.tables import Category, PriceSnapshot, Shop, SourceProduct
+
+ProductSort = Literal[
+    "latest_price",
+    "-latest_price",
+    "title",
+    "-title",
+    "shop",
+    "-shop",
+    "last_seen_at",
+    "-last_seen_at",
+]
 
 
 def _escape_like_pattern(value: str) -> str:
@@ -18,6 +30,7 @@ class ProductSearchFilters:
     category_id: int | None = None
     category_slug: str | None = None
     shop_id: int | None = None
+    sort: ProductSort = "-last_seen_at"
     limit: int = 50
     offset: int = 0
 
@@ -109,9 +122,6 @@ class ProductCatalog:
                 ),
             )
             .where(SourceProduct.is_active.is_(True))
-            .order_by(SourceProduct.last_seen_at.desc(), SourceProduct.id.asc())
-            .limit(filters.limit)
-            .offset(filters.offset)
         )
 
         if filters.q is not None:
@@ -134,6 +144,12 @@ class ProductCatalog:
 
         if filters.shop_id is not None:
             statement = statement.where(SourceProduct.shop_id == filters.shop_id)
+
+        statement = (
+            statement.order_by(*self._sort_expressions(filters.sort, latest_prices))
+            .limit(filters.limit)
+            .offset(filters.offset)
+        )
 
         items: list[ProductSearchItem] = []
         for (
@@ -237,3 +253,20 @@ class ProductCatalog:
                     pending.append(child_id)
 
         return category_ids
+
+    def _sort_expressions(self, sort: ProductSort, latest_prices: Any) -> tuple[Any, ...]:
+        if sort == "latest_price":
+            return (latest_prices.c.latest_price.asc().nullslast(), SourceProduct.id.asc())
+        if sort == "-latest_price":
+            return (latest_prices.c.latest_price.desc().nullslast(), SourceProduct.id.asc())
+        if sort == "title":
+            return (SourceProduct.normalized_title.asc(), SourceProduct.id.asc())
+        if sort == "-title":
+            return (SourceProduct.normalized_title.desc(), SourceProduct.id.asc())
+        if sort == "shop":
+            return (Shop.name.asc(), SourceProduct.id.asc())
+        if sort == "-shop":
+            return (Shop.name.desc(), SourceProduct.id.asc())
+        if sort == "last_seen_at":
+            return (SourceProduct.last_seen_at.asc(), SourceProduct.id.asc())
+        return (SourceProduct.last_seen_at.desc(), SourceProduct.id.asc())

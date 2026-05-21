@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
-from stroyhub.catalog.products import ProductCatalog, ProductSearchFilters
+from stroyhub.catalog.products import ProductCatalog, ProductSearchFilters, ProductSort
 from stroyhub.db import get_session
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -79,6 +79,7 @@ def search_products(
     category_id: int | None = None,
     category_slug: str | None = None,
     shop: int | None = None,
+    sort: ProductSort = "-last_seen_at",
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ProductSearchResponse:
@@ -87,6 +88,7 @@ def search_products(
         category_id=category_id if category_id is not None else category,
         category_slug=category_slug,
         shop_id=shop,
+        sort=sort,
         limit=limit,
         offset=offset,
     )
