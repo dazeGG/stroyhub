@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import {
@@ -10,6 +11,7 @@ import {
   type ProductSort,
   type ShopListItem,
 } from '../lib/api'
+import { icons } from '../lib/icons'
 
 const pageSize = 50
 const searchQuery = ref('')
@@ -202,7 +204,10 @@ onMounted(() => {
   <section class="space-y-6">
     <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
       <div>
-        <p class="text-sm font-medium text-amber-300">Каталог товаров</p>
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+          <Icon :icon="icons.package" class="size-4" aria-hidden="true" />
+          Каталог товаров
+        </p>
         <h2 class="mt-2 text-2xl font-semibold text-white">Инспекция исходных карточек</h2>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
           Ищем собранные карточки, сверяем категории и смотрим последние наблюдения по ценам.
@@ -213,12 +218,19 @@ onMounted(() => {
         class="grid gap-3 lg:grid-cols-[minmax(180px,1.4fr)_minmax(180px,1fr)_minmax(160px,1fr)_170px] 2xl:min-w-[760px]"
         data-testid="catalog-filters"
       >
-        <input
-          v-model="searchQuery"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
-          placeholder="Поиск по названию"
-          type="search"
-        />
+        <label class="relative">
+          <Icon
+            :icon="icons.search"
+            class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-600"
+            aria-hidden="true"
+          />
+          <input
+            v-model="searchQuery"
+            class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-900 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+            placeholder="Поиск по названию"
+            type="search"
+          />
+        </label>
         <select
           v-model="selectedCategoryId"
           aria-label="Фильтр по категории"
@@ -277,6 +289,7 @@ onMounted(() => {
       </div>
 
       <div v-if="isLoadingProducts" class="min-w-[920px] px-4 py-14 text-center text-sm text-neutral-500">
+        <Icon :icon="icons.package" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         Загружаем каталог...
       </div>
 
@@ -284,6 +297,7 @@ onMounted(() => {
         v-else-if="errorMessage"
         class="min-w-[920px] px-4 py-14 text-center text-sm text-red-200"
       >
+        <Icon :icon="icons.alertTriangle" class="mx-auto mb-3 size-6 text-red-300" aria-hidden="true" />
         Не удалось загрузить каталог: {{ errorMessage }}
       </div>
 
@@ -291,6 +305,7 @@ onMounted(() => {
         v-else-if="products.length === 0"
         class="min-w-[920px] px-4 py-14 text-center text-sm text-neutral-500"
       >
+        <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         По этим фильтрам товаров не найдено.
       </div>
 
@@ -325,10 +340,11 @@ onMounted(() => {
           <div class="min-w-0 text-neutral-400">
             <p>{{ formatDateTime(product.last_seen_at) }}</p>
             <RouterLink
-              class="mt-1 inline-flex text-xs font-medium text-amber-300 hover:text-amber-200"
+              class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200"
               data-testid="catalog-price-link"
               :to="{ name: 'prices', query: { productId: product.id, q: product.title } }"
             >
+              <Icon :icon="icons.history" class="size-3.5" aria-hidden="true" />
               История цен
             </RouterLink>
           </div>
@@ -342,20 +358,22 @@ onMounted(() => {
       </p>
       <div class="flex gap-2">
         <button
-          class="h-9 rounded-md border border-neutral-800 px-3 text-sm text-neutral-200 transition enabled:hover:border-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
+          class="inline-flex h-9 items-center gap-1 rounded-md border border-neutral-800 px-3 text-sm text-neutral-200 transition enabled:hover:border-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
           :disabled="!hasPreviousPage || isLoadingProducts"
           type="button"
           @click="previousPage"
         >
+          <Icon :icon="icons.chevronLeft" class="size-4" aria-hidden="true" />
           Назад
         </button>
         <button
-          class="h-9 rounded-md border border-neutral-800 px-3 text-sm text-neutral-200 transition enabled:hover:border-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
+          class="inline-flex h-9 items-center gap-1 rounded-md border border-neutral-800 px-3 text-sm text-neutral-200 transition enabled:hover:border-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
           :disabled="!hasNextPage || isLoadingProducts"
           type="button"
           @click="nextPage"
         >
           Вперед
+          <Icon :icon="icons.chevronRight" class="size-4" aria-hidden="true" />
         </button>
       </div>
     </div>

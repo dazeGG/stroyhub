@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import {
@@ -8,6 +9,7 @@ import {
   type MatchCandidateProduct,
   type ShopListItem,
 } from '../lib/api'
+import { icons } from '../lib/icons'
 
 const selectedSource = ref('')
 const selectedShopId = ref('')
@@ -119,7 +121,10 @@ onMounted(() => {
   <section class="space-y-6">
     <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
       <div>
-        <p class="text-sm font-medium text-amber-300">Матчинг товаров</p>
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+          <Icon :icon="icons.gitCompare" class="size-4" aria-hidden="true" />
+          Матчинг товаров
+        </p>
         <h2 class="mt-2 text-2xl font-semibold text-white">Кандидаты на ревью</h2>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
           Read-only сравнение возможных дублей: confidence, reasons и пары карточек без accept/reject действий.
@@ -171,20 +176,30 @@ onMounted(() => {
 
     <div class="grid gap-4 md:grid-cols-3">
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Товаров проверено</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.shoppingBag" class="size-4" aria-hidden="true" />
+          Товаров проверено
+        </p>
         <p class="mt-3 text-3xl font-semibold text-white">{{ productsConsidered }}</p>
       </div>
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Кандидатов</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.link" class="size-4" aria-hidden="true" />
+          Кандидатов
+        </p>
         <p class="mt-3 text-3xl font-semibold text-white">{{ candidates.length }}</p>
       </div>
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Режим</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.shieldLock" class="size-4" aria-hidden="true" />
+          Режим
+        </p>
         <p class="mt-3 text-lg font-semibold text-white">Read-only</p>
       </div>
     </div>
 
     <div v-if="isLoading" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">
+      <Icon :icon="icons.gitCompare" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
       Загружаем кандидатов...
     </div>
 
@@ -192,6 +207,7 @@ onMounted(() => {
       v-else-if="candidates.length === 0"
       class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500"
     >
+      <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
       Кандидатов по этим фильтрам нет.
     </div>
 
@@ -204,7 +220,8 @@ onMounted(() => {
       >
         <div class="flex flex-col gap-3 border-b border-neutral-800 pb-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p class="text-sm font-semibold text-white">
+            <p class="inline-flex items-center gap-2 text-sm font-semibold text-white">
+              <Icon :icon="icons.link" class="size-4 text-amber-300" aria-hidden="true" />
               {{ confidencePercent(candidate.confidence) }} · {{ candidate.reason.method }}
             </p>
             <p class="mt-1 text-xs text-neutral-500">
@@ -212,7 +229,8 @@ onMounted(() => {
               {{ candidate.reason.same_category === null ? '-' : candidate.reason.same_category ? 'yes' : 'no' }}
             </p>
           </div>
-          <span class="w-fit rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-xs text-amber-200">
+          <span class="inline-flex w-fit items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-xs text-amber-200">
+            <Icon :icon="icons.shieldLock" class="size-3.5" aria-hidden="true" />
             actions deferred
           </span>
         </div>

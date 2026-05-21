@@ -1,0 +1,55 @@
+import activityIcon from '@iconify-icons/tabler/activity'
+import alertTriangleIcon from '@iconify-icons/tabler/alert-triangle'
+import arrowLeftIcon from '@iconify-icons/tabler/arrow-left'
+import buildingStoreIcon from '@iconify-icons/tabler/building-store'
+import calendarDueIcon from '@iconify-icons/tabler/calendar-due'
+import categoryIcon from '@iconify-icons/tabler/category'
+import chartLineIcon from '@iconify-icons/tabler/chart-line'
+import chevronLeftIcon from '@iconify-icons/tabler/chevron-left'
+import chevronRightIcon from '@iconify-icons/tabler/chevron-right'
+import clockIcon from '@iconify-icons/tabler/clock'
+import copyIcon from '@iconify-icons/tabler/copy'
+import currencyRubelIcon from '@iconify-icons/tabler/currency-rubel'
+import filesIcon from '@iconify-icons/tabler/files'
+import filterIcon from '@iconify-icons/tabler/filter'
+import gitCompareIcon from '@iconify-icons/tabler/git-compare'
+import helpCircleIcon from '@iconify-icons/tabler/help-circle'
+import historyIcon from '@iconify-icons/tabler/history'
+import linkIcon from '@iconify-icons/tabler/link'
+import listCheckIcon from '@iconify-icons/tabler/list-check'
+import packageIcon from '@iconify-icons/tabler/package'
+import reportAnalyticsIcon from '@iconify-icons/tabler/report-analytics'
+import searchIcon from '@iconify-icons/tabler/search'
+import shieldLockIcon from '@iconify-icons/tabler/shield-lock'
+import shoppingBagIcon from '@iconify-icons/tabler/shopping-bag'
+import tagsIcon from '@iconify-icons/tabler/tags'
+import timelineIcon from '@iconify-icons/tabler/timeline'
+
+export const icons = {
+  activity: activityIcon,
+  alertTriangle: alertTriangleIcon,
+  arrowLeft: arrowLeftIcon,
+  buildingStore: buildingStoreIcon,
+  calendarDue: calendarDueIcon,
+  category: categoryIcon,
+  chartLine: chartLineIcon,
+  chevronLeft: chevronLeftIcon,
+  chevronRight: chevronRightIcon,
+  clock: clockIcon,
+  copy: copyIcon,
+  currencyRubel: currencyRubelIcon,
+  files: filesIcon,
+  filter: filterIcon,
+  gitCompare: gitCompareIcon,
+  helpCircle: helpCircleIcon,
+  history: historyIcon,
+  link: linkIcon,
+  listCheck: listCheckIcon,
+  package: packageIcon,
+  reportAnalytics: reportAnalyticsIcon,
+  search: searchIcon,
+  shieldLock: shieldLockIcon,
+  shoppingBag: shoppingBagIcon,
+  tags: tagsIcon,
+  timeline: timelineIcon,
+}

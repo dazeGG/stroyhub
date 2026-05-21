@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import {
@@ -8,6 +9,7 @@ import {
   type ScrapeStatusCount,
   type ShopListItem,
 } from '../lib/api'
+import { icons } from '../lib/icons'
 
 const selectedSource = ref('')
 const selectedStatus = ref('')
@@ -172,7 +174,10 @@ onMounted(() => {
   <section class="space-y-6">
     <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
       <div>
-        <p class="text-sm font-medium text-amber-300">Статус скрейпов</p>
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+          <Icon :icon="icons.activity" class="size-4" aria-hidden="true" />
+          Статус скрейпов
+        </p>
         <h2 class="mt-2 text-2xl font-semibold text-white">Здоровье источников</h2>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
           Смотрим последние запуски, упавшие магазины, устаревшие источники и расписание следующих запусков.
@@ -215,23 +220,35 @@ onMounted(() => {
 
     <div class="grid gap-4 md:grid-cols-4">
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Магазины</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.buildingStore" class="size-4" aria-hidden="true" />
+          Магазины
+        </p>
         <p class="mt-3 text-3xl font-semibold text-white">{{ shops.length }}</p>
       </div>
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Failed / partial</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.alertTriangle" class="size-4" aria-hidden="true" />
+          Failed / partial
+        </p>
         <p class="mt-3 text-3xl font-semibold" :class="failedOrPartialRuns > 0 ? 'text-red-200' : 'text-white'">
           {{ failedOrPartialRuns }}
         </p>
       </div>
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Due now</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.calendarDue" class="size-4" aria-hidden="true" />
+          Due now
+        </p>
         <p class="mt-3 text-3xl font-semibold" :class="dueShops > 0 ? 'text-amber-200' : 'text-white'">
           {{ dueShops }}
         </p>
       </div>
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Последний запуск</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.clock" class="size-4" aria-hidden="true" />
+          Последний запуск
+        </p>
         <p class="mt-3 text-lg font-semibold text-white">
           {{ mostRecentRun ? formatDateTime(mostRecentRun.started_at) : '-' }}
         </p>
@@ -252,6 +269,7 @@ onMounted(() => {
         </div>
 
         <div v-if="isLoading" class="min-w-[880px] px-4 py-14 text-center text-sm text-neutral-500">
+          <Icon :icon="icons.activity" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
           Загружаем магазины...
         </div>
 
@@ -259,6 +277,7 @@ onMounted(() => {
           v-else-if="shops.length === 0"
           class="min-w-[880px] px-4 py-14 text-center text-sm text-neutral-500"
         >
+          <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
           По этим фильтрам магазинов не найдено.
         </div>
 
@@ -289,15 +308,18 @@ onMounted(() => {
       </div>
 
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40">
-        <div class="border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+        <div class="flex items-center gap-2 border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          <Icon :icon="icons.timeline" class="size-4" aria-hidden="true" />
           Recent runs
         </div>
 
         <div v-if="isLoading" class="px-4 py-14 text-center text-sm text-neutral-500">
+          <Icon :icon="icons.timeline" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
           Загружаем запуски...
         </div>
 
         <div v-else-if="recentRuns.length === 0" class="px-4 py-14 text-center text-sm text-neutral-500">
+          <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
           Запусков по этим фильтрам нет.
         </div>
 
