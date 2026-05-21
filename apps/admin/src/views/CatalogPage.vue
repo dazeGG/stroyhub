@@ -322,7 +322,16 @@ onMounted(() => {
             </p>
           </div>
           <div class="pr-5 text-neutral-200">{{ formatPrice(product) }}</div>
-          <div class="text-neutral-400">{{ formatDateTime(product.last_seen_at) }}</div>
+          <div class="min-w-0 text-neutral-400">
+            <p>{{ formatDateTime(product.last_seen_at) }}</p>
+            <RouterLink
+              class="mt-1 inline-flex text-xs font-medium text-amber-300 hover:text-amber-200"
+              data-testid="catalog-price-link"
+              :to="{ name: 'prices', query: { productId: product.id, q: product.title } }"
+            >
+              История цен
+            </RouterLink>
+          </div>
         </div>
       </div>
     </div>

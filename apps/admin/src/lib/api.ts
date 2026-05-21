@@ -54,6 +54,20 @@ export interface ProductSearchResponse {
   offset: number
 }
 
+export interface ProductPriceSnapshot {
+  id: number
+  price: string | null
+  currency: string
+  unit_raw: string | null
+  source_updated_at: string | null
+  parsed_at: string
+}
+
+export interface ProductPriceHistoryResponse {
+  product_id: number
+  items: ProductPriceSnapshot[]
+}
+
 export interface CategoryTreeItem {
   id: number
   slug: string
@@ -130,4 +144,11 @@ export function fetchCategories(signal?: AbortSignal): Promise<CategoryTreeRespo
 
 export function fetchShops(signal?: AbortSignal): Promise<ShopListResponse> {
   return fetchJson<ShopListResponse>('/shops', signal)
+}
+
+export function fetchProductPriceHistory(
+  productId: number,
+  signal?: AbortSignal,
+): Promise<ProductPriceHistoryResponse> {
+  return fetchJson<ProductPriceHistoryResponse>(`/products/${productId}/prices`, signal)
 }
