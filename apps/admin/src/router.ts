@@ -15,6 +15,6 @@ export const router = createRouter({
     { path: '/scrapes', name: 'scrapes', component: ScrapeStatusPage },
     { path: '/categories', name: 'categories', component: CategoryReviewPage },
     { path: '/matches', name: 'matches', component: MatchReviewPage },
-    { path: '/help', name: 'help', component: HelpPage },
+    { path: '/help', name: 'help', component: HelpPage, meta: { fullPage: true } },
   ],
 })
