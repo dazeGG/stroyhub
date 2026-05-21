@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -8,6 +9,7 @@ import {
   type ProductPriceSnapshot,
   type ProductSearchItem,
 } from '../lib/api'
+import { icons } from '../lib/icons'
 
 const route = useRoute()
 const router = useRouter()
@@ -225,7 +227,10 @@ onMounted(() => {
   <section class="space-y-6">
     <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
       <div>
-        <p class="text-sm font-medium text-amber-300">История цен</p>
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+          <Icon :icon="icons.history" class="size-4" aria-hidden="true" />
+          История цен
+        </p>
         <h2 class="mt-2 text-2xl font-semibold text-white">Наблюдения по товару во времени</h2>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
           Выберите исходную карточку из каталога, чтобы посмотреть повторные наблюдения и время сбора.
@@ -236,12 +241,19 @@ onMounted(() => {
         class="grid gap-3 lg:grid-cols-[minmax(220px,1.2fr)_minmax(280px,1.8fr)] 2xl:min-w-[720px]"
         data-testid="price-history-picker"
       >
-        <input
-          v-model="productQuery"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
-          placeholder="Поиск карточки"
-          type="search"
-        />
+        <label class="relative">
+          <Icon
+            :icon="icons.search"
+            class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-600"
+            aria-hidden="true"
+          />
+          <input
+            v-model="productQuery"
+            class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-900 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+            placeholder="Поиск карточки"
+            type="search"
+          />
+        </label>
         <select
           v-model="selectedProductId"
           aria-label="Исходная карточка для истории цен"
@@ -269,7 +281,10 @@ onMounted(() => {
       data-testid="price-history-detail"
     >
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Исходная карточка</p>
+        <p class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          <Icon :icon="icons.package" class="size-4" aria-hidden="true" />
+          Исходная карточка
+        </p>
         <h3 class="mt-3 text-lg font-semibold text-white">
           {{ selectedProduct?.title || `Карточка #${selectedProductId}` }}
         </h3>
@@ -299,21 +314,31 @@ onMounted(() => {
 
       <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
         <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">Наблюдений</p>
+          <p class="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-neutral-500">
+            <Icon :icon="icons.timeline" class="size-4" aria-hidden="true" />
+            Наблюдений
+          </p>
           <p class="mt-2 text-2xl font-semibold text-white">{{ snapshots.length }}</p>
         </div>
         <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">Повторов цены</p>
+          <p class="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-neutral-500">
+            <Icon :icon="icons.currencyRubel" class="size-4" aria-hidden="true" />
+            Повторов цены
+          </p>
           <p class="mt-2 text-2xl font-semibold text-white">{{ repeatedObservations }}</p>
         </div>
         <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">Без цены</p>
+          <p class="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-neutral-500">
+            <Icon :icon="icons.alertTriangle" class="size-4" aria-hidden="true" />
+            Без цены
+          </p>
           <p class="mt-2 text-2xl font-semibold text-white">{{ nullPriceCount }}</p>
         </div>
       </div>
     </div>
 
     <div v-else class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-sm text-neutral-500">
+      <Icon :icon="icons.search" class="mb-3 size-6 text-neutral-600" aria-hidden="true" />
       Найдите и выберите исходную карточку, чтобы открыть ее историю цен.
     </div>
 
@@ -329,6 +354,7 @@ onMounted(() => {
       </div>
 
       <div v-if="isLoadingHistory" class="min-w-[760px] px-4 py-14 text-center text-sm text-neutral-500">
+        <Icon :icon="icons.history" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         Загружаем историю...
       </div>
 
@@ -336,6 +362,7 @@ onMounted(() => {
         v-else-if="historyErrorMessage"
         class="min-w-[760px] px-4 py-14 text-center text-sm text-red-200"
       >
+        <Icon :icon="icons.alertTriangle" class="mx-auto mb-3 size-6 text-red-300" aria-hidden="true" />
         Не удалось загрузить историю цен: {{ historyErrorMessage }}
       </div>
 
@@ -343,6 +370,7 @@ onMounted(() => {
         v-else-if="selectedProductId && snapshots.length === 0"
         class="min-w-[760px] px-4 py-14 text-center text-sm text-neutral-500"
       >
+        <Icon :icon="icons.timeline" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         Для этой карточки пока нет ценовых наблюдений.
       </div>
 
@@ -350,6 +378,7 @@ onMounted(() => {
         v-else-if="!selectedProductId"
         class="min-w-[760px] px-4 py-14 text-center text-sm text-neutral-500"
       >
+        <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         История появится после выбора товара.
       </div>
 

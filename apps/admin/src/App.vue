@@ -1,14 +1,17 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
 import { computed } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 
+import { icons } from './lib/icons'
+
 const navItems = [
-  { label: 'Каталог', to: '/' },
-  { label: 'История цен', to: '/prices' },
-  { label: 'Скрейпы', to: '/scrapes' },
-  { label: 'Категории', to: '/categories' },
-  { label: 'Матчинг', to: '/matches' },
-  { label: 'Помощь', to: '/help' },
+  { label: 'Каталог', to: '/', icon: icons.package },
+  { label: 'История цен', to: '/prices', icon: icons.history },
+  { label: 'Скрейпы', to: '/scrapes', icon: icons.activity },
+  { label: 'Категории', to: '/categories', icon: icons.category },
+  { label: 'Матчинг', to: '/matches', icon: icons.gitCompare },
+  { label: 'Помощь', to: '/help', icon: icons.helpCircle },
 ]
 
 const route = useRoute()
@@ -32,9 +35,10 @@ const isFullPage = computed(() => route.meta.fullPage === true)
               v-for="item in navItems"
               :key="item.to"
               :to="item.to"
-              class="rounded-md px-3 py-2 text-sm font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-white"
+              class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-white"
               active-class="bg-neutral-800 text-white"
             >
+              <Icon :icon="item.icon" class="size-4 text-neutral-500" aria-hidden="true" />
               {{ item.label }}
             </RouterLink>
           </nav>
@@ -54,9 +58,10 @@ const isFullPage = computed(() => route.meta.fullPage === true)
                 v-for="item in navItems"
                 :key="item.to"
                 :to="item.to"
-                class="shrink-0 rounded-md px-3 py-2 text-sm font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-white"
+                class="inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-white"
                 active-class="bg-neutral-800 text-white"
               >
+                <Icon :icon="item.icon" class="size-4 text-neutral-500" aria-hidden="true" />
                 {{ item.label }}
               </RouterLink>
             </nav>

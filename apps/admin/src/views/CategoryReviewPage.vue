@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import {
@@ -8,6 +9,7 @@ import {
   type ShopListItem,
   type UncategorizedCategoryGroup,
 } from '../lib/api'
+import { icons } from '../lib/icons'
 
 const selectedSource = ref('')
 const selectedShopId = ref('')
@@ -148,7 +150,10 @@ onMounted(() => {
   <section class="space-y-6">
     <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
       <div>
-        <p class="text-sm font-medium text-amber-300">Качество категорий</p>
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+          <Icon :icon="icons.category" class="size-4" aria-hidden="true" />
+          Качество категорий
+        </p>
         <h2 class="mt-2 text-2xl font-semibold text-white">Проверка шумных категорий</h2>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
           Группируем некатегоризованные товары по исходной категории и собираем примеры для правок.
@@ -191,11 +196,17 @@ onMounted(() => {
 
     <div class="grid gap-4 md:grid-cols-4">
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Всего товаров</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.shoppingBag" class="size-4" aria-hidden="true" />
+          Всего товаров
+        </p>
         <p class="mt-3 text-3xl font-semibold text-white">{{ quality?.total_products || 0 }}</p>
       </div>
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Покрытие</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.chartLine" class="size-4" aria-hidden="true" />
+          Покрытие
+        </p>
         <p
           class="mt-3 text-3xl font-semibold"
           :class="coveragePercent < 90 ? 'text-amber-200' : 'text-white'"
@@ -204,7 +215,10 @@ onMounted(() => {
         </p>
       </div>
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Без категории</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.alertTriangle" class="size-4" aria-hidden="true" />
+          Без категории
+        </p>
         <p
           class="mt-3 text-3xl font-semibold"
           :class="(quality?.uncategorized_products || 0) > 0 ? 'text-red-200' : 'text-white'"
@@ -213,18 +227,23 @@ onMounted(() => {
         </p>
       </div>
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Групп на ревью</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.listCheck" class="size-4" aria-hidden="true" />
+          Групп на ревью
+        </p>
         <p class="mt-3 text-3xl font-semibold text-white">{{ quality?.groups.length || 0 }}</p>
       </div>
     </div>
 
     <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div class="overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900/40">
-        <div class="border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+        <div class="flex items-center gap-2 border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+          <Icon :icon="icons.tags" class="size-4" aria-hidden="true" />
           Unmatched by source category
         </div>
 
         <div v-if="isLoading" class="px-4 py-14 text-center text-sm text-neutral-500">
+          <Icon :icon="icons.category" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
           Загружаем группы...
         </div>
 
@@ -232,6 +251,7 @@ onMounted(() => {
           v-else-if="!quality || quality.groups.length === 0"
           class="px-4 py-14 text-center text-sm text-neutral-500"
         >
+          <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
           Некатегоризованных групп по этим фильтрам нет.
         </div>
 
@@ -270,11 +290,12 @@ onMounted(() => {
 
       <div class="space-y-3">
         <button
-          class="h-10 w-full rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-sm font-medium text-amber-100 transition hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
+          class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-sm font-medium text-amber-100 transition hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
           :disabled="!exportText"
           type="button"
           @click="copyExportText"
         >
+          <Icon :icon="icons.copy" class="size-4" aria-hidden="true" />
           Скопировать отчет
         </button>
         <p v-if="copyMessage" class="text-sm text-emerald-300">{{ copyMessage }}</p>
