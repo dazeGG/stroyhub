@@ -15,6 +15,7 @@ htmlcov/
 venv/
 .uv-cache/
 .uv-python/
+.var/
 dist/
 build/
 

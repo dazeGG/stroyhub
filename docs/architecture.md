@@ -6,6 +6,8 @@ StroyHub starts as a Python monorepo with thin applications and one reusable dom
 
 - `apps/api` owns the HTTP entrypoint and API composition.
 - `apps/admin` owns the Vue-based admin/review UI.
+- `apps/ml` owns dataset labeling, dataset snapshots, training, evaluation,
+  and model artifact management commands.
 - `apps/worker` owns Celery startup and background task registration.
 - `packages/stroyhub` owns reusable parsing, catalog, persistence, and scraping logic.
 - `infra` owns local infrastructure definitions.
@@ -17,6 +19,11 @@ not depend on any application module. The admin UI is a separate frontend app
 under `apps/admin`; it should talk to `apps/api` over HTTP instead of importing
 Python domain code directly.
 
+The ML workspace is also an application boundary, not a separate package. It
+may use `stroyhub` database/session helpers and public ML services from
+`packages/stroyhub/ml`, but reusable model loaders, feature builders, and
+prediction APIs belong in `packages/stroyhub/ml`.
+
 ## Package Layout
 
 ```text
@@ -27,7 +34,7 @@ packages/stroyhub/
   parsers/    Source-specific extraction code.
   catalog/    Product, category, price, and normalization services.
   scraping/   Scrape orchestration and persistence workflow.
-  ml/         Later classification and matching experiments.
+  ml/         Reusable ML feature builders, model loaders, and prediction APIs.
 ```
 
 `parsers` should not write to the database directly. A parser fetches source data and maps it into a shared parsed-product contract. `scraping` coordinates which shop to scrape, calls the right parser, and persists results through `catalog` and `db`.
@@ -67,3 +74,7 @@ Celery Beat dispatches due shop scraping once per day at `00:00 Asia/Yakutsk`:
 ```bash
 uv run celery -A apps.worker.celery_app:celery_app beat --loglevel=info
 ```
+
+ML commands are run explicitly through `apps/ml`. They read product data from
+PostgreSQL and store ML runtime artifacts under `.var/ml`, which is ignored by
+git.
