@@ -62,6 +62,7 @@ def test_shops_endpoint_lists_shops_without_raw_payload(
             raw={"secret": "not exposed"},
             scrape_status="ok",
             last_scraped_at=datetime(2026, 5, 17, 8, 30, tzinfo=UTC),
+            next_scrape_at=datetime(2026, 5, 18, 0, 0, tzinfo=UTC),
         )
     )
 
@@ -78,6 +79,7 @@ def test_shops_endpoint_lists_shops_without_raw_payload(
         "address": "Yakutsk, Test Street 1",
         "scrape_status": "ok",
         "last_scraped_at": "2026-05-17T08:30:00Z",
+        "next_scrape_at": "2026-05-18T00:00:00Z",
     }
     assert "raw" not in item
 
