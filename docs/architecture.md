@@ -54,8 +54,7 @@ Development is managed with `uv`:
 
 The API can be run with `uv run uvicorn apps.api.main:app --reload`.
 
-The admin UI can be run from `apps/admin` with its Vite development server once
-M12 implementation adds the app.
+The admin UI can be run from `apps/admin` with its Vite development server.
 
 The worker can be run with:
 
