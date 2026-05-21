@@ -7,7 +7,6 @@ import { icons } from './lib/icons'
 
 const navItems = [
   { label: 'Каталог', to: '/', icon: icons.package },
-  { label: 'История цен', to: '/prices', icon: icons.history },
   { label: 'Скрейпы', to: '/scrapes', icon: icons.activity },
   { label: 'Категории', to: '/categories', icon: icons.category },
   { label: 'Матчинг', to: '/matches', icon: icons.gitCompare },

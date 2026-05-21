@@ -99,6 +99,18 @@ def search_products(
     return ProductSearchResponse(items=items, limit=limit, offset=offset)
 
 
+@router.get("/{product_id}", response_model=ProductSearchItemResponse)
+def get_product(
+    product_id: int,
+    session: Annotated[Session, Depends(get_session)],
+) -> ProductSearchItemResponse:
+    item = ProductCatalog(session).get_product(product_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Source product not found")
+
+    return ProductSearchItemResponse.model_validate(item)
+
+
 @router.get("/{product_id}/prices", response_model=ProductPriceHistoryResponse)
 def list_product_prices(
     product_id: int,

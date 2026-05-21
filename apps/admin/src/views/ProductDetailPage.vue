@@ -1,35 +1,33 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 
 import {
+  fetchProduct,
   fetchProductPriceHistory,
-  fetchProducts,
   type ProductPriceSnapshot,
   type ProductSearchItem,
 } from '../lib/api'
 import { icons } from '../lib/icons'
 
 const route = useRoute()
-const router = useRouter()
 
-const productQuery = ref('')
-const selectedProductId = ref('')
-const products = ref<ProductSearchItem[]>([])
+const product = ref<ProductSearchItem | null>(null)
 const snapshots = ref<ProductPriceSnapshot[]>([])
-const selectedProduct = ref<ProductSearchItem | null>(null)
-const isLoadingProducts = ref(false)
+const isLoadingProduct = ref(false)
 const isLoadingHistory = ref(false)
 const productErrorMessage = ref('')
 const historyErrorMessage = ref('')
 
 let productRequest: AbortController | null = null
 let historyRequest: AbortController | null = null
-let productSearchTimer: number | undefined
 
-const selectedProductIdNumber = computed(() => {
-  const parsed = Number(selectedProductId.value)
+const productId = computed(() => {
+  const rawValue = Array.isArray(route.params.productId)
+    ? route.params.productId[0]
+    : route.params.productId
+  const parsed = Number(rawValue)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 })
 
@@ -83,21 +81,33 @@ function formatDateTime(value: string | null): string {
   }).format(new Date(value))
 }
 
-function formatPrice(snapshot: ProductPriceSnapshot): string {
+function formatSnapshotPrice(snapshot: ProductPriceSnapshot): string {
   if (snapshot.price === null) {
     return 'Цена отсутствует'
   }
 
-  const amount = Number(snapshot.price)
+  return formatMoney(snapshot.price, snapshot.currency, snapshot.unit_raw)
+}
+
+function formatLatestPrice(item: ProductSearchItem | null): string {
+  if (!item?.latest_price?.price) {
+    return '-'
+  }
+
+  return formatMoney(item.latest_price.price, item.latest_price.currency, item.latest_price.unit_raw)
+}
+
+function formatMoney(price: string, currency: string, unitRaw: string | null): string {
+  const amount = Number(price)
   const value = Number.isFinite(amount)
     ? new Intl.NumberFormat('ru-RU', {
         maximumFractionDigits: 2,
         minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
       }).format(amount)
-    : snapshot.price
-  const unit = snapshot.unit_raw ? ` / ${snapshot.unit_raw}` : ''
+    : price
+  const unit = unitRaw ? ` / ${unitRaw}` : ''
 
-  return `${value} ${snapshot.currency}${unit}`
+  return `${value} ${currency}${unit}`
 }
 
 function snapshotStatus(snapshot: ProductPriceSnapshot, index: number): string {
@@ -114,48 +124,30 @@ function snapshotStatus(snapshot: ProductPriceSnapshot, index: number): string {
     : 'Цена изменилась'
 }
 
-function selectProductFromList(productId: string): void {
-  const product = products.value.find((item) => String(item.id) === productId)
-  selectedProduct.value = product || null
-}
-
-async function loadProducts(): Promise<void> {
+async function loadProduct(nextProductId: number): Promise<void> {
   productRequest?.abort()
   const request = new AbortController()
   productRequest = request
-  isLoadingProducts.value = true
+  isLoadingProduct.value = true
   productErrorMessage.value = ''
 
   try {
-    const response = await fetchProducts(
-      {
-        q: productQuery.value,
-        sort: '-last_seen_at',
-        limit: 25,
-        offset: 0,
-      },
-      request.signal,
-    )
-    products.value = response.items
-    if (selectedProductId.value) {
-      selectProductFromList(selectedProductId.value)
-    }
+    product.value = await fetchProduct(nextProductId, request.signal)
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       return
     }
 
-    productErrorMessage.value =
-      error instanceof Error ? error.message : 'Не удалось загрузить список товаров'
-    products.value = []
+    productErrorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить товар'
+    product.value = null
   } finally {
     if (productRequest === request) {
-      isLoadingProducts.value = false
+      isLoadingProduct.value = false
     }
   }
 }
 
-async function loadHistory(productId: number): Promise<void> {
+async function loadHistory(nextProductId: number): Promise<void> {
   historyRequest?.abort()
   const request = new AbortController()
   historyRequest = request
@@ -163,15 +155,14 @@ async function loadHistory(productId: number): Promise<void> {
   historyErrorMessage.value = ''
 
   try {
-    const response = await fetchProductPriceHistory(productId, request.signal)
+    const response = await fetchProductPriceHistory(nextProductId, request.signal)
     snapshots.value = response.items
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       return
     }
 
-    historyErrorMessage.value =
-      error instanceof Error ? error.message : 'Не удалось загрузить историю цен'
+    historyErrorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить историю цен'
     snapshots.value = []
   } finally {
     if (historyRequest === request) {
@@ -180,134 +171,95 @@ async function loadHistory(productId: number): Promise<void> {
   }
 }
 
-watch(productQuery, () => {
-  window.clearTimeout(productSearchTimer)
-  productSearchTimer = window.setTimeout(() => {
-    void loadProducts()
-  }, 250)
-})
-
-watch(selectedProductId, (productId) => {
-  selectProductFromList(productId)
-
-  void router.replace({
-    name: 'prices',
-    query: productId ? { productId, q: productQuery.value || undefined } : {},
-  })
-
-  const parsed = selectedProductIdNumber.value
-  if (parsed === null) {
+function loadPage(): void {
+  const nextProductId = productId.value
+  if (nextProductId === null) {
+    product.value = null
     snapshots.value = []
+    productErrorMessage.value = 'Некорректный ID товара'
     historyErrorMessage.value = ''
     return
   }
 
-  void loadHistory(parsed)
+  void loadProduct(nextProductId)
+  void loadHistory(nextProductId)
+}
+
+watch(productId, () => {
+  loadPage()
 })
 
-watch(
-  () => route.query.productId,
-  (productId) => {
-    const nextProductId = Array.isArray(productId) ? productId[0] : productId
-    selectedProductId.value = nextProductId || ''
-  },
-)
-
 onMounted(() => {
-  const initialProductId = route.query.productId
-  const initialQuery = route.query.q
-  productQuery.value = Array.isArray(initialQuery) ? initialQuery[0] || '' : initialQuery || ''
-  selectedProductId.value = Array.isArray(initialProductId) ? initialProductId[0] || '' : initialProductId || ''
-  window.clearTimeout(productSearchTimer)
-  void loadProducts()
+  loadPage()
 })
 </script>
 
 <template>
   <section class="space-y-6">
-    <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
-          <Icon :icon="icons.history" class="size-4" aria-hidden="true" />
-          История цен
-        </p>
-        <h2 class="mt-2 text-2xl font-semibold text-white">Наблюдения по товару во времени</h2>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
-          Выберите исходную карточку из каталога, чтобы посмотреть повторные наблюдения и время сбора.
-        </p>
-      </div>
-
-      <div
-        class="grid gap-3 lg:grid-cols-[minmax(220px,1.2fr)_minmax(280px,1.8fr)] 2xl:min-w-[720px]"
-        data-testid="price-history-picker"
-      >
-        <label class="relative">
-          <Icon
-            :icon="icons.search"
-            class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-600"
-            aria-hidden="true"
-          />
-          <input
-            v-model="productQuery"
-            class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-900 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
-            placeholder="Поиск карточки"
-            type="search"
-          />
-        </label>
-        <select
-          v-model="selectedProductId"
-          aria-label="Исходная карточка для истории цен"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
-          :disabled="isLoadingProducts"
+        <RouterLink
+          to="/"
+          class="inline-flex items-center gap-2 text-sm font-medium text-neutral-400 transition hover:text-white"
         >
-          <option value="">Выберите товар</option>
-          <option v-for="product in products" :key="product.id" :value="String(product.id)">
-            #{{ product.id }} · {{ product.title }} · {{ product.shop.name }}
-          </option>
-        </select>
+          <Icon :icon="icons.chevronLeft" class="size-4" aria-hidden="true" />
+          Назад в каталог
+        </RouterLink>
+        <p class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+          <Icon :icon="icons.package" class="size-4" aria-hidden="true" />
+          Карточка товара
+        </p>
+        <h2 class="mt-2 max-w-4xl text-2xl font-semibold text-white">
+          {{ product?.title || (productId ? `Товар #${productId}` : 'Товар') }}
+        </h2>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+          Магазин, исходная категория, последняя цена и наблюдения по сбору.
+        </p>
       </div>
     </div>
 
     <div
       v-if="productErrorMessage"
-      class="rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100"
+      class="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100"
     >
-      Список товаров не загрузился: {{ productErrorMessage }}
+      Товар не загрузился: {{ productErrorMessage }}
     </div>
 
     <div
-      v-if="selectedProductId"
+      v-if="product || isLoadingProduct"
       class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]"
-      data-testid="price-history-detail"
+      data-testid="product-detail"
     >
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
         <p class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
           <Icon :icon="icons.package" class="size-4" aria-hidden="true" />
           Исходная карточка
         </p>
-        <h3 class="mt-3 text-lg font-semibold text-white">
-          {{ selectedProduct?.title || `Карточка #${selectedProductId}` }}
-        </h3>
-        <div class="mt-4 grid gap-3 text-sm text-neutral-400 sm:grid-cols-2">
+        <div v-if="isLoadingProduct" class="mt-6 text-sm text-neutral-500">Загружаем товар...</div>
+        <div v-else class="mt-4 grid gap-4 text-sm text-neutral-400 sm:grid-cols-2">
           <div>
             <p class="text-xs uppercase tracking-wide text-neutral-600">Магазин</p>
-            <p class="mt-1 text-neutral-200">{{ selectedProduct?.shop.name || '-' }}</p>
+            <p class="mt-1 text-neutral-200">{{ product?.shop.name || '-' }}</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wide text-neutral-600">Текущая цена</p>
+            <p class="mt-1 text-neutral-200">{{ formatLatestPrice(product) }}</p>
           </div>
           <div>
             <p class="text-xs uppercase tracking-wide text-neutral-600">Source ID</p>
-            <p class="mt-1 text-neutral-200">
-              {{ selectedProduct?.source_product_id || selectedProductId }}
-            </p>
+            <p class="mt-1 text-neutral-200">{{ product?.source_product_id || '-' }}</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wide text-neutral-600">Источник</p>
+            <p class="mt-1 text-neutral-200">{{ product?.source || '-' }}</p>
           </div>
           <div>
             <p class="text-xs uppercase tracking-wide text-neutral-600">Категория источника</p>
-            <p class="mt-1 text-neutral-200">{{ selectedProduct?.category_raw || '-' }}</p>
+            <p class="mt-1 text-neutral-200">{{ product?.category_raw || '-' }}</p>
           </div>
           <div>
             <p class="text-xs uppercase tracking-wide text-neutral-600">Последний раз</p>
-            <p class="mt-1 text-neutral-200">
-              {{ selectedProduct ? formatDateTime(selectedProduct.last_seen_at) : '-' }}
-            </p>
+            <p class="mt-1 text-neutral-200">{{ formatDateTime(product?.last_seen_at || null) }}</p>
           </div>
         </div>
       </div>
@@ -337,11 +289,6 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-else class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-sm text-neutral-500">
-      <Icon :icon="icons.search" class="mb-3 size-6 text-neutral-600" aria-hidden="true" />
-      Найдите и выберите исходную карточку, чтобы открыть ее историю цен.
-    </div>
-
     <div class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
       <div
         class="grid min-w-[760px] grid-cols-[190px_180px_150px_170px_minmax(160px,1fr)] border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
@@ -367,19 +314,11 @@ onMounted(() => {
       </div>
 
       <div
-        v-else-if="selectedProductId && snapshots.length === 0"
+        v-else-if="snapshots.length === 0"
         class="min-w-[760px] px-4 py-14 text-center text-sm text-neutral-500"
       >
         <Icon :icon="icons.timeline" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         Для этой карточки пока нет ценовых наблюдений.
-      </div>
-
-      <div
-        v-else-if="!selectedProductId"
-        class="min-w-[760px] px-4 py-14 text-center text-sm text-neutral-500"
-      >
-        <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
-        История появится после выбора товара.
       </div>
 
       <div v-else class="min-w-[760px] divide-y divide-neutral-800">
@@ -390,7 +329,7 @@ onMounted(() => {
           data-testid="price-snapshot-row"
         >
           <div class="text-neutral-200">{{ formatDateTime(snapshot.parsed_at) }}</div>
-          <div class="font-medium text-white">{{ formatPrice(snapshot) }}</div>
+          <div class="font-medium text-white">{{ formatSnapshotPrice(snapshot) }}</div>
           <div>
             <span
               class="rounded-full border px-2 py-1 text-xs"
@@ -411,9 +350,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <p v-if="selectedProductId" class="text-sm text-neutral-500">
-      Изменений цены: {{ priceChanges }}. Повторные наблюдения остаются видимыми, потому что snapshot
-      хранит факт наблюдения, а не только изменение.
+    <p v-if="productId" class="text-sm text-neutral-500">
+      Изменений цены: {{ priceChanges }}.
     </p>
   </section>
 </template>

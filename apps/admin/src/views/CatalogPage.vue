@@ -342,7 +342,7 @@ onMounted(() => {
             <RouterLink
               class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200"
               data-testid="catalog-price-link"
-              :to="{ name: 'prices', query: { productId: product.id, q: product.title } }"
+              :to="{ name: 'product-detail', params: { productId: product.id } }"
             >
               <Icon :icon="icons.history" class="size-3.5" aria-hidden="true" />
               История цен

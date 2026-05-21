@@ -85,6 +85,71 @@ class ProductCatalog:
         self._session = session
 
     def search_products(self, filters: ProductSearchFilters) -> list[ProductSearchItem]:
+        statement, latest_prices = self._product_listing_statement()
+
+        if filters.q is not None:
+            query = filters.q.strip()
+            if query:
+                pattern = f"%{_escape_like_pattern(query)}%"
+                statement = statement.where(
+                    or_(
+                        SourceProduct.title.ilike(pattern, escape="\\"),
+                        SourceProduct.normalized_title.ilike(pattern.lower(), escape="\\"),
+                    )
+                )
+
+        category_ids = self._category_filter_ids(filters)
+        if category_ids is not None:
+            if category_ids:
+                statement = statement.where(SourceProduct.category_id.in_(category_ids))
+            else:
+                statement = statement.where(false())
+
+        if filters.shop_id is not None:
+            statement = statement.where(SourceProduct.shop_id == filters.shop_id)
+
+        statement = (
+            statement.order_by(*self._sort_expressions(filters.sort, latest_prices))
+            .limit(filters.limit)
+            .offset(filters.offset)
+        )
+
+        return [self._product_search_item(*row) for row in self._session.execute(statement)]
+
+    def get_product(self, product_id: int) -> ProductSearchItem | None:
+        statement, _latest_prices = self._product_listing_statement()
+        row = self._session.execute(
+            statement.where(SourceProduct.id == product_id)
+        ).first()
+        if row is None:
+            return None
+
+        return self._product_search_item(*row)
+
+    def source_product_exists(self, product_id: int) -> bool:
+        statement = select(SourceProduct.id).where(SourceProduct.id == product_id)
+        return self._session.scalar(statement) is not None
+
+    def list_price_history(self, product_id: int) -> list[ProductPriceSnapshot]:
+        statement = (
+            select(PriceSnapshot)
+            .where(PriceSnapshot.source_product_id == product_id)
+            .order_by(PriceSnapshot.parsed_at.asc(), PriceSnapshot.id.asc())
+        )
+
+        return [
+            ProductPriceSnapshot(
+                id=snapshot.id,
+                price=snapshot.price,
+                currency=snapshot.currency,
+                unit_raw=snapshot.unit_raw,
+                source_updated_at=snapshot.source_updated_at,
+                parsed_at=snapshot.parsed_at,
+            )
+            for snapshot in self._session.scalars(statement)
+        ]
+
+    def _product_listing_statement(self) -> tuple[Any, Any]:
         latest_prices = (
             select(
                 PriceSnapshot.source_product_id.label("source_product_id"),
@@ -124,101 +189,49 @@ class ProductCatalog:
             .where(SourceProduct.is_active.is_(True))
         )
 
-        if filters.q is not None:
-            query = filters.q.strip()
-            if query:
-                pattern = f"%{_escape_like_pattern(query)}%"
-                statement = statement.where(
-                    or_(
-                        SourceProduct.title.ilike(pattern, escape="\\"),
-                        SourceProduct.normalized_title.ilike(pattern.lower(), escape="\\"),
-                    )
-                )
+        return statement, latest_prices
 
-        category_ids = self._category_filter_ids(filters)
-        if category_ids is not None:
-            if category_ids:
-                statement = statement.where(SourceProduct.category_id.in_(category_ids))
-            else:
-                statement = statement.where(false())
-
-        if filters.shop_id is not None:
-            statement = statement.where(SourceProduct.shop_id == filters.shop_id)
-
-        statement = (
-            statement.order_by(*self._sort_expressions(filters.sort, latest_prices))
-            .limit(filters.limit)
-            .offset(filters.offset)
-        )
-
-        items: list[ProductSearchItem] = []
-        for (
-            product,
-            shop,
-            latest_price,
-            latest_currency,
-            latest_unit_raw,
-            latest_source_updated_at,
-            latest_parsed_at,
-        ) in self._session.execute(statement):
-            price = None
-            if latest_parsed_at is not None:
-                price = ProductLatestPrice(
-                    price=latest_price,
-                    currency=latest_currency,
-                    unit_raw=latest_unit_raw,
-                    source_updated_at=latest_source_updated_at,
-                    parsed_at=latest_parsed_at,
-                )
-
-            items.append(
-                ProductSearchItem(
-                    id=product.id,
-                    source=product.source,
-                    source_product_id=product.source_product_id,
-                    title=product.title,
-                    normalized_title=product.normalized_title,
-                    description=product.description,
-                    category_id=product.category_id,
-                    category_raw=product.category_raw,
-                    unit_raw=product.unit_raw,
-                    image_url=product.image_url,
-                    source_updated_at=product.source_updated_at,
-                    last_seen_at=product.last_seen_at,
-                    shop=ProductShop(
-                        id=shop.id,
-                        source=shop.source,
-                        source_id=shop.source_id,
-                        name=shop.name,
-                    ),
-                    latest_price=price,
-                )
+    def _product_search_item(
+        self,
+        product: SourceProduct,
+        shop: Shop,
+        latest_price: Decimal | None,
+        latest_currency: str | None,
+        latest_unit_raw: str | None,
+        latest_source_updated_at: datetime | None,
+        latest_parsed_at: datetime | None,
+    ) -> ProductSearchItem:
+        price = None
+        if latest_parsed_at is not None:
+            price = ProductLatestPrice(
+                price=latest_price,
+                currency=latest_currency or "RUB",
+                unit_raw=latest_unit_raw,
+                source_updated_at=latest_source_updated_at,
+                parsed_at=latest_parsed_at,
             )
 
-        return items
-
-    def source_product_exists(self, product_id: int) -> bool:
-        statement = select(SourceProduct.id).where(SourceProduct.id == product_id)
-        return self._session.scalar(statement) is not None
-
-    def list_price_history(self, product_id: int) -> list[ProductPriceSnapshot]:
-        statement = (
-            select(PriceSnapshot)
-            .where(PriceSnapshot.source_product_id == product_id)
-            .order_by(PriceSnapshot.parsed_at.asc(), PriceSnapshot.id.asc())
+        return ProductSearchItem(
+            id=product.id,
+            source=product.source,
+            source_product_id=product.source_product_id,
+            title=product.title,
+            normalized_title=product.normalized_title,
+            description=product.description,
+            category_id=product.category_id,
+            category_raw=product.category_raw,
+            unit_raw=product.unit_raw,
+            image_url=product.image_url,
+            source_updated_at=product.source_updated_at,
+            last_seen_at=product.last_seen_at,
+            shop=ProductShop(
+                id=shop.id,
+                source=shop.source,
+                source_id=shop.source_id,
+                name=shop.name,
+            ),
+            latest_price=price,
         )
-
-        return [
-            ProductPriceSnapshot(
-                id=snapshot.id,
-                price=snapshot.price,
-                currency=snapshot.currency,
-                unit_raw=snapshot.unit_raw,
-                source_updated_at=snapshot.source_updated_at,
-                parsed_at=snapshot.parsed_at,
-            )
-            for snapshot in self._session.scalars(statement)
-        ]
 
     def _category_filter_ids(self, filters: ProductSearchFilters) -> set[int] | None:
         starting_ids: set[int] = set()
