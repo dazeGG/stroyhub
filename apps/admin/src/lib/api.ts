@@ -164,6 +164,53 @@ export interface CategoryQualityParams {
   titlesPerGroup?: number
 }
 
+export interface MatchCandidateProduct {
+  id: number
+  source: string
+  shop_id: number
+  shop_name: string
+  shop_source_id: string
+  title: string
+  normalized_title: string
+  category_id: number | null
+  category_raw: string | null
+}
+
+export interface MatchCandidateReason {
+  method: string
+  exact_title: boolean
+  matched_normalized_title: string | null
+  token_overlap: string[]
+  left_only_tokens: string[]
+  right_only_tokens: string[]
+  ignored_tokens: string[]
+  blocked_by: string[]
+  token_similarity: number
+  same_category: boolean | null
+}
+
+export interface MatchCandidatePair {
+  left: MatchCandidateProduct
+  right: MatchCandidateProduct
+  confidence: number
+  reason: MatchCandidateReason
+}
+
+export interface MatchCandidateResponse {
+  products_considered: number
+  candidates: MatchCandidatePair[]
+}
+
+export interface MatchCandidateParams {
+  source?: string
+  shopId?: number
+  categoryRaw?: string
+  minConfidence?: number
+  maxConfidence?: number
+  limit?: number
+  allowCategoryMismatch?: boolean
+}
+
 async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(apiPath(path), {
     headers: { Accept: 'application/json' },
@@ -247,4 +294,23 @@ export function fetchCategoryQuality(
   const query = params.toString()
 
   return fetchJson<CategoryQualityResponse>(query ? `/categories/quality?${query}` : '/categories/quality', signal)
+}
+
+export function fetchMatchCandidates(
+  filters: MatchCandidateParams = {},
+  signal?: AbortSignal,
+): Promise<MatchCandidateResponse> {
+  const params = new URLSearchParams()
+  appendOptionalParam(params, 'source', filters.source)
+  appendOptionalParam(params, 'shop', filters.shopId)
+  appendOptionalParam(params, 'category_raw', filters.categoryRaw)
+  appendOptionalParam(params, 'min_confidence', filters.minConfidence)
+  appendOptionalParam(params, 'max_confidence', filters.maxConfidence)
+  appendOptionalParam(params, 'limit', filters.limit)
+  if (filters.allowCategoryMismatch !== undefined) {
+    params.set('allow_category_mismatch', String(filters.allowCategoryMismatch))
+  }
+  const query = params.toString()
+
+  return fetchJson<MatchCandidateResponse>(query ? `/matches/candidates?${query}` : '/matches/candidates', signal)
 }
