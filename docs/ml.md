@@ -75,6 +75,11 @@ accepted suggestions.
 files created from the live log before training. A snapshot is not created for
 every individual label.
 
+Duplicate product/category pair labels are allowed as later corrections in the
+append-only log. Dataset helpers use the latest label for a product/category
+pair by default, while CLI queue helpers can skip pairs that already have any
+label.
+
 Training uses the latest snapshot. The planned training command creates the next
 snapshot version automatically before fitting a model. It should refuse to train
 unless there are at least 50 newly labeled products since the latest snapshot,
