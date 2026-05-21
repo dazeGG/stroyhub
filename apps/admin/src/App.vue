@@ -7,6 +7,7 @@ const navItems = [
   { label: 'Скрейпы', to: '/scrapes' },
   { label: 'Категории', to: '/categories' },
   { label: 'Матчинг', to: '/matches' },
+  { label: 'Помощь', to: '/help' },
 ]
 </script>
 

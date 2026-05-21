@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import CatalogPage from './views/CatalogPage.vue'
 import CategoryReviewPage from './views/CategoryReviewPage.vue'
+import HelpPage from './views/HelpPage.vue'
 import MatchReviewPage from './views/MatchReviewPage.vue'
 import PriceHistoryPage from './views/PriceHistoryPage.vue'
 import ScrapeStatusPage from './views/ScrapeStatusPage.vue'
@@ -14,5 +15,6 @@ export const router = createRouter({
     { path: '/scrapes', name: 'scrapes', component: ScrapeStatusPage },
     { path: '/categories', name: 'categories', component: CategoryReviewPage },
     { path: '/matches', name: 'matches', component: MatchReviewPage },
+    { path: '/help', name: 'help', component: HelpPage },
   ],
 })
