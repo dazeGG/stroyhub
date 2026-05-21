@@ -182,6 +182,35 @@ rules/aliases can still improve general coverage without hiding reviewer-made
 exceptions. The implementation lives in `category_overrides`, with active
 overrides exposed through product API responses.
 
+## 2026-05-22: Keep ML Workflows in a Separate Workspace App
+
+Context:
+Category verifier and predictor work needs dataset collection, snapshots,
+training, evaluation, model artifacts, and reports. Those are project utility
+workflows, not operational catalog data. The product database should stay
+focused on source products, categories, prices, scrapes, and admin decisions.
+
+Decision:
+Use `apps/ml` for ML commands and `.var/ml` for runtime ML artifacts. Keep
+reusable model code in `packages/stroyhub/ml`. The first dataset collection
+workflow is CLI-first and reads products/categories from PostgreSQL directly.
+It stores live labels in `.var/ml/category_verifier/labels.jsonl`, creates
+versioned dataset snapshots before training, and writes trained model artifacts
+under `.var/ml/category_verifier/models`.
+
+`apps/api` and `apps/worker` may use ready models through public APIs from
+`packages/stroyhub/ml`, but they do not train models and do not import model
+implementation internals directly. `apps/admin` remains an operational review
+UI; it can review suggestions exposed by the API, but it does not collect ML
+training labels.
+
+Consequences:
+ML labels, snapshots, models, and reports are not committed to git and are not
+stored in PostgreSQL. A single CLI labeling answer can support both category
+verifier training and a future category predictor. Operational category changes
+continue to use manual overrides or accepted suggestion review, not raw ML
+labels.
+
 ## 2026-05-18: Accept Conservative Product Matching Schema
 
 Context:
