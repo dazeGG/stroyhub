@@ -10,6 +10,9 @@ from stroyhub.core.config import settings
 from stroyhub.db import (
     CanonicalProductCreate,
     CanonicalProductRepository,
+    CategoryOverrideCreate,
+    CategoryOverrideRepository,
+    CategoryOverrideRevert,
     CategoryRepository,
     CategoryUpsert,
     PriceSnapshotCreate,
@@ -23,7 +26,15 @@ from stroyhub.db import (
     SourceProductRepository,
     SourceProductUpsert,
 )
-from stroyhub.models import Category, PriceSnapshot, ProductMatch, ScrapeRun, Shop, SourceProduct
+from stroyhub.models import (
+    Category,
+    CategoryOverride,
+    PriceSnapshot,
+    ProductMatch,
+    ScrapeRun,
+    Shop,
+    SourceProduct,
+)
 
 
 @pytest.fixture
@@ -157,6 +168,123 @@ def test_category_repository_upserts_by_parent_and_slug(db_session: Session) -> 
     assert updated.parent_id == parent.id
     assert updated.name == "Цемент"
     assert count == 2
+
+
+def test_category_override_repository_creates_replaces_and_reverts(
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="category-override-shop", name="Shop")
+    )
+    category_repository = CategoryRepository(db_session)
+    original_category = category_repository.upsert(
+        CategoryUpsert(slug="override-original", name="Original")
+    )
+    first_category = category_repository.upsert(
+        CategoryUpsert(slug="override-first", name="First")
+    )
+    second_category = category_repository.upsert(
+        CategoryUpsert(slug="override-second", name="Second")
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="category-override-product",
+            title="Override product",
+            normalized_title="override product",
+            category_id=original_category.id,
+        )
+    )
+
+    repository = CategoryOverrideRepository(db_session)
+    first_override = repository.create_or_replace(
+        CategoryOverrideCreate(
+            source_product_id=product.id,
+            category_id=first_category.id,
+            reason="review",
+            actor="admin",
+        )
+    )
+    second_override = repository.create_or_replace(
+        CategoryOverrideCreate(
+            source_product_id=product.id,
+            category_id=second_category.id,
+            actor="admin",
+        )
+    )
+
+    active_override = repository.get_active(product.id)
+    active_count = db_session.scalar(
+        select(func.count())
+        .select_from(CategoryOverride)
+        .where(
+            CategoryOverride.source_product_id == product.id,
+            CategoryOverride.status == "active",
+        )
+    )
+
+    assert first_override.status == "replaced"
+    assert first_override.deactivated_by == "admin"
+    assert second_override.previous_category_id == original_category.id
+    assert active_override is not None
+    assert active_override.id == second_override.id
+    assert active_count == 1
+    assert product.category_id == second_category.id
+
+    reverted = repository.revert_active(
+        CategoryOverrideRevert(source_product_id=product.id, actor="admin")
+    )
+
+    assert reverted is not None
+    assert reverted.status == "reverted"
+    assert repository.get_active(product.id) is None
+    assert product.category_id == original_category.id
+
+
+def test_source_product_upsert_preserves_active_category_override(
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="category-override-rescrape-shop", name="Shop")
+    )
+    category_repository = CategoryRepository(db_session)
+    rule_category = category_repository.upsert(CategoryUpsert(slug="rule-category", name="Rule"))
+    override_category = category_repository.upsert(
+        CategoryUpsert(slug="manual-category", name="Manual")
+    )
+    product_repository = SourceProductRepository(db_session)
+    product = product_repository.upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="category-override-rescrape-product",
+            title="Rescrape product",
+            normalized_title="rescrape product",
+            category_id=rule_category.id,
+        )
+    )
+    CategoryOverrideRepository(db_session).create_or_replace(
+        CategoryOverrideCreate(
+            source_product_id=product.id,
+            category_id=override_category.id,
+            actor="admin",
+        )
+    )
+
+    rescraped = product_repository.upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="category-override-rescrape-product",
+            title="Rescrape product updated",
+            normalized_title="rescrape product updated",
+            category_id=rule_category.id,
+        )
+    )
+
+    assert rescraped.id == product.id
+    assert rescraped.category_id == override_category.id
 
 
 def test_source_product_repository_falls_back_to_fingerprint(

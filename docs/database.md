@@ -110,7 +110,7 @@ Both fields are needed. `category_raw` preserves source context and supports rep
 
 Manual category overrides:
 
-- Store reviewer corrections separately in a future `category_overrides` table
+- Store reviewer corrections separately in the `category_overrides` table
   instead of mutating source payloads or encoding one-off exceptions in rules.
 - When an active override exists for a source product, it should take
   precedence over source category aliases and rule-based categorization.
@@ -119,7 +119,7 @@ Manual category overrides:
 - Rescraping a product should preserve active overrides and reapply them when
   calculating the effective `category_id`.
 
-Proposed `category_overrides` table:
+`category_overrides` table:
 
 - `id`: `bigint` primary key
 - `source_product_id`: `bigint`, required reference to `source_products.id`
@@ -134,13 +134,13 @@ Proposed `category_overrides` table:
 - `deactivated_by`: `text`, nullable
 - `deactivated_at`: `timestamp with time zone`, nullable
 
-Proposed status values:
+Status values:
 
 - `active`: override is the current manual category decision.
 - `replaced`: override was superseded by a newer manual decision.
 - `reverted`: override was intentionally removed and rules/aliases should apply again.
 
-Proposed constraints and indexes:
+Constraints and indexes:
 
 - Unique partial index: `source_product_id` where `status = 'active'`.
 - Index: `category_id`.

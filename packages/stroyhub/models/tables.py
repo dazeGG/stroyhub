@@ -84,6 +84,10 @@ class Category(TimestampMixin, Base):
     children: Mapped[list["Category"]] = relationship(back_populates="parent")
     source_products: Mapped[list["SourceProduct"]] = relationship(back_populates="category")
     canonical_products: Mapped[list["CanonicalProduct"]] = relationship(back_populates="category")
+    category_overrides: Mapped[list["CategoryOverride"]] = relationship(
+        back_populates="category",
+        foreign_keys="CategoryOverride.category_id",
+    )
 
 
 class SourceProduct(TimestampMixin, Base):
@@ -137,6 +141,50 @@ class SourceProduct(TimestampMixin, Base):
     category: Mapped[Category | None] = relationship(back_populates="source_products")
     price_snapshots: Mapped[list["PriceSnapshot"]] = relationship(back_populates="source_product")
     product_matches: Mapped[list["ProductMatch"]] = relationship(back_populates="source_product")
+    category_overrides: Mapped[list["CategoryOverride"]] = relationship(
+        back_populates="source_product",
+        foreign_keys="CategoryOverride.source_product_id",
+    )
+
+
+class CategoryOverride(TimestampMixin, Base):
+    __tablename__ = "category_overrides"
+    __table_args__: Any = (
+        Index("ix_category_overrides_category_id", "category_id"),
+        Index("ix_category_overrides_status", "status"),
+        Index("ix_category_overrides_created_at", "created_at"),
+        Index(
+            "uq_category_overrides_source_product_active",
+            "source_product_id",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    source_product_id: Mapped[int] = mapped_column(
+        ForeignKey("source_products.id"), nullable=False
+    )
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), nullable=False)
+    previous_category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"))
+    reason: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))
+    created_by: Mapped[str | None] = mapped_column(Text)
+    updated_by: Mapped[str | None] = mapped_column(Text)
+    deactivated_by: Mapped[str | None] = mapped_column(Text)
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    source_product: Mapped[SourceProduct] = relationship(
+        back_populates="category_overrides",
+        foreign_keys=[source_product_id],
+    )
+    category: Mapped[Category] = relationship(
+        back_populates="category_overrides",
+        foreign_keys=[category_id],
+    )
+    previous_category: Mapped[Category | None] = relationship(
+        foreign_keys=[previous_category_id],
+    )
 
 
 class CanonicalProduct(TimestampMixin, Base):

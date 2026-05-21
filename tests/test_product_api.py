@@ -451,6 +451,7 @@ def test_product_detail_endpoint_returns_source_product(
     assert payload["shop"]["name"] == "Detail Shop"
     assert payload["latest_price"]["price"] == "560.00"
     assert payload["latest_price"]["unit_raw"] == "bag"
+    assert payload["category_override"] is None
 
 
 def test_product_detail_endpoint_returns_404_for_missing_product(
@@ -460,6 +461,129 @@ def test_product_detail_endpoint_returns_404_for_missing_product(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Source product not found"}
+
+
+def test_product_category_override_endpoint_creates_reads_and_reverts_override(
+    client: TestClient, db_session: Session
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-api-override", name="Override Shop")
+    )
+    root = Category(slug="api-override-root", name="Override Root")
+    db_session.add(root)
+    db_session.flush()
+    original_category = Category(
+        slug="api-override-original",
+        name="Override Original",
+        parent_id=root.id,
+    )
+    manual_category = Category(
+        slug="api-override-manual",
+        name="Override Manual",
+        parent_id=root.id,
+    )
+    db_session.add_all([original_category, manual_category])
+    db_session.flush()
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="override-api-1",
+            title="Override Product",
+            normalized_title="override product",
+            category_id=original_category.id,
+        )
+    )
+
+    assign_response = client.put(
+        f"/products/{product.id}/category-override",
+        json={
+            "category_id": manual_category.id,
+            "reason": "admin review",
+            "actor": "tester",
+        },
+    )
+
+    assert assign_response.status_code == 200
+    assigned = assign_response.json()
+    assert assigned["category_id"] == manual_category.id
+    assert assigned["category_override"]["category_id"] == manual_category.id
+    assert assigned["category_override"]["previous_category_id"] == original_category.id
+    assert assigned["category_override"]["reason"] == "admin review"
+    assert assigned["category_override"]["created_by"] == "tester"
+
+    detail_response = client.get(f"/products/{product.id}")
+
+    assert detail_response.status_code == 200
+    assert detail_response.json()["category_override"]["category_id"] == manual_category.id
+
+    revert_response = client.delete(
+        f"/products/{product.id}/category-override",
+        params={"actor": "tester"},
+    )
+
+    assert revert_response.status_code == 200
+    reverted = revert_response.json()
+    assert reverted["category_id"] == original_category.id
+    assert reverted["category_override"] is None
+
+
+def test_product_category_override_endpoint_rejects_root_category(
+    client: TestClient, db_session: Session
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-api-root-override", name="Root Shop")
+    )
+    root = Category(slug="api-root-override-root", name="Root Override Root")
+    db_session.add(root)
+    db_session.flush()
+    child = Category(
+        slug="api-root-override-child",
+        name="Root Override Child",
+        parent_id=root.id,
+    )
+    db_session.add(child)
+    db_session.flush()
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="root-override-api-1",
+            title="Root Override Product",
+            normalized_title="root override product",
+            category_id=child.id,
+        )
+    )
+
+    response = client.put(
+        f"/products/{product.id}/category-override",
+        json={"category_id": root.id},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Category override must target a leaf category"}
+
+
+def test_product_category_override_revert_returns_404_without_active_override(
+    client: TestClient, db_session: Session
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-api-no-override", name="No Override Shop")
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="no-override-api-1",
+            title="No Override Product",
+            normalized_title="no override product",
+        )
+    )
+
+    response = client.delete(f"/products/{product.id}/category-override")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Active category override not found"}
 
 
 def test_product_price_history_endpoint_returns_ordered_snapshots(

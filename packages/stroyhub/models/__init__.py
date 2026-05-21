@@ -3,6 +3,7 @@
 from stroyhub.models.tables import (
     CanonicalProduct,
     Category,
+    CategoryOverride,
     PriceSnapshot,
     ProductMatch,
     ScrapeRun,
@@ -13,6 +14,7 @@ from stroyhub.models.tables import (
 __all__ = [
     "CanonicalProduct",
     "Category",
+    "CategoryOverride",
     "PriceSnapshot",
     "ProductMatch",
     "ScrapeRun",

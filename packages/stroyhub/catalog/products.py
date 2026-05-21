@@ -6,7 +6,7 @@ from typing import Any, Literal
 from sqlalchemy import and_, false, func, or_, select
 from sqlalchemy.orm import Session
 
-from stroyhub.models.tables import Category, PriceSnapshot, Shop, SourceProduct
+from stroyhub.models.tables import Category, CategoryOverride, PriceSnapshot, Shop, SourceProduct
 
 ProductSort = Literal[
     "latest_price",
@@ -53,6 +53,21 @@ class ProductLatestPrice:
 
 
 @dataclass(frozen=True, kw_only=True)
+class ProductCategoryOverride:
+    id: int
+    category_id: int
+    previous_category_id: int | None
+    reason: str | None
+    status: str
+    created_by: str | None
+    created_at: datetime
+    updated_by: str | None
+    updated_at: datetime
+    deactivated_by: str | None
+    deactivated_at: datetime | None
+
+
+@dataclass(frozen=True, kw_only=True)
 class ProductSearchItem:
     id: int
     source: str
@@ -68,6 +83,7 @@ class ProductSearchItem:
     last_seen_at: datetime
     shop: ProductShop
     latest_price: ProductLatestPrice | None
+    category_override: ProductCategoryOverride | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -177,6 +193,7 @@ class ProductCatalog:
                 latest_prices.c.latest_unit_raw,
                 latest_prices.c.latest_source_updated_at,
                 latest_prices.c.latest_parsed_at,
+                CategoryOverride,
             )
             .join(Shop, SourceProduct.shop_id == Shop.id)
             .outerjoin(
@@ -184,6 +201,13 @@ class ProductCatalog:
                 and_(
                     latest_prices.c.source_product_id == SourceProduct.id,
                     latest_prices.c.row_number == 1,
+                ),
+            )
+            .outerjoin(
+                CategoryOverride,
+                and_(
+                    CategoryOverride.source_product_id == SourceProduct.id,
+                    CategoryOverride.status == "active",
                 ),
             )
             .where(SourceProduct.is_active.is_(True))
@@ -200,6 +224,7 @@ class ProductCatalog:
         latest_unit_raw: str | None,
         latest_source_updated_at: datetime | None,
         latest_parsed_at: datetime | None,
+        category_override: CategoryOverride | None,
     ) -> ProductSearchItem:
         price = None
         if latest_parsed_at is not None:
@@ -231,6 +256,27 @@ class ProductCatalog:
                 name=shop.name,
             ),
             latest_price=price,
+            category_override=self._category_override_info(category_override),
+        )
+
+    def _category_override_info(
+        self, category_override: CategoryOverride | None
+    ) -> ProductCategoryOverride | None:
+        if category_override is None:
+            return None
+
+        return ProductCategoryOverride(
+            id=category_override.id,
+            category_id=category_override.category_id,
+            previous_category_id=category_override.previous_category_id,
+            reason=category_override.reason,
+            status=category_override.status,
+            created_by=category_override.created_by,
+            created_at=category_override.created_at,
+            updated_by=category_override.updated_by,
+            updated_at=category_override.updated_at,
+            deactivated_by=category_override.deactivated_by,
+            deactivated_at=category_override.deactivated_at,
         )
 
     def _category_filter_ids(self, filters: ProductSearchFilters) -> set[int] | None:

@@ -4,8 +4,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
 import {
+  assignProductCategoryOverride,
+  fetchCategories,
   fetchProduct,
   fetchProductPriceHistory,
+  revertProductCategoryOverride,
+  type CategoryTreeItem,
   type ProductPriceSnapshot,
   type ProductSearchItem,
 } from '../lib/api'
@@ -14,14 +18,20 @@ import { icons } from '../lib/icons'
 const route = useRoute()
 
 const product = ref<ProductSearchItem | null>(null)
+const categories = ref<CategoryTreeItem[]>([])
 const snapshots = ref<ProductPriceSnapshot[]>([])
+const selectedCategoryId = ref('')
 const isLoadingProduct = ref(false)
+const isLoadingCategories = ref(false)
 const isLoadingHistory = ref(false)
+const isSavingCategory = ref(false)
 const productErrorMessage = ref('')
+const categoryErrorMessage = ref('')
 const historyErrorMessage = ref('')
 
 let productRequest: AbortController | null = null
 let historyRequest: AbortController | null = null
+let categorySaveRequest: AbortController | null = null
 
 const productId = computed(() => {
   const rawValue = Array.isArray(route.params.productId)
@@ -62,6 +72,48 @@ const repeatedObservations = computed(() => {
 })
 
 const nullPriceCount = computed(() => snapshots.value.filter((snapshot) => snapshot.price === null).length)
+
+const leafCategoryOptions = computed(() => {
+  const options: { id: number; label: string }[] = []
+
+  function walk(items: CategoryTreeItem[], path: string[]): void {
+    for (const item of items) {
+      const nextPath = [...path, item.name]
+      if (item.children.length === 0) {
+        options.push({ id: item.id, label: nextPath.join(' / ') })
+      } else {
+        walk(item.children, nextPath)
+      }
+    }
+  }
+
+  walk(categories.value, [])
+  return options
+})
+
+const categoryNameById = computed(() => {
+  const names = new Map<number, string>()
+
+  function walk(items: CategoryTreeItem[]): void {
+    for (const item of items) {
+      names.set(item.id, item.name)
+      walk(item.children)
+    }
+  }
+
+  walk(categories.value)
+  return names
+})
+
+const categoryLabel = computed(() => {
+  if (!product.value?.category_id) {
+    return 'Не нормализовано'
+  }
+
+  return categoryNameById.value.get(product.value.category_id) || `ID ${product.value.category_id}`
+})
+
+const hasActiveOverride = computed(() => product.value?.category_override != null)
 
 function priceStateKey(snapshot: ProductPriceSnapshot): string {
   return snapshot.price === null ? 'null' : `${snapshot.price}:${snapshot.currency}:${snapshot.unit_raw || ''}`
@@ -133,6 +185,7 @@ async function loadProduct(nextProductId: number): Promise<void> {
 
   try {
     product.value = await fetchProduct(nextProductId, request.signal)
+    selectedCategoryId.value = product.value.category_id ? String(product.value.category_id) : ''
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       return
@@ -144,6 +197,21 @@ async function loadProduct(nextProductId: number): Promise<void> {
     if (productRequest === request) {
       isLoadingProduct.value = false
     }
+  }
+}
+
+async function loadCategories(): Promise<void> {
+  isLoadingCategories.value = true
+  categoryErrorMessage.value = ''
+
+  try {
+    const response = await fetchCategories()
+    categories.value = response.items
+  } catch (error) {
+    categoryErrorMessage.value =
+      error instanceof Error ? error.message : 'Не удалось загрузить категории'
+  } finally {
+    isLoadingCategories.value = false
   }
 }
 
@@ -171,6 +239,65 @@ async function loadHistory(nextProductId: number): Promise<void> {
   }
 }
 
+async function saveCategoryOverride(): Promise<void> {
+  const nextProductId = productId.value
+  const nextCategoryId = Number(selectedCategoryId.value)
+  if (nextProductId === null || !Number.isInteger(nextCategoryId) || nextCategoryId <= 0) {
+    return
+  }
+
+  categorySaveRequest?.abort()
+  const request = new AbortController()
+  categorySaveRequest = request
+  isSavingCategory.value = true
+  categoryErrorMessage.value = ''
+
+  try {
+    product.value = await assignProductCategoryOverride(nextProductId, nextCategoryId, request.signal)
+    selectedCategoryId.value = product.value.category_id ? String(product.value.category_id) : ''
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return
+    }
+
+    categoryErrorMessage.value =
+      error instanceof Error ? error.message : 'Не удалось сохранить категорию'
+  } finally {
+    if (categorySaveRequest === request) {
+      isSavingCategory.value = false
+    }
+  }
+}
+
+async function revertCategoryOverride(): Promise<void> {
+  const nextProductId = productId.value
+  if (nextProductId === null) {
+    return
+  }
+
+  categorySaveRequest?.abort()
+  const request = new AbortController()
+  categorySaveRequest = request
+  isSavingCategory.value = true
+  categoryErrorMessage.value = ''
+
+  try {
+    product.value = await revertProductCategoryOverride(nextProductId, request.signal)
+    selectedCategoryId.value = product.value.category_id ? String(product.value.category_id) : ''
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return
+    }
+
+    categoryErrorMessage.value =
+      error instanceof Error ? error.message : 'Не удалось откатить категорию'
+  } finally {
+    if (categorySaveRequest === request) {
+      isSavingCategory.value = false
+    }
+  }
+}
+
 function loadPage(): void {
   const nextProductId = productId.value
   if (nextProductId === null) {
@@ -190,6 +317,7 @@ watch(productId, () => {
 })
 
 onMounted(() => {
+  void loadCategories()
   loadPage()
 })
 </script>
@@ -258,9 +386,69 @@ onMounted(() => {
             <p class="mt-1 text-neutral-200">{{ product?.category_raw || '-' }}</p>
           </div>
           <div>
+            <p class="text-xs uppercase tracking-wide text-neutral-600">Категория StroyHub</p>
+            <p class="mt-1 text-neutral-200">{{ categoryLabel }}</p>
+          </div>
+          <div>
             <p class="text-xs uppercase tracking-wide text-neutral-600">Последний раз</p>
             <p class="mt-1 text-neutral-200">{{ formatDateTime(product?.last_seen_at || null) }}</p>
           </div>
+          <div>
+            <p class="text-xs uppercase tracking-wide text-neutral-600">Ручное правило</p>
+            <p class="mt-1">
+              <span
+                class="rounded-full border px-2 py-1 text-xs"
+                :class="
+                  hasActiveOverride
+                    ? 'border-amber-400/30 bg-amber-400/10 text-amber-200'
+                    : 'border-neutral-700 bg-neutral-900 text-neutral-300'
+                "
+              >
+                {{ hasActiveOverride ? 'Активен' : 'Нет' }}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-6 border-t border-neutral-800 pt-5">
+          <p class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            <Icon :icon="icons.category" class="size-4" aria-hidden="true" />
+            Ручная категория
+          </p>
+          <div class="mt-3 grid gap-3 md:grid-cols-[minmax(220px,1fr)_auto_auto]">
+            <select
+              v-model="selectedCategoryId"
+              aria-label="Ручная категория товара"
+              class="h-10 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+              :disabled="isLoadingCategories || isSavingCategory || !product"
+            >
+              <option value="">Выберите категорию</option>
+              <option v-for="category in leafCategoryOptions" :key="category.id" :value="String(category.id)">
+                {{ category.label }}
+              </option>
+            </select>
+            <button
+              class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition enabled:hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="!selectedCategoryId || isSavingCategory || !product"
+              type="button"
+              @click="saveCategoryOverride"
+            >
+              <Icon :icon="icons.check" class="size-4" aria-hidden="true" />
+              Сохранить
+            </button>
+            <button
+              class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-800 px-4 text-sm font-medium text-neutral-200 transition enabled:hover:border-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="!hasActiveOverride || isSavingCategory || !product"
+              type="button"
+              @click="revertCategoryOverride"
+            >
+              <Icon :icon="icons.restore" class="size-4" aria-hidden="true" />
+              Откатить
+            </button>
+          </div>
+          <p v-if="categoryErrorMessage" class="mt-3 text-sm text-red-200">
+            {{ categoryErrorMessage }}
+          </p>
         </div>
       </div>
 

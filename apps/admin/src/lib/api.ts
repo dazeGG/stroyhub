@@ -31,6 +31,20 @@ export interface ProductLatestPrice {
   parsed_at: string
 }
 
+export interface ProductCategoryOverride {
+  id: number
+  category_id: number
+  previous_category_id: number | null
+  reason: string | null
+  status: string
+  created_by: string | null
+  created_at: string
+  updated_by: string | null
+  updated_at: string
+  deactivated_by: string | null
+  deactivated_at: string | null
+}
+
 export interface ProductSearchItem {
   id: number
   source: string
@@ -46,6 +60,7 @@ export interface ProductSearchItem {
   last_seen_at: string
   shop: ProductShop
   latest_price: ProductLatestPrice | null
+  category_override: ProductCategoryOverride | null
 }
 
 export interface ProductSearchResponse {
@@ -224,6 +239,28 @@ async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return response.json() as Promise<T>
 }
 
+async function writeJson<T>(
+  path: string,
+  init: RequestInit,
+  signal?: AbortSignal,
+): Promise<T> {
+  const response = await fetch(apiPath(path), {
+    ...init,
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...init.headers,
+    },
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(`API request failed with ${response.status}`)
+  }
+
+  return response.json() as Promise<T>
+}
+
 function appendOptionalParam(params: URLSearchParams, key: string, value: string | number | undefined): void {
   if (value !== undefined && value !== '') {
     params.set(key, String(value))
@@ -250,6 +287,32 @@ export function fetchProduct(
   signal?: AbortSignal,
 ): Promise<ProductSearchItem> {
   return fetchJson<ProductSearchItem>(`/products/${productId}`, signal)
+}
+
+export function assignProductCategoryOverride(
+  productId: number,
+  categoryId: number,
+  signal?: AbortSignal,
+): Promise<ProductSearchItem> {
+  return writeJson<ProductSearchItem>(
+    `/products/${productId}/category-override`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ category_id: categoryId, actor: 'admin' }),
+    },
+    signal,
+  )
+}
+
+export function revertProductCategoryOverride(
+  productId: number,
+  signal?: AbortSignal,
+): Promise<ProductSearchItem> {
+  return writeJson<ProductSearchItem>(
+    `/products/${productId}/category-override?actor=admin`,
+    { method: 'DELETE' },
+    signal,
+  )
 }
 
 export function fetchCategories(signal?: AbortSignal): Promise<CategoryTreeResponse> {
