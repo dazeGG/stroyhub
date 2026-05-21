@@ -139,6 +139,31 @@ export interface ShopListParams {
   status?: string
 }
 
+export interface UncategorizedCategoryGroup {
+  source: string
+  shop_id: number
+  shop_name: string
+  shop_source_id: string
+  category_raw: string | null
+  count: number
+  titles: string[]
+}
+
+export interface CategoryQualityResponse {
+  total_products: number
+  categorized_products: number
+  uncategorized_products: number
+  coverage_pct: string
+  groups: UncategorizedCategoryGroup[]
+}
+
+export interface CategoryQualityParams {
+  source?: string
+  shopId?: number
+  limitGroups?: number
+  titlesPerGroup?: number
+}
+
 async function fetchJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(apiPath(path), {
     headers: { Accept: 'application/json' },
@@ -208,4 +233,18 @@ export function fetchScrapeHealth(
   const query = params.toString()
 
   return fetchJson<ScrapeHealthResponse>(query ? `/scrapes/health?${query}` : '/scrapes/health', signal)
+}
+
+export function fetchCategoryQuality(
+  filters: CategoryQualityParams = {},
+  signal?: AbortSignal,
+): Promise<CategoryQualityResponse> {
+  const params = new URLSearchParams()
+  appendOptionalParam(params, 'source', filters.source)
+  appendOptionalParam(params, 'shop', filters.shopId)
+  appendOptionalParam(params, 'limit_groups', filters.limitGroups)
+  appendOptionalParam(params, 'titles_per_group', filters.titlesPerGroup)
+  const query = params.toString()
+
+  return fetchJson<CategoryQualityResponse>(query ? `/categories/quality?${query}` : '/categories/quality', signal)
 }

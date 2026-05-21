@@ -163,6 +163,40 @@ Example response:
 }
 ```
 
+### `GET /categories/quality`
+
+Returns category coverage metrics and uncategorized product groups for review.
+Manual category edits are not exposed in M12.
+
+Query params:
+
+- `source`: optional source filter.
+- `shop`: optional shop id filter.
+- `limit_groups`: 1-100, default `50`.
+- `titles_per_group`: 1-10, default `3`.
+
+Example response:
+
+```json
+{
+  "total_products": 100,
+  "categorized_products": 92,
+  "uncategorized_products": 8,
+  "coverage_pct": "92.00",
+  "groups": [
+    {
+      "source": "2gis",
+      "shop_id": 3,
+      "shop_name": "Build Shop",
+      "shop_source_id": "70000001007229923",
+      "category_raw": "Raw Category",
+      "count": 4,
+      "titles": ["Example product"]
+    }
+  ]
+}
+```
+
 ## Shops
 
 ### `GET /shops`

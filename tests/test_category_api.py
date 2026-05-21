@@ -257,3 +257,84 @@ def test_category_price_summary_endpoint_aggregates_latest_prices(
         "avg_price": "10.00",
         "max_price": "10.00",
     }
+
+
+def test_category_quality_endpoint_groups_uncategorized_products(
+    client: TestClient, db_session: Session
+) -> None:
+    category = Category(slug="quality-api-category", name="Quality API Category")
+    db_session.add(category)
+    db_session.flush()
+
+    matching_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="quality-api-shop-1", name="Quality Shop")
+    )
+    other_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="unicom", source_id="quality-api-shop-2", name="Other Quality Shop")
+    )
+    products = SourceProductRepository(db_session)
+    products.upsert(
+        SourceProductUpsert(
+            shop_id=matching_shop.id,
+            source="2gis",
+            source_product_id="quality-categorized",
+            title="Categorized Product",
+            normalized_title="categorized product",
+            category_id=category.id,
+            category_raw="Raw A",
+        )
+    )
+    products.upsert(
+        SourceProductUpsert(
+            shop_id=matching_shop.id,
+            source="2gis",
+            source_product_id="quality-uncategorized-1",
+            title="Uncategorized First",
+            normalized_title="uncategorized first",
+            category_raw="Raw A",
+        )
+    )
+    products.upsert(
+        SourceProductUpsert(
+            shop_id=matching_shop.id,
+            source="2gis",
+            source_product_id="quality-uncategorized-2",
+            title="Uncategorized Second",
+            normalized_title="uncategorized second",
+            category_raw="Raw A",
+        )
+    )
+    products.upsert(
+        SourceProductUpsert(
+            shop_id=other_shop.id,
+            source="unicom",
+            source_product_id="quality-other-source",
+            title="Other Source Product",
+            normalized_title="other source product",
+            category_raw="Raw B",
+        )
+    )
+
+    response = client.get(
+        "/categories/quality",
+        params={"source": "2gis", "shop": matching_shop.id, "titles_per_group": 1},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "total_products": 3,
+        "categorized_products": 1,
+        "uncategorized_products": 2,
+        "coverage_pct": "33.33",
+        "groups": [
+            {
+                "source": "2gis",
+                "shop_id": matching_shop.id,
+                "shop_name": "Quality Shop",
+                "shop_source_id": "quality-api-shop-1",
+                "category_raw": "Raw A",
+                "count": 2,
+                "titles": ["Uncategorized First"],
+            }
+        ],
+    }
