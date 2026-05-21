@@ -129,4 +129,5 @@ Project tasks are tracked in GitHub Issues and the [StroyHub MVP project](https:
 
 ## Runbooks
 
+- [API v2 endpoints](docs/api.md)
 - [Local data collection](docs/local-data-collection.md)
