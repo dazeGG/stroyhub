@@ -11,6 +11,7 @@ Vue-based admin/review UI for the M12 milestone.
 - Nuxt UI
 - Vue Router
 - pnpm
+- Node.js 22.12+
 
 ## Local Development
 

@@ -22,7 +22,7 @@ not import Python modules from `packages/stroyhub` directly.
 - Tailwind CSS for layout, spacing, and custom styling.
 - Nuxt UI as the Tailwind-based Vue component library through its Vite plugin.
 - Vue Router for admin pages.
-- pnpm with the active Node.js LTS line for frontend dependency management.
+- pnpm with Node.js 22.12+ for frontend dependency management.
 
 Nuxt UI is used as a Vue component library. M12 does not adopt Nuxt as the app
 framework.

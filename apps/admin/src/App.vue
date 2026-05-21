@@ -16,7 +16,7 @@ const navItems = [
       <aside class="fixed inset-y-0 left-0 hidden w-64 border-r border-neutral-800 bg-neutral-950/95 px-5 py-6 lg:block">
         <RouterLink to="/" class="block">
           <p class="text-xs font-semibold uppercase tracking-wide text-amber-300">StroyHub</p>
-          <h1 class="mt-2 text-xl font-semibold text-white">Admin</h1>
+          <h1 class="mt-2 text-xl font-semibold text-white">Админка</h1>
         </RouterLink>
 
         <nav class="mt-10 flex flex-col gap-1">
@@ -36,10 +36,10 @@ const navItems = [
         <header class="sticky top-0 z-10 border-b border-neutral-800 bg-neutral-950/90 backdrop-blur">
           <div class="flex min-h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
             <div>
-              <p class="text-xs font-medium uppercase tracking-wide text-neutral-500">M12 review console</p>
-              <p class="text-sm text-neutral-300">Yakutsk construction material data</p>
+              <p class="text-xs font-medium uppercase tracking-wide text-neutral-500">M12 админка</p>
+              <p class="text-sm text-neutral-300">Данные по стройматериалам Якутска</p>
             </div>
-            <UBadge color="neutral" variant="subtle">Local API</UBadge>
+            <UBadge color="neutral" variant="subtle">Локальный API</UBadge>
           </div>
           <nav class="flex gap-2 overflow-x-auto border-t border-neutral-900 px-4 pb-3 sm:px-6 lg:hidden">
             <RouterLink
