@@ -179,8 +179,8 @@ object remains the runtime representation of that highest-precedence decision.
 Consequences:
 Manual decisions are auditable and reversible. Source data remains intact, and
 rules/aliases can still improve general coverage without hiding reviewer-made
-exceptions. A schema migration and repository/API implementation should be done
-in follow-up issue [#109](https://github.com/dazeGG/stroyhub/issues/109).
+exceptions. The implementation lives in `category_overrides`, with active
+overrides exposed through product API responses.
 
 ## 2026-05-18: Accept Conservative Product Matching Schema
 

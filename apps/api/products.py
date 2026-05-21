@@ -7,6 +7,12 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from stroyhub.catalog.products import ProductCatalog, ProductSearchFilters, ProductSort
 from stroyhub.db import get_session
+from stroyhub.db.repositories import (
+    CategoryOverrideCreate,
+    CategoryOverrideRepository,
+    CategoryOverrideRevert,
+    CategoryRepository,
+)
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -30,6 +36,22 @@ class ProductLatestPriceResponse(BaseModel):
     parsed_at: datetime
 
 
+class ProductCategoryOverrideResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    category_id: int
+    previous_category_id: int | None
+    reason: str | None
+    status: str
+    created_by: str | None
+    created_at: datetime
+    updated_by: str | None
+    updated_at: datetime
+    deactivated_by: str | None
+    deactivated_at: datetime | None
+
+
 class ProductSearchItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,6 +69,7 @@ class ProductSearchItemResponse(BaseModel):
     last_seen_at: datetime
     shop: ProductShopResponse
     latest_price: ProductLatestPriceResponse | None
+    category_override: ProductCategoryOverrideResponse | None
 
 
 class ProductSearchResponse(BaseModel):
@@ -69,6 +92,12 @@ class ProductPriceSnapshotResponse(BaseModel):
 class ProductPriceHistoryResponse(BaseModel):
     product_id: int
     items: list[ProductPriceSnapshotResponse]
+
+
+class ProductCategoryOverrideRequest(BaseModel):
+    category_id: int
+    reason: str | None = None
+    actor: str | None = "admin"
 
 
 @router.get("", response_model=ProductSearchResponse)
@@ -108,6 +137,62 @@ def get_product(
     if item is None:
         raise HTTPException(status_code=404, detail="Source product not found")
 
+    return ProductSearchItemResponse.model_validate(item)
+
+
+@router.put("/{product_id}/category-override", response_model=ProductSearchItemResponse)
+def assign_product_category_override(
+    product_id: int,
+    payload: ProductCategoryOverrideRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> ProductSearchItemResponse:
+    catalog = ProductCatalog(session)
+    if catalog.get_product(product_id) is None:
+        raise HTTPException(status_code=404, detail="Source product not found")
+
+    category_repository = CategoryRepository(session)
+    if category_repository.get(payload.category_id) is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+    if category_repository.has_children(payload.category_id):
+        raise HTTPException(status_code=422, detail="Category override must target a leaf category")
+
+    CategoryOverrideRepository(session).create_or_replace(
+        CategoryOverrideCreate(
+            source_product_id=product_id,
+            category_id=payload.category_id,
+            reason=payload.reason,
+            actor=payload.actor,
+        )
+    )
+    session.commit()
+
+    item = ProductCatalog(session).get_product(product_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Source product not found")
+    return ProductSearchItemResponse.model_validate(item)
+
+
+@router.delete("/{product_id}/category-override", response_model=ProductSearchItemResponse)
+def revert_product_category_override(
+    product_id: int,
+    session: Annotated[Session, Depends(get_session)],
+    actor: str | None = "admin",
+) -> ProductSearchItemResponse:
+    catalog = ProductCatalog(session)
+    if catalog.get_product(product_id) is None:
+        raise HTTPException(status_code=404, detail="Source product not found")
+
+    reverted = CategoryOverrideRepository(session).revert_active(
+        CategoryOverrideRevert(source_product_id=product_id, actor=actor)
+    )
+    if reverted is None:
+        raise HTTPException(status_code=404, detail="Active category override not found")
+
+    session.commit()
+
+    item = ProductCatalog(session).get_product(product_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Source product not found")
     return ProductSearchItemResponse.model_validate(item)
 
 

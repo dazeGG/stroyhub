@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from stroyhub.models.tables import (
     CanonicalProduct,
     Category,
+    CategoryOverride,
     PriceSnapshot,
     ProductMatch,
     ScrapeRun,
@@ -18,6 +19,7 @@ from stroyhub.models.tables import (
 
 JsonObject = dict[str, Any]
 PRODUCT_MATCH_STATUSES = frozenset({"accepted", "candidate", "rejected", "superseded"})
+CATEGORY_OVERRIDE_STATUSES = frozenset({"active", "replaced", "reverted"})
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -40,6 +42,20 @@ class CategoryUpsert:
     slug: str
     name: str
     parent_id: int | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class CategoryOverrideCreate:
+    source_product_id: int
+    category_id: int
+    reason: str | None = None
+    actor: str | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class CategoryOverrideRevert:
+    source_product_id: int
+    actor: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -175,6 +191,13 @@ class CategoryRepository:
 
         return self._session.scalar(statement)
 
+    def get(self, category_id: int) -> Category | None:
+        return self._session.get(Category, category_id)
+
+    def has_children(self, category_id: int) -> bool:
+        statement = select(Category.id).where(Category.parent_id == category_id).limit(1)
+        return self._session.scalar(statement) is not None
+
     def upsert(self, data: CategoryUpsert) -> Category:
         category = self.get_by_slug(slug=data.slug, parent_id=data.parent_id)
         if category is None:
@@ -184,6 +207,76 @@ class CategoryRepository:
         category.name = data.name
         self._session.flush()
         return category
+
+
+class CategoryOverrideRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_active(self, source_product_id: int) -> CategoryOverride | None:
+        statement = select(CategoryOverride).where(
+            CategoryOverride.source_product_id == source_product_id,
+            CategoryOverride.status == "active",
+        )
+        return self._session.scalar(statement)
+
+    def list_for_product(self, source_product_id: int) -> list[CategoryOverride]:
+        statement = (
+            select(CategoryOverride)
+            .where(CategoryOverride.source_product_id == source_product_id)
+            .order_by(CategoryOverride.created_at.desc(), CategoryOverride.id.desc())
+        )
+        return list(self._session.scalars(statement))
+
+    def create_or_replace(self, data: CategoryOverrideCreate) -> CategoryOverride:
+        product = self._session.get(SourceProduct, data.source_product_id)
+        if product is None:
+            raise ValueError("source product not found")
+
+        if self._session.get(Category, data.category_id) is None:
+            raise ValueError("category not found")
+
+        now = datetime.now(UTC)
+        active_override = self.get_active(data.source_product_id)
+        previous_category_id = product.category_id
+        if active_override is not None:
+            previous_category_id = active_override.previous_category_id
+            active_override.status = "replaced"
+            active_override.updated_by = data.actor
+            active_override.deactivated_by = data.actor
+            active_override.deactivated_at = now
+
+        override = CategoryOverride(
+            source_product_id=data.source_product_id,
+            category_id=data.category_id,
+            previous_category_id=previous_category_id,
+            reason=data.reason,
+            status="active",
+            created_by=data.actor,
+            updated_by=data.actor,
+        )
+        self._session.add(override)
+        product.category_id = data.category_id
+        self._session.flush()
+        return override
+
+    def revert_active(self, data: CategoryOverrideRevert) -> CategoryOverride | None:
+        active_override = self.get_active(data.source_product_id)
+        if active_override is None:
+            return None
+
+        now = datetime.now(UTC)
+        active_override.status = "reverted"
+        active_override.updated_by = data.actor
+        active_override.deactivated_by = data.actor
+        active_override.deactivated_at = now
+
+        product = self._session.get(SourceProduct, data.source_product_id)
+        if product is not None:
+            product.category_id = active_override.previous_category_id
+
+        self._session.flush()
+        return active_override
 
 
 class SourceProductRepository:
@@ -233,8 +326,14 @@ class SourceProductRepository:
         product.fingerprint = data.fingerprint
         product.title = data.title
         product.normalized_title = data.normalized_title
+        active_override = None
+        if product.id is not None:
+            active_override = CategoryOverrideRepository(self._session).get_active(product.id)
+
         product.description = data.description
-        product.category_id = data.category_id
+        product.category_id = (
+            active_override.category_id if active_override is not None else data.category_id
+        )
         product.category_raw = data.category_raw
         product.unit_raw = data.unit_raw
         product.image_url = data.image_url
