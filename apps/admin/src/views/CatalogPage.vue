@@ -1,6 +1,206 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+
+import {
+  fetchCategories,
+  fetchProducts,
+  fetchShops,
+  type CategoryTreeItem,
+  type ProductSearchItem,
+  type ProductSort,
+  type ShopListItem,
+} from '../lib/api'
+
+const pageSize = 50
+const searchQuery = ref('')
+const selectedCategoryId = ref('')
+const selectedShopId = ref('')
+const sort = ref<ProductSort>('-last_seen_at')
+const offset = ref(0)
+const products = ref<ProductSearchItem[]>([])
+const categories = ref<CategoryTreeItem[]>([])
+const shops = ref<ShopListItem[]>([])
+const isLoadingProducts = ref(false)
+const isLoadingFilters = ref(false)
+const errorMessage = ref('')
+const filterErrorMessage = ref('')
+
+let productRequest: AbortController | null = null
+let searchTimer: number | undefined
+
+const categoryOptions = computed(() => {
+  const options: { id: number; label: string }[] = []
+
+  function walk(items: CategoryTreeItem[], depth: number): void {
+    for (const item of items) {
+      options.push({
+        id: item.id,
+        label: `${'  '.repeat(depth)}${item.name} (${item.product_count})`,
+      })
+      walk(item.children, depth + 1)
+    }
+  }
+
+  walk(categories.value, 0)
+  return options
+})
+
+const categoryNameById = computed(() => {
+  const names = new Map<number, string>()
+
+  function walk(items: CategoryTreeItem[]): void {
+    for (const item of items) {
+      names.set(item.id, item.name)
+      walk(item.children)
+    }
+  }
+
+  walk(categories.value)
+  return names
+})
+
+const hasPreviousPage = computed(() => offset.value > 0)
+const hasNextPage = computed(() => products.value.length === pageSize)
+const currentPage = computed(() => Math.floor(offset.value / pageSize) + 1)
+
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return '-'
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function formatPrice(product: ProductSearchItem): string {
+  if (!product.latest_price?.price) {
+    return '-'
+  }
+
+  const amount = Number(product.latest_price.price)
+  const value = Number.isFinite(amount)
+    ? new Intl.NumberFormat('ru-RU', {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+      }).format(amount)
+    : product.latest_price.price
+  const unit = product.latest_price.unit_raw ? ` / ${product.latest_price.unit_raw}` : ''
+
+  return `${value} ${product.latest_price.currency}${unit}`
+}
+
+function categoryLabel(product: ProductSearchItem): string {
+  if (!product.category_id) {
+    return 'Не нормализовано'
+  }
+
+  return categoryNameById.value.get(product.category_id) || `ID ${product.category_id}`
+}
+
+function resetPagination(): void {
+  offset.value = 0
+}
+
+function resetPaginationAndLoad(): void {
+  if (offset.value === 0) {
+    void loadProducts()
+    return
+  }
+
+  resetPagination()
+}
+
+async function loadFilters(): Promise<void> {
+  isLoadingFilters.value = true
+  filterErrorMessage.value = ''
+
+  try {
+    const [categoryResponse, shopResponse] = await Promise.all([fetchCategories(), fetchShops()])
+    categories.value = categoryResponse.items
+    shops.value = shopResponse.items
+  } catch (error) {
+    filterErrorMessage.value =
+      error instanceof Error ? error.message : 'Не удалось загрузить фильтры каталога'
+  } finally {
+    isLoadingFilters.value = false
+  }
+}
+
+async function loadProducts(): Promise<void> {
+  productRequest?.abort()
+  const request = new AbortController()
+  productRequest = request
+  isLoadingProducts.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await fetchProducts(
+      {
+        q: searchQuery.value,
+        categoryId: selectedCategoryId.value ? Number(selectedCategoryId.value) : undefined,
+        shopId: selectedShopId.value ? Number(selectedShopId.value) : undefined,
+        sort: sort.value,
+        limit: pageSize,
+        offset: offset.value,
+      },
+      request.signal,
+    )
+    products.value = response.items
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return
+    }
+
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить товары'
+    products.value = []
+  } finally {
+    if (productRequest === request) {
+      isLoadingProducts.value = false
+    }
+  }
+}
+
+function nextPage(): void {
+  if (hasNextPage.value) {
+    offset.value += pageSize
+  }
+}
+
+function previousPage(): void {
+  if (hasPreviousPage.value) {
+    offset.value = Math.max(0, offset.value - pageSize)
+  }
+}
+
+watch([selectedCategoryId, selectedShopId, sort], () => {
+  resetPaginationAndLoad()
+})
+
+watch(offset, () => {
+  void loadProducts()
+})
+
+watch(searchQuery, () => {
+  window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(() => {
+    resetPaginationAndLoad()
+  }, 250)
+})
+
+onMounted(() => {
+  void loadFilters()
+  void loadProducts()
+})
+</script>
+
 <template>
   <section class="space-y-6">
-    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
       <div>
         <p class="text-sm font-medium text-amber-300">Каталог товаров</p>
         <h2 class="mt-2 text-2xl font-semibold text-white">Инспекция исходных карточек</h2>
@@ -9,23 +209,145 @@
         </p>
       </div>
 
-      <div class="grid gap-3 sm:grid-cols-3 xl:min-w-[640px]">
-        <UInput placeholder="Поиск по названию" />
-        <USelectMenu placeholder="Категория" :items="[]" />
-        <USelectMenu placeholder="Магазин" :items="[]" />
+      <div
+        class="grid gap-3 lg:grid-cols-[minmax(180px,1.4fr)_minmax(180px,1fr)_minmax(160px,1fr)_170px] 2xl:min-w-[760px]"
+        data-testid="catalog-filters"
+      >
+        <input
+          v-model="searchQuery"
+          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+          placeholder="Поиск по названию"
+          type="search"
+        />
+        <select
+          v-model="selectedCategoryId"
+          aria-label="Фильтр по категории"
+          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          :disabled="isLoadingFilters"
+        >
+          <option value="">Все категории</option>
+          <option v-for="category in categoryOptions" :key="category.id" :value="String(category.id)">
+            {{ category.label }}
+          </option>
+        </select>
+        <select
+          v-model="selectedShopId"
+          aria-label="Фильтр по магазину"
+          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          :disabled="isLoadingFilters"
+        >
+          <option value="">Все магазины</option>
+          <option v-for="shop in shops" :key="shop.id" :value="String(shop.id)">
+            {{ shop.name }}
+          </option>
+        </select>
+        <select
+          v-model="sort"
+          aria-label="Сортировка каталога"
+          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+        >
+          <option value="-last_seen_at">Сначала свежие</option>
+          <option value="last_seen_at">Сначала старые</option>
+          <option value="latest_price">Цена по возрастанию</option>
+          <option value="-latest_price">Цена по убыванию</option>
+          <option value="title">Название A-Z</option>
+          <option value="-title">Название Z-A</option>
+          <option value="shop">Магазин A-Z</option>
+          <option value="-shop">Магазин Z-A</option>
+        </select>
       </div>
     </div>
 
+    <div
+      v-if="filterErrorMessage"
+      class="rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100"
+    >
+      Фильтры не загрузились: {{ filterErrorMessage }}
+    </div>
+
     <div class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
-      <div class="grid min-w-[840px] grid-cols-[minmax(260px,2fr)_1fr_1fr_140px_150px] border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+      <div
+        class="grid min-w-[920px] grid-cols-[minmax(280px,2fr)_170px_150px_150px_140px] border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
+      >
         <span>Товар</span>
         <span>Магазин</span>
         <span>Категория</span>
         <span>Цена</span>
         <span>Последний раз</span>
       </div>
-      <div class="min-w-[840px] px-4 py-14 text-center text-sm text-neutral-500">
-        Данные каталога будут загружаться из <code class="text-neutral-300">GET /products</code>.
+
+      <div v-if="isLoadingProducts" class="min-w-[920px] px-4 py-14 text-center text-sm text-neutral-500">
+        Загружаем каталог...
+      </div>
+
+      <div
+        v-else-if="errorMessage"
+        class="min-w-[920px] px-4 py-14 text-center text-sm text-red-200"
+      >
+        Не удалось загрузить каталог: {{ errorMessage }}
+      </div>
+
+      <div
+        v-else-if="products.length === 0"
+        class="min-w-[920px] px-4 py-14 text-center text-sm text-neutral-500"
+      >
+        По этим фильтрам товаров не найдено.
+      </div>
+
+      <div v-else class="min-w-[920px] divide-y divide-neutral-800">
+        <div
+          v-for="product in products"
+          :key="product.id"
+          class="grid grid-cols-[minmax(280px,2fr)_170px_150px_150px_140px] gap-0 px-4 py-4 text-sm"
+          data-testid="catalog-row"
+        >
+          <div class="min-w-0 pr-5">
+            <p class="truncate font-medium text-white" :title="product.title">{{ product.title }}</p>
+            <p class="mt-1 truncate text-xs text-neutral-500" :title="product.normalized_title">
+              {{ product.source }} · {{ product.source_product_id || 'без source id' }}
+            </p>
+          </div>
+          <div class="min-w-0 pr-5">
+            <p class="truncate text-neutral-200" :title="product.shop.name">{{ product.shop.name }}</p>
+            <p class="mt-1 truncate text-xs text-neutral-500" :title="product.shop.source_id">
+              {{ product.shop.source_id }}
+            </p>
+          </div>
+          <div class="min-w-0 pr-5">
+            <p class="truncate text-neutral-200" :title="categoryLabel(product)">
+              {{ categoryLabel(product) }}
+            </p>
+            <p class="mt-1 truncate text-xs text-neutral-500" :title="product.category_raw || 'Без исходной категории'">
+              {{ product.category_raw || 'Без исходной категории' }}
+            </p>
+          </div>
+          <div class="pr-5 text-neutral-200">{{ formatPrice(product) }}</div>
+          <div class="text-neutral-400">{{ formatDateTime(product.last_seen_at) }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p class="text-sm text-neutral-500">
+        Страница {{ currentPage }} · показано {{ products.length }}
+      </p>
+      <div class="flex gap-2">
+        <button
+          class="h-9 rounded-md border border-neutral-800 px-3 text-sm text-neutral-200 transition enabled:hover:border-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
+          :disabled="!hasPreviousPage || isLoadingProducts"
+          type="button"
+          @click="previousPage"
+        >
+          Назад
+        </button>
+        <button
+          class="h-9 rounded-md border border-neutral-800 px-3 text-sm text-neutral-200 transition enabled:hover:border-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
+          :disabled="!hasNextPage || isLoadingProducts"
+          type="button"
+          @click="nextPage"
+        >
+          Вперед
+        </button>
       </div>
     </div>
   </section>
