@@ -26,6 +26,8 @@ stay unmatched, look noisy, or need product-scope decisions.
 
 Choose the smallest durable change:
 
+- Keep the MVP taxonomy at two levels: root categories group product families,
+  and child categories are the only categories that receive products.
 - Add a source category alias when a source raw category is narrow and stable,
   for example `Профлист, металлочерепица` to `profiled_sheet`.
 - Add or adjust keywords when product titles contain reliable domain terms that
@@ -34,6 +36,8 @@ Choose the smallest durable change:
   review, or future matching, and the existing leaves would be misleading.
 - Add a root category only when several related leaf categories need a shared
   parent and no current root fits.
+- Do not assign products, manual overrides, ML labels, or future ML predictions
+  to root categories. They should target child/leaf categories only.
 - Do not add aliases for broad raw categories such as `Материалы` or `Сухие
   смеси` when title-specific rules can produce better categories.
 - Do not add categories for obvious non-product/job/service cards. Track those
@@ -54,6 +58,8 @@ Use stable, English, snake_case slugs:
 
 Categories live in `packages/stroyhub/catalog/taxonomy.py`. Parent categories
 must appear before their children because seed and tests rely on that order.
+For the MVP, root categories should not have keywords that make them assignable
+product categories; keywords belong on child categories.
 
 ## Change Workflow
 
@@ -83,8 +89,9 @@ uv run python scripts/backfill_category_ids.py --source 2gis --dry-run
 ## Review Checklist
 
 - The change is backed by source examples or a recorded audit.
+- The taxonomy still has only root and child levels for MVP use.
+- Any assigned category is a child/leaf category, not a root grouping category.
 - Existing broad categories did not become less specific by accident.
 - Exact aliases do not override better title-led categorization.
 - Tests cover the new positive case and any relevant false positive.
 - `uv run pytest`, `uv run ruff check .`, and mypy pass for code changes.
-

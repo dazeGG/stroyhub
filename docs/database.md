@@ -55,7 +55,15 @@ Rules:
 
 - Categories are hierarchical through `parent_id`.
 - The schema must allow any number of nested levels.
-- The MVP will likely use 2-3 levels, but the database should not enforce that limit.
+- The MVP product taxonomy uses two levels:
+  - root categories group material families and navigation sections;
+  - child categories are the assignable product categories.
+- Products, manual overrides, ML labels, and future ML predictions should target
+  child/leaf categories only. Root categories should not receive products
+  directly.
+- The database intentionally keeps the flexible `parent_id` schema instead of
+  enforcing the two-level MVP policy, so later taxonomy decisions do not require
+  a schema rewrite.
 - The initial normalized StroyHub category tree is defined in
   `packages/stroyhub/catalog/taxonomy.py` and can be seeded with
   `uv run python scripts/seed_categories.py`.
@@ -95,6 +103,8 @@ Category fields:
 
 - `category_raw` stores the source category exactly as received, such as `Строительные смеси` or `Каталог / Стройматериалы / Цемент`.
 - `category_id` points to StroyHub's normalized `categories` table.
+- For the MVP, `category_id` should point to a child/leaf category, not a root
+  grouping category.
 
 Both fields are needed. `category_raw` preserves source context and supports reprocessing/debugging. `category_id` gives stable filtering for API and UI.
 

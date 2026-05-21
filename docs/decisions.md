@@ -140,6 +140,27 @@ Manual category overrides are represented at the service level: a provided overr
 Consequences:
 Initial categories are explainable and easy to adjust. Some products will remain uncategorized until rules are expanded from real scrape data.
 
+## 2026-05-22: Treat MVP Categories as Two-Level Taxonomy
+
+Context:
+StroyHub needs category navigation and ML category verification to stay simple
+while the catalog is still being shaped from real source data.
+
+Decision:
+Use a two-level taxonomy policy for the MVP:
+
+- root categories are grouping/navigation sections;
+- child categories are assignable product categories;
+- products, manual overrides, ML labels, and future ML predictions target
+  child/leaf categories only;
+- root categories should not receive products directly.
+
+Consequences:
+The database keeps the flexible `parent_id` hierarchy and does not enforce this
+policy at schema level. This preserves room for future taxonomy changes without
+rewriting the schema, while current product, admin, and ML workflows treat the
+taxonomy as two-level.
+
 ## 2026-05-18: Persist Manual Category Overrides Separately
 
 Context:
