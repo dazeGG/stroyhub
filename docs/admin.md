@@ -30,6 +30,31 @@ framework.
 Add Pinia, a charting package, or generated API clients only when an implemented
 screen needs them.
 
+## Local Commands
+
+Install dependencies:
+
+```bash
+cd apps/admin
+pnpm install
+```
+
+Run the API from the repository root:
+
+```bash
+uv run uvicorn apps.api.main:app --reload
+```
+
+Run the admin dev server:
+
+```bash
+cd apps/admin
+pnpm dev
+```
+
+The admin dev server proxies `/api/*` requests to the local FastAPI app on
+`http://127.0.0.1:8000`.
+
 ## Initial M12 Jobs
 
 The first admin version should help a human answer these questions without
