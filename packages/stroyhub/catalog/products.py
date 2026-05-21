@@ -2,10 +2,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, false, func, or_, select
 from sqlalchemy.orm import Session
 
-from stroyhub.models.tables import PriceSnapshot, Shop, SourceProduct
+from stroyhub.models.tables import Category, PriceSnapshot, Shop, SourceProduct
 
 
 def _escape_like_pattern(value: str) -> str:
@@ -16,6 +16,7 @@ def _escape_like_pattern(value: str) -> str:
 class ProductSearchFilters:
     q: str | None = None
     category_id: int | None = None
+    category_slug: str | None = None
     shop_id: int | None = None
     limit: int = 50
     offset: int = 0
@@ -124,8 +125,12 @@ class ProductCatalog:
                     )
                 )
 
-        if filters.category_id is not None:
-            statement = statement.where(SourceProduct.category_id == filters.category_id)
+        category_ids = self._category_filter_ids(filters)
+        if category_ids is not None:
+            if category_ids:
+                statement = statement.where(SourceProduct.category_id.in_(category_ids))
+            else:
+                statement = statement.where(false())
 
         if filters.shop_id is not None:
             statement = statement.where(SourceProduct.shop_id == filters.shop_id)
@@ -198,3 +203,37 @@ class ProductCatalog:
             )
             for snapshot in self._session.scalars(statement)
         ]
+
+    def _category_filter_ids(self, filters: ProductSearchFilters) -> set[int] | None:
+        starting_ids: set[int] = set()
+        if filters.category_id is not None:
+            starting_ids.add(filters.category_id)
+
+        if filters.category_slug is not None:
+            slug = filters.category_slug.strip()
+            if slug:
+                starting_ids.update(
+                    self._session.scalars(select(Category.id).where(Category.slug == slug))
+                )
+
+        if not starting_ids:
+            return None
+
+        category_rows = self._session.execute(select(Category.id, Category.parent_id))
+        child_ids_by_parent: dict[int, list[int]] = {}
+        known_ids: set[int] = set()
+        for category_id, parent_id in category_rows:
+            known_ids.add(category_id)
+            if parent_id is not None:
+                child_ids_by_parent.setdefault(parent_id, []).append(category_id)
+
+        category_ids = {category_id for category_id in starting_ids if category_id in known_ids}
+        pending = list(category_ids)
+        while pending:
+            category_id = pending.pop()
+            for child_id in child_ids_by_parent.get(category_id, []):
+                if child_id not in category_ids:
+                    category_ids.add(child_id)
+                    pending.append(child_id)
+
+        return category_ids

@@ -169,6 +169,116 @@ def test_products_endpoint_filters_by_search_shop_and_category(
     assert payload["offset"] == 0
 
 
+def test_products_endpoint_filters_parent_category_by_descendants(
+    client: TestClient, db_session: Session
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-api-category-tree", name="Tree Shop")
+    )
+    root = Category(slug="tree-filter-root", name="Tree Filter Root")
+    other_root = Category(slug="tree-filter-other", name="Tree Filter Other")
+    db_session.add_all([root, other_root])
+    db_session.flush()
+
+    leaf = Category(slug="tree-filter-leaf", name="Tree Filter Leaf", parent_id=root.id)
+    db_session.add(leaf)
+    db_session.flush()
+
+    grandchild = Category(
+        slug="tree-filter-grandchild",
+        name="Tree Filter Grandchild",
+        parent_id=leaf.id,
+    )
+    db_session.add(grandchild)
+    db_session.flush()
+
+    products = SourceProductRepository(db_session)
+    leaf_product = products.upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="tree-filter-leaf-product",
+            title="Tree Filter Leaf Product",
+            normalized_title="tree filter leaf product",
+            category_id=leaf.id,
+        )
+    )
+    grandchild_product = products.upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="tree-filter-grandchild-product",
+            title="Tree Filter Grandchild Product",
+            normalized_title="tree filter grandchild product",
+            category_id=grandchild.id,
+        )
+    )
+    products.upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="tree-filter-other-product",
+            title="Tree Filter Other Product",
+            normalized_title="tree filter other product",
+            category_id=other_root.id,
+        )
+    )
+
+    response = client.get("/products", params={"category_id": root.id})
+
+    assert response.status_code == 200
+    assert {item["id"] for item in response.json()["items"]} == {
+        grandchild_product.id,
+        leaf_product.id,
+    }
+
+
+def test_products_endpoint_filters_leaf_category_by_slug(
+    client: TestClient, db_session: Session
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-api-category-slug", name="Slug Shop")
+    )
+    root = Category(slug="slug-filter-root", name="Slug Filter Root")
+    db_session.add(root)
+    db_session.flush()
+
+    leaf = Category(slug="slug-filter-leaf", name="Slug Filter Leaf", parent_id=root.id)
+    sibling = Category(
+        slug="slug-filter-sibling",
+        name="Slug Filter Sibling",
+        parent_id=root.id,
+    )
+    db_session.add_all([leaf, sibling])
+    db_session.flush()
+
+    matching_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="slug-filter-leaf-product",
+            title="Slug Filter Leaf Product",
+            normalized_title="slug filter leaf product",
+            category_id=leaf.id,
+        )
+    )
+    SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="slug-filter-sibling-product",
+            title="Slug Filter Sibling Product",
+            normalized_title="slug filter sibling product",
+            category_id=sibling.id,
+        )
+    )
+
+    response = client.get("/products", params={"category_slug": "slug-filter-leaf"})
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == [matching_product.id]
+
+
 def test_products_endpoint_handles_empty_results(client: TestClient) -> None:
     response = client.get("/products", params={"q": "nothing-here"})
 

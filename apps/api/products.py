@@ -76,13 +76,16 @@ def search_products(
     session: Annotated[Session, Depends(get_session)],
     q: str | None = None,
     category: int | None = None,
+    category_id: int | None = None,
+    category_slug: str | None = None,
     shop: int | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ProductSearchResponse:
     filters = ProductSearchFilters(
         q=q,
-        category_id=category,
+        category_id=category_id if category_id is not None else category,
+        category_slug=category_slug,
         shop_id=shop,
         limit=limit,
         offset=offset,
