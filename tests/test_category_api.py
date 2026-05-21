@@ -1,4 +1,6 @@
 from collections.abc import Iterator
+from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,7 +9,14 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.catalog.categories import CategoryTreeItem
 from stroyhub.core.config import settings
-from stroyhub.db import ShopRepository, ShopUpsert, SourceProductRepository, SourceProductUpsert
+from stroyhub.db import (
+    PriceSnapshotCreate,
+    PriceSnapshotRepository,
+    ShopRepository,
+    ShopUpsert,
+    SourceProductRepository,
+    SourceProductUpsert,
+)
 from stroyhub.models import Category
 
 import apps.api.categories as categories_api
@@ -153,3 +162,98 @@ def test_categories_endpoint_handles_empty_tree(
 
     assert response.status_code == 200
     assert response.json() == {"items": []}
+
+
+def test_category_price_summary_endpoint_aggregates_latest_prices(
+    client: TestClient, db_session: Session
+) -> None:
+    category = Category(slug="summary-api-category", name="Summary API Category")
+    db_session.add(category)
+    db_session.flush()
+
+    matching_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="summary-api-shop-1", name="Summary Shop")
+    )
+    other_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="unicom", source_id="summary-api-shop-2", name="Other Shop")
+    )
+    products = SourceProductRepository(db_session)
+    priced_product = products.upsert(
+        SourceProductUpsert(
+            shop_id=matching_shop.id,
+            source="2gis",
+            source_product_id="summary-priced-product",
+            title="Summary Priced Product",
+            normalized_title="summary priced product",
+            category_id=category.id,
+        )
+    )
+    null_price_product = products.upsert(
+        SourceProductUpsert(
+            shop_id=matching_shop.id,
+            source="2gis",
+            source_product_id="summary-null-price-product",
+            title="Summary Null Price Product",
+            normalized_title="summary null price product",
+            category_id=category.id,
+        )
+    )
+    other_source_product = products.upsert(
+        SourceProductUpsert(
+            shop_id=other_shop.id,
+            source="unicom",
+            source_product_id="summary-other-source-product",
+            title="Summary Other Source Product",
+            normalized_title="summary other source product",
+            category_id=category.id,
+        )
+    )
+    prices = PriceSnapshotRepository(db_session)
+    prices.add(
+        PriceSnapshotCreate(
+            source_product_id=priced_product.id,
+            price=Decimal("8.00"),
+            parsed_at=datetime(2026, 5, 17, 8, 0, tzinfo=UTC),
+        )
+    )
+    prices.add(
+        PriceSnapshotCreate(
+            source_product_id=priced_product.id,
+            price=Decimal("10.00"),
+            parsed_at=datetime(2026, 5, 17, 9, 0, tzinfo=UTC),
+        )
+    )
+    prices.add(
+        PriceSnapshotCreate(
+            source_product_id=null_price_product.id,
+            price=None,
+            parsed_at=datetime(2026, 5, 17, 9, 0, tzinfo=UTC),
+        )
+    )
+    prices.add(
+        PriceSnapshotCreate(
+            source_product_id=other_source_product.id,
+            price=Decimal("20.00"),
+            parsed_at=datetime(2026, 5, 17, 9, 0, tzinfo=UTC),
+        )
+    )
+
+    response = client.get(
+        "/categories/price-summary",
+        params={"source": "2gis", "shop": matching_shop.id},
+    )
+
+    assert response.status_code == 200
+    item = next(
+        item for item in response.json()["items"] if item["category_id"] == category.id
+    )
+    assert item == {
+        "category_id": category.id,
+        "category_slug": "summary-api-category",
+        "category_name": "Summary API Category",
+        "product_count": 2,
+        "priced_product_count": 1,
+        "min_price": "10.00",
+        "avg_price": "10.00",
+        "max_price": "10.00",
+    }
