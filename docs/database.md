@@ -8,8 +8,47 @@ This document records the initial MVP database design. It is the source of truth
 - Preserve raw source context wherever source data may change or need reprocessing.
 - Treat price history as observations over time, not only price-change events.
 - Keep parsers out of persistence details; they should emit normalized parsed records.
+- Keep StroyHub as an aggregator. Admin-maintained shop metadata is allowed,
+  but manual products, manual prices, manual catalogs, and manual price
+  snapshots are out of scope for the MVP.
 
 ## Tables
+
+### `shop_identities`
+
+Stores StroyHub's stable identity for one real-world shop/location. It groups
+source-specific `shops` records without collapsing or rewriting them.
+
+Core fields:
+
+- `id`: `bigint` primary key
+- `display_name`: `text`, required
+- `address`: `text`, nullable
+- `website_url`: `text`, nullable
+- `preferred_source`: `text`, nullable
+- `status`: `text`, required, default `active`
+- `notes`: `text`, nullable
+- `locked_fields`: `jsonb`, nullable
+- `created_at`: `timestamp with time zone`, required
+- `updated_at`: `timestamp with time zone`, required
+
+Rules:
+
+- Use one identity to group official and fallback source records for the same
+  real-world shop/location.
+- Source-specific shop rows remain intact; the identity is a grouping layer,
+  not a replacement for source records.
+- `preferred_source` records which concrete source slug should win for shop
+  metadata when sources disagree, for example `unicom` over `2gis`.
+- `locked_fields` protects admin-maintained identity metadata from automatic
+  refreshes, for example `{"display_name": true}`.
+- Valid statuses are `active`, `hold`, `disabled`, and `out_of_scope`.
+
+Constraints and indexes:
+
+- Check: known `status`
+- Index: `status`
+- Index: `preferred_source`
 
 ### `shops`
 
@@ -18,8 +57,10 @@ Stores one seller/location as seen by a source.
 Core fields:
 
 - `id`: `bigint` primary key
+- `shop_identity_id`: `bigint`, nullable reference to `shop_identities.id`
 - `source`: `text`, required
 - `source_id`: `text`, required
+- `source_type`: `text`, required
 - `name`: `text`, required
 - `address`: `text`, nullable
 - `url`: `text`, nullable
@@ -35,8 +76,24 @@ Core fields:
 Constraints and indexes:
 
 - Unique: `source`, `source_id`
+- Check: `source_type` is one of `2gis`, `official_api`, `official_html`
+- Index: `shop_identity_id`
+- Index: `source_type`
 - Index: `next_scrape_at`
 - Index: `scrape_status`
+
+Source type policy:
+
+- `2gis`: fallback/branch data loaded from 2GIS.
+- `official_api`: official shop API source.
+- `official_html`: official shop HTML/catalog source.
+- Do not add a `manual` shop source type for M13/MVP. Manual/admin actions may
+  manage shop identities, source links, preferred source, notes, status, and
+  field locks only.
+- Future owner-managed behavior should be modeled as ownership/management
+  state, not as a generic manual source. Owner-managed catalogs should still
+  use an explicit integration type such as official API/HTML or a future
+  partner/merchant integration.
 
 ### `categories`
 

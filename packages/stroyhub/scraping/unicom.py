@@ -106,6 +106,7 @@ def persist_unicom_scrape_result(
         ShopUpsert(
             source=UNICOM_SOURCE,
             source_id=result.shop_source_id,
+            source_type="official_api",
             name=shop_name,
             url=shop_url,
             raw=_shop_raw(result),

@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Identity,
@@ -34,17 +35,48 @@ class TimestampMixin:
     )
 
 
+class ShopIdentity(TimestampMixin, Base):
+    __tablename__ = "shop_identities"
+    __table_args__: Any = (
+        CheckConstraint(
+            "status IN ('active', 'hold', 'disabled', 'out_of_scope')",
+            name="ck_shop_identities_status_known",
+        ),
+        Index("ix_shop_identities_status", "status"),
+        Index("ix_shop_identities_preferred_source", "preferred_source"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    address: Mapped[str | None] = mapped_column(Text)
+    website_url: Mapped[str | None] = mapped_column(Text)
+    preferred_source: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))
+    notes: Mapped[str | None] = mapped_column(Text)
+    locked_fields: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+
+    source_shops: Mapped[list["Shop"]] = relationship(back_populates="shop_identity")
+
+
 class Shop(TimestampMixin, Base):
     __tablename__ = "shops"
     __table_args__: Any = (
         UniqueConstraint("source", "source_id", name="uq_shops_source_source_id"),
+        CheckConstraint(
+            "source_type IN ('2gis', 'official_api', 'official_html')",
+            name="ck_shops_source_type_known",
+        ),
+        Index("ix_shops_shop_identity_id", "shop_identity_id"),
+        Index("ix_shops_source_type", "source_type"),
         Index("ix_shops_next_scrape_at", "next_scrape_at"),
         Index("ix_shops_scrape_status", "scrape_status"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    shop_identity_id: Mapped[int | None] = mapped_column(ForeignKey("shop_identities.id"))
     source: Mapped[str] = mapped_column(Text, nullable=False)
     source_id: Mapped[str] = mapped_column(Text, nullable=False)
+    source_type: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     address: Mapped[str | None] = mapped_column(Text)
     url: Mapped[str | None] = mapped_column(Text)
@@ -57,6 +89,7 @@ class Shop(TimestampMixin, Base):
     scrape_status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'new'"))
     error_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
 
+    shop_identity: Mapped[ShopIdentity | None] = relationship(back_populates="source_shops")
     source_products: Mapped[list["SourceProduct"]] = relationship(back_populates="shop")
     scrape_runs: Mapped[list["ScrapeRun"]] = relationship(back_populates="shop")
 

@@ -21,6 +21,9 @@ from stroyhub.db import (
     ProductMatchRepository,
     ScrapeRunCreate,
     ScrapeRunRepository,
+    ShopIdentityCreate,
+    ShopIdentityRepository,
+    ShopIdentityUpdate,
     ShopRepository,
     ShopUpsert,
     SourceProductRepository,
@@ -33,6 +36,7 @@ from stroyhub.models import (
     ProductMatch,
     ScrapeRun,
     Shop,
+    ShopIdentity,
     SourceProduct,
 )
 
@@ -95,6 +99,107 @@ def test_shop_repository_upserts_and_preserves_raw_payload(db_session: Session) 
     assert updated.scrape_status == "success"
     assert updated.error_count == 2
     assert count == 1
+
+
+def test_shop_identity_repository_links_source_specific_shops(
+    db_session: Session,
+) -> None:
+    identity_repository = ShopIdentityRepository(db_session)
+    shop_repository = ShopRepository(db_session)
+
+    identity = identity_repository.create(
+        ShopIdentityCreate(
+            display_name="Юником",
+            website_url="https://unicom-ykt.ru/",
+            preferred_source="unicom",
+            locked_fields={"display_name": True},
+        )
+    )
+    twogis_shop = shop_repository.upsert(
+        ShopUpsert(source="2gis", source_id="identity-2gis", name="Юником 2GIS")
+    )
+    official_shop = shop_repository.upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="identity-official",
+            name="Юником",
+            shop_identity_id=identity.id,
+        )
+    )
+    source_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=twogis_shop.id,
+            source="2gis",
+            source_product_id="identity-product",
+            title="Identity product",
+            normalized_title="identity product",
+        )
+    )
+
+    linked_twogis_shop = identity_repository.link_shop(
+        identity_id=identity.id,
+        shop_id=twogis_shop.id,
+    )
+    source_shops = identity_repository.list_source_shops(identity.id)
+
+    assert isinstance(identity, ShopIdentity)
+    assert official_shop.source_type == "official_api"
+    assert linked_twogis_shop.source_type == "2gis"
+    assert linked_twogis_shop.shop_identity_id == identity.id
+    assert {shop.source for shop in source_shops} == {"2gis", "unicom"}
+    assert source_product.shop_id == twogis_shop.id
+
+
+def test_shop_identity_update_respects_locked_fields(db_session: Session) -> None:
+    repository = ShopIdentityRepository(db_session)
+    identity = repository.create(
+        ShopIdentityCreate(
+            display_name="Admin maintained",
+            address="Old address",
+            locked_fields={"display_name": True},
+        )
+    )
+
+    updated = repository.update(
+        identity.id,
+        ShopIdentityUpdate(
+            display_name="2GIS refresh name",
+            address="New address",
+            preferred_source="2gis",
+        ),
+    )
+
+    assert updated.display_name == "Admin maintained"
+    assert updated.address == "New address"
+    assert updated.preferred_source == "2gis"
+
+
+def test_shop_repository_rejects_manual_source_type(db_session: Session) -> None:
+    repository = ShopRepository(db_session)
+
+    with pytest.raises(ValueError, match="unknown shop source type"):
+        repository.upsert(
+            ShopUpsert(
+                source="manual",
+                source_id="manual-shop",
+                source_type="manual",
+                name="Manual Shop",
+            )
+        )
+
+
+def test_shop_identity_repository_rejects_manual_preferred_source(
+    db_session: Session,
+) -> None:
+    repository = ShopIdentityRepository(db_session)
+
+    with pytest.raises(ValueError, match="manual is not an accepted shop source"):
+        repository.create(
+            ShopIdentityCreate(
+                display_name="Manual source",
+                preferred_source="manual",
+            )
+        )
 
 
 def test_source_product_repository_upserts_by_source_product_id(
