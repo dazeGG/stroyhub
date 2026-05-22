@@ -640,8 +640,13 @@ onMounted(() => {
             <h3 class="text-lg font-semibold text-white">Создать магазин</h3>
             <p class="mt-1 text-sm text-neutral-500">Карточка магазина появится без ручного каталога и цен.</p>
           </div>
-          <button type="button" class="text-sm text-neutral-400 transition hover:text-white" @click="closeCreateModal">
-            Закрыть
+          <button
+            type="button"
+            class="inline-flex size-9 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-900 hover:text-white"
+            aria-label="Закрыть окно создания магазина"
+            @click="closeCreateModal"
+          >
+            <Icon :icon="icons.x" class="size-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -704,8 +709,13 @@ onMounted(() => {
             <h3 class="text-lg font-semibold text-white">Редактировать магазин</h3>
             <p class="mt-1 text-sm text-neutral-500">{{ editingIdentity.display_name }}</p>
           </div>
-          <button type="button" class="text-sm text-neutral-400 transition hover:text-white" @click="closeEditModal">
-            Закрыть
+          <button
+            type="button"
+            class="inline-flex size-9 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-900 hover:text-white"
+            aria-label="Закрыть окно редактирования магазина"
+            @click="closeEditModal"
+          >
+            <Icon :icon="icons.x" class="size-5" aria-hidden="true" />
           </button>
         </div>
 
