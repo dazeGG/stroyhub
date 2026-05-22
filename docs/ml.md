@@ -152,6 +152,15 @@ metadata. Current planned thresholds are:
 The shared feature builder used during training must also be used at runtime.
 This keeps training behavior and production behavior aligned.
 
+Applications load trained verifier artifacts through `CategoryVerifier` from
+`packages/stroyhub/ml`. The default loader reads
+`.var/ml/category_verifier/models/current`, loads `model.joblib` and
+`metadata.json`, and exposes `verify(product, category)`. Runtime decisions use
+the thresholds stored in model metadata and return `match`, `no_match`, or
+`uncertain` with confidence and model version. Missing artifacts raise an
+explicit model-unavailable error so apps can decide whether to fall back to
+manual review.
+
 Feature building lives in `packages/stroyhub/ml/features.py`. The verifier
 feature contract is versioned as `category_verifier_features/v1` and turns one
 product/category pair into deterministic string features. The current contract

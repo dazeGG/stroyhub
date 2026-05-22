@@ -32,6 +32,12 @@ from stroyhub.ml.matching import (
     SourceProductLike,
     generate_product_match_candidates,
 )
+from stroyhub.ml.runtime import (
+    CategoryVerifier,
+    CategoryVerifierModelUnavailableError,
+    CategoryVerifierResult,
+    CategoryVerifierThresholds,
+)
 from stroyhub.ml.training import (
     CategoryVerifierTrainingResult,
     InsufficientTrainingDataError,
@@ -61,9 +67,13 @@ __all__ = [
     "CategoryVerifierProductInput",
     "CategoryVerifierBaselineModel",
     "CategoryVerifierExample",
+    "CategoryVerifier",
+    "CategoryVerifierModelUnavailableError",
     "CategoryVerifierPrediction",
+    "CategoryVerifierResult",
     "CategoryVerifierSnapshot",
     "CategoryVerifierSnapshotMetadata",
+    "CategoryVerifierThresholds",
     "CategoryVerifierTrainingResult",
     "CATEGORY_VERIFIER_FEATURE_SCHEMA_VERSION",
     "InsufficientTrainingDataError",
