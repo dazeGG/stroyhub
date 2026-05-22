@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
 from stroyhub.db import ShopRepository, ShopUpsert
 from stroyhub.models import ScrapeRun, Shop
+from stroyhub.scraping import runner as scrape_runner
 
 import apps.worker.tasks as worker_tasks
 import scripts.scrape_shop_sources as scrape_shop_sources
@@ -153,7 +154,7 @@ def test_scrape_shop_skips_disabled_source_without_live_network(
     def fail_if_called(*args: object, **kwargs: object) -> None:
         raise AssertionError("disabled source should not be scraped")
 
-    monkeypatch.setattr(worker_tasks, "scrape_twogis_branch", fail_if_called)
+    monkeypatch.setattr(scrape_runner, "scrape_twogis_branch", fail_if_called)
 
     try:
         result = worker_tasks.scrape_shop.run(shop.id)
@@ -316,7 +317,7 @@ def test_scrape_shop_runs_unicom_source_without_live_network(
             price_snapshots_saved=3,
         )
 
-    monkeypatch.setattr(worker_tasks, "scrape_unicom_shop", fake_scrape_unicom_shop)
+    monkeypatch.setattr(scrape_runner, "scrape_unicom_shop", fake_scrape_unicom_shop)
 
     try:
         result = worker_tasks.scrape_shop.run(shop.id)
@@ -350,7 +351,7 @@ def test_scrape_shop_records_unicom_failure_run(
     def fake_scrape_unicom_shop(*args: object, **kwargs: object) -> SimpleNamespace:
         raise RuntimeError("source timeout")
 
-    monkeypatch.setattr(worker_tasks, "scrape_unicom_shop", fake_scrape_unicom_shop)
+    monkeypatch.setattr(scrape_runner, "scrape_unicom_shop", fake_scrape_unicom_shop)
 
     try:
         with pytest.raises(RuntimeError, match="source timeout"):
@@ -394,7 +395,7 @@ def test_scrape_shop_runs_metalltorg_source_without_live_network(
             price_snapshots_saved=1,
         )
 
-    monkeypatch.setattr(worker_tasks, "scrape_metalltorg_shop", fake_scrape_metalltorg_shop)
+    monkeypatch.setattr(scrape_runner, "scrape_metalltorg_shop", fake_scrape_metalltorg_shop)
 
     try:
         result = worker_tasks.scrape_shop.run(shop.id)
@@ -428,7 +429,7 @@ def test_scrape_shop_records_metalltorg_failure_run(
     def fake_scrape_metalltorg_shop(*args: object, **kwargs: object) -> SimpleNamespace:
         raise RuntimeError("selector changed")
 
-    monkeypatch.setattr(worker_tasks, "scrape_metalltorg_shop", fake_scrape_metalltorg_shop)
+    monkeypatch.setattr(scrape_runner, "scrape_metalltorg_shop", fake_scrape_metalltorg_shop)
 
     try:
         with pytest.raises(RuntimeError, match="selector changed"):

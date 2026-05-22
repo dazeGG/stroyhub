@@ -445,6 +445,29 @@ Example response:
 }
 ```
 
+### `POST /scrapes/shops/{shop_id}/run`
+
+Runs one tracked shop/source scrape immediately from the API process. This is
+intended for explicit admin actions, for example after approving a new 2GIS
+candidate. It does not require Celery beat or a worker process to be running.
+
+Example response:
+
+```json
+{
+  "shop_id": 217,
+  "source": "2gis",
+  "source_type": "2gis",
+  "status": "success",
+  "duration_seconds": 1.42,
+  "products_seen": 64,
+  "products_saved": 64,
+  "price_snapshots_saved": 64,
+  "reason": null,
+  "error": null
+}
+```
+
 ## Matches
 
 ### `GET /matches/candidates`

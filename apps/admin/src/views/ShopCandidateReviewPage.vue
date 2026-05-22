@@ -7,6 +7,7 @@ import {
   approveShopSourceCandidate,
   fetchShopSourceCandidates,
   refreshShopSourceCandidates,
+  runShopScrape,
   type ShopSourceCandidate,
   type ShopSourceCandidateRefreshResponse,
   type ShopSourceCandidateStatus,
@@ -18,9 +19,11 @@ const selectedStatus = ref<ShopSourceCandidateStatus | ''>('')
 const isLoading = ref(false)
 const isRefreshing = ref(false)
 const approvingCandidateId = ref<number | null>(null)
+const scrapingShopId = ref<number | null>(null)
 const errorMessage = ref('')
 const saveMessage = ref('')
 const lastRefresh = ref<ShopSourceCandidateRefreshResponse | null>(null)
+const approvedSource = ref<{ id: number, name: string } | null>(null)
 
 let candidateRequest: AbortController | null = null
 
@@ -116,6 +119,7 @@ async function refreshCandidates(): Promise<void> {
   isRefreshing.value = true
   errorMessage.value = ''
   saveMessage.value = ''
+  approvedSource.value = null
 
   try {
     const response = await refreshShopSourceCandidates()
@@ -140,17 +144,44 @@ async function approveCandidate(
   approvingCandidateId.value = candidate.id
   errorMessage.value = ''
   saveMessage.value = ''
+  approvedSource.value = null
 
   try {
-    await approveShopSourceCandidate(candidate.id, shopIdentityId)
-    saveMessage.value = shopIdentityId && candidate.suggested_identity
-      ? `${candidate.display_name} добавлен как филиал ${candidate.suggested_identity.display_name}`
-      : `${candidate.display_name} добавлен в магазины`
+    const approvedCandidate = await approveShopSourceCandidate(candidate.id, shopIdentityId)
+    approvedSource.value = approvedCandidate.approved_shop_id
+      ? { id: approvedCandidate.approved_shop_id, name: candidate.display_name }
+      : null
+    const approvalTarget = shopIdentityId && candidate.suggested_identity
+      ? `как филиал ${candidate.suggested_identity.display_name}`
+      : 'в магазины'
+    saveMessage.value = `${candidate.display_name} добавлен ${approvalTarget}. Товары ещё не загружены.`
     await loadCandidates()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось утвердить кандидата'
   } finally {
     approvingCandidateId.value = null
+  }
+}
+
+async function scrapeApprovedSource(): Promise<void> {
+  if (!approvedSource.value) {
+    return
+  }
+
+  scrapingShopId.value = approvedSource.value.id
+  errorMessage.value = ''
+
+  try {
+    const result = await runShopScrape(approvedSource.value.id)
+    saveMessage.value = result.status === 'success'
+      ? `${approvedSource.value.name}: товары загружены, сохранено ${result.products_saved ?? 0}`
+      : `${approvedSource.value.name}: загрузка завершилась со статусом ${result.status}`
+    approvedSource.value = null
+    await loadCandidates()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить товары'
+  } finally {
+    scrapingShopId.value = null
   }
 }
 
@@ -184,8 +215,21 @@ onMounted(() => {
     <div v-if="errorMessage" class="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100">
       {{ errorMessage }}
     </div>
-    <div v-if="saveMessage" class="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
-      {{ saveMessage }}
+    <div
+      v-if="saveMessage"
+      class="flex flex-col gap-3 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <span>{{ saveMessage }}</span>
+      <button
+        v-if="approvedSource"
+        type="button"
+        class="inline-flex h-9 w-fit items-center justify-center gap-2 rounded-md bg-emerald-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="scrapingShopId === approvedSource.id"
+        @click="scrapeApprovedSource"
+      >
+        <Icon :icon="icons.refresh" class="size-3.5" aria-hidden="true" />
+        {{ scrapingShopId === approvedSource.id ? 'Загружаем...' : 'Загрузить товары' }}
+      </button>
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">
