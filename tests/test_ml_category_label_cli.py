@@ -23,6 +23,8 @@ from apps.ml.category_label_cli import LabelAction, parse_label_answer, run_labe
         ("", LabelAction(kind="skip")),
         ("x", LabelAction(kind="not_product")),
         ("not_product", LabelAction(kind="not_product")),
+        ("u", LabelAction(kind="undo")),
+        ("undo", LabelAction(kind="undo")),
     ],
 )
 def test_parse_label_answer_supported_flows(answer: str, expected: LabelAction) -> None:
@@ -199,6 +201,104 @@ def test_run_label_session_recovers_from_undecodable_input(tmp_path) -> None:
     assert "Could not decode input" in output.text
 
 
+def test_run_label_session_undo_save(tmp_path) -> None:
+    label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
+    # product1 saved with candidate 1, then undone, then re-saved with candidate 2
+    # product2 saved afterward to reach limit=2
+    queue = FakeQueue([_queue_item(product_id=1), _queue_item(product_id=2)])
+
+    result = run_label_session(
+        queue,  # type: ignore[arg-type]
+        label_store,
+        limit=2,
+        input_fn=FakeInput(["1", "u", "2", "1"]),
+        output=FakeOutput(),
+    )
+
+    records = label_store.read_records()
+    assert result.saved == 2
+    assert records[0].product_id == 1
+    assert records[0].selected_category_ids == (20,)
+    assert records[1].product_id == 2
+
+
+def test_run_label_session_undo_skip(tmp_path) -> None:
+    label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
+    queue = FakeQueue([_queue_item(product_id=1), _queue_item(product_id=2)])
+
+    result = run_label_session(
+        queue,  # type: ignore[arg-type]
+        label_store,
+        limit=1,
+        input_fn=FakeInput(["s", "u", "1"]),
+        output=FakeOutput(),
+    )
+
+    assert result.saved == 1
+    assert result.skipped == 0
+    assert label_store.read_records()[0].product_id == 1
+
+
+def test_run_label_session_undo_not_product(tmp_path) -> None:
+    label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
+    unmarked: list[int] = []
+    queue = FakeQueue([_queue_item(product_id=1), _queue_item(product_id=2)])
+    queue.unmark_not_product = lambda pid: unmarked.append(pid)  # type: ignore[method-assign]
+
+    result = run_label_session(
+        queue,  # type: ignore[arg-type]
+        label_store,
+        limit=1,
+        input_fn=FakeInput(["x", "u", "1"]),
+        output=FakeOutput(),
+    )
+
+    assert result.saved == 1
+    assert result.not_product == 0
+    assert 1 in unmarked
+    assert label_store.read_records()[0].product_id == 1
+
+
+def test_run_label_session_undo_empty_stack_shows_message(tmp_path) -> None:
+    label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
+    output = FakeOutput()
+
+    run_label_session(
+        FakeQueue([_queue_item(product_id=1)]),  # type: ignore[arg-type]
+        label_store,
+        limit=1,
+        input_fn=FakeInput(["u", "1"]),
+        output=output,
+    )
+
+    assert "Nothing to undo" in output.text
+
+
+def test_run_label_session_undo_multiple_levels(tmp_path) -> None:
+    label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
+    # save product1, skip product2, undo skip, undo save, re-save product1 and product2
+    queue = FakeQueue([
+        _queue_item(product_id=1),
+        _queue_item(product_id=2),
+        _queue_item(product_id=3),
+    ])
+
+    result = run_label_session(
+        queue,  # type: ignore[arg-type]
+        label_store,
+        limit=2,
+        input_fn=FakeInput(["1", "s", "u", "u", "2", "3"]),
+        output=FakeOutput(),
+    )
+
+    records = label_store.read_records()
+    assert result.saved == 2
+    assert result.skipped == 0
+    assert [r.product_id for r in records] == [1, 2]
+    assert records[0].selected_category_ids == (20,)
+    assert records[1].selected_category_ids == (30,)
+
+
 class FakeQueue:
     def __init__(self, items: Iterable[CategoryLabelQueueItem]) -> None:
         self._items = tuple(items)
@@ -221,6 +321,9 @@ class FakeQueue:
         return len(self._items)
 
     def mark_not_product(self, product_id: int) -> None:
+        pass
+
+    def unmark_not_product(self, product_id: int) -> None:
         pass
 
 

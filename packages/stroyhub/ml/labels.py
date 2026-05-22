@@ -53,6 +53,19 @@ class CategoryLabelStore:
     def from_path(cls, path: str | Path) -> CategoryLabelStore:
         return cls(Path(path))
 
+    def pop_last(self) -> None:
+        if not self._path.exists():
+            return
+        raw = self._path.read_text(encoding="utf-8").splitlines()
+        lines = [line for line in raw if line.strip()]
+        if not lines:
+            return
+        lines.pop()
+        self._path.write_text(
+            "\n".join(lines) + ("\n" if lines else ""),
+            encoding="utf-8",
+        )
+
     def append(self, record: CategoryLabelRecord) -> CategoryLabelRecord:
         normalized = _normalize_record(record)
         self._path.parent.mkdir(parents=True, exist_ok=True)

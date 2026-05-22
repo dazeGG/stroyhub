@@ -109,6 +109,12 @@ class CategoryLabelQueue:
             product.is_not_product = True
             self._session.flush()
 
+    def unmark_not_product(self, product_id: int) -> None:
+        product = self._session.get(SourceProduct, product_id)
+        if product is not None:
+            product.is_not_product = False
+            self._session.flush()
+
     def _products(self) -> list[SourceProduct]:
         statement = (
             select(SourceProduct)
