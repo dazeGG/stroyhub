@@ -433,6 +433,8 @@ DEFAULT_NORMALIZED_CATEGORIES: tuple[NormalizedCategory, ...] = (
             "изовер",
             "isover",
             "техноблок",
+            "технотерм",
+            "тисма",
         ),
     ),
     category(

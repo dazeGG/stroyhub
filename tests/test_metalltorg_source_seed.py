@@ -52,6 +52,11 @@ def test_seed_metalltorg_source_preserves_existing_scrape_metadata(
         "METALLTORG_SHOP_SOURCE_ID",
         "metalltorg-seed-test",
     )
+    monkeypatch.setattr(
+        seed_metalltorg_source,
+        "METALLTORG_DEFAULT_SHOP_NAME",
+        "Металл Торг Seed Test",
+    )
 
     scraped_at = datetime(2026, 5, 18, 1, 0, tzinfo=UTC)
     next_scrape_at = datetime(2026, 5, 19, 0, 0, tzinfo=UTC)
@@ -68,6 +73,12 @@ def test_seed_metalltorg_source_preserves_existing_scrape_metadata(
             raw={"last_scrape_error": "timeout"},
         )
     )
+    existing_identity = ShopIdentity(
+        display_name="Металл Торг Seed Test",
+        preferred_source="2gis",
+        website_url="https://old.example.test/",
+    )
+    db_session.add(existing_identity)
     db_session.commit()
 
     try:
@@ -95,7 +106,9 @@ def test_seed_metalltorg_source_preserves_existing_scrape_metadata(
         assert result == 0
         assert seeded is not None
         assert identity is not None
+        assert identity.id == existing_identity.id
         assert seeded.shop_identity_id == identity.id
+        assert identity.website_url == "https://old.example.test/"
         assert seeded.source_type == "official_html"
         assert seeded.last_scraped_at == scraped_at
         assert seeded.next_scrape_at == next_scrape_at

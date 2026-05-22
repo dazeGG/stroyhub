@@ -15,7 +15,7 @@ const docs = [
   },
   {
     slug: 'catalog',
-    title: 'Каталог',
+    title: 'Товары',
     description: 'Проверка исходных карточек, категорий и последних цен.',
     icon: icons.package,
   },
