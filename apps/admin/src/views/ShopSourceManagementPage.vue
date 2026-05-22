@@ -372,7 +372,7 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
+    <div>
       <div>
         <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
           <Icon :icon="icons.buildingStore" class="size-4" aria-hidden="true" />
@@ -382,46 +382,6 @@ onMounted(() => {
         <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
           Магазины объединяют source-записи из 2GIS, официальных API и HTML-каталогов. Здесь только метаданные, статусы и связи источников.
         </p>
-      </div>
-
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:min-w-[780px]">
-        <select
-          v-model="selectedSource"
-          aria-label="Фильтр магазинов по источнику"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
-        >
-          <option value="">Все источники</option>
-          <option v-for="source in sourceOptions" :key="source" :value="source">{{ source }}</option>
-        </select>
-        <select
-          v-model="selectedStatus"
-          aria-label="Фильтр магазинов по scrape status"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
-        >
-          <option value="">Все статусы</option>
-          <option v-for="status in scrapeStatusOptions" :key="status" :value="status">
-            {{ statusLabel(status) }}
-          </option>
-        </select>
-        <select
-          v-model="selectedSourceType"
-          aria-label="Фильтр магазинов по типу источника"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
-        >
-          <option value="">Все типы</option>
-          <option v-for="option in sourceTypeOptions" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </option>
-        </select>
-        <select
-          v-model="selectedRelationship"
-          aria-label="Фильтр магазинов по связи"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
-        >
-          <option value="">Все связи</option>
-          <option value="linked">Сгруппированные</option>
-          <option value="unlinked">Без магазина</option>
-        </select>
       </div>
     </div>
 
@@ -455,8 +415,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <section class="rounded-lg border border-neutral-800 bg-neutral-900/40">
-      <div class="flex flex-col gap-3 border-b border-neutral-800 p-4 lg:flex-row lg:items-center lg:justify-between">
+    <section class="space-y-3">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h3 class="text-base font-semibold text-white">Магазины</h3>
           <p class="mt-1 text-sm text-neutral-500">Карточки магазинов, их статус и приоритетный источник.</p>
@@ -471,11 +431,13 @@ onMounted(() => {
         </button>
       </div>
 
-      <div v-if="isLoading" class="p-4 text-sm text-neutral-400">Загружаем магазины...</div>
-      <div v-else-if="identities.length === 0" class="p-8 text-center text-sm text-neutral-500">
+      <div v-if="isLoading" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-400">
+        Загружаем магазины...
+      </div>
+      <div v-else-if="identities.length === 0" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">
         Магазины ещё не созданы.
       </div>
-      <div v-else class="overflow-x-auto">
+      <div v-else class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
         <table class="w-full min-w-[920px] text-left text-sm">
           <thead class="border-b border-neutral-800 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
@@ -526,29 +488,70 @@ onMounted(() => {
       </div>
     </section>
 
-    <section class="rounded-lg border border-neutral-800 bg-neutral-900/40">
-      <div class="flex flex-col gap-3 border-b border-neutral-800 p-4 xl:flex-row xl:items-center xl:justify-between">
+    <section class="space-y-3">
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <h3 class="text-base font-semibold text-white">Источники</h3>
           <p class="mt-1 text-sm text-neutral-500">Отдельные scrape targets: 2GIS, официальный API и официальный HTML-каталог.</p>
         </div>
-        <select
-          v-model.number="selectedIdentityId"
-          aria-label="Фильтр по магазину"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
-        >
-          <option value="">Все магазины</option>
-          <option v-for="identity in identities" :key="identity.id" :value="identity.id">
-            {{ identity.display_name }}
-          </option>
-        </select>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:min-w-[920px] xl:grid-cols-5">
+          <select
+            v-model="selectedSource"
+            aria-label="Фильтр магазинов по источнику"
+            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          >
+            <option value="">Все источники</option>
+            <option v-for="source in sourceOptions" :key="source" :value="source">{{ source }}</option>
+          </select>
+          <select
+            v-model="selectedStatus"
+            aria-label="Фильтр магазинов по scrape status"
+            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          >
+            <option value="">Все статусы</option>
+            <option v-for="status in scrapeStatusOptions" :key="status" :value="status">
+              {{ statusLabel(status) }}
+            </option>
+          </select>
+          <select
+            v-model="selectedSourceType"
+            aria-label="Фильтр магазинов по типу источника"
+            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          >
+            <option value="">Все типы</option>
+            <option v-for="option in sourceTypeOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+          <select
+            v-model="selectedRelationship"
+            aria-label="Фильтр магазинов по связи"
+            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          >
+            <option value="">Все связи</option>
+            <option value="linked">Сгруппированные</option>
+            <option value="unlinked">Без магазина</option>
+          </select>
+          <select
+            v-model.number="selectedIdentityId"
+            aria-label="Фильтр по магазину"
+            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          >
+            <option value="">Все магазины</option>
+            <option v-for="identity in identities" :key="identity.id" :value="identity.id">
+              {{ identity.display_name }}
+            </option>
+          </select>
+        </div>
       </div>
 
-      <div v-if="isLoading" class="p-4 text-sm text-neutral-400">Загружаем источники...</div>
-      <div v-else-if="shops.length === 0" class="p-8 text-center text-sm text-neutral-500">
+      <div v-if="isLoading" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-400">
+        Загружаем источники...
+      </div>
+      <div v-else-if="shops.length === 0" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">
         По этим фильтрам источников нет.
       </div>
-      <div v-else class="overflow-x-auto">
+      <div v-else class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
         <table class="w-full min-w-[1160px] text-left text-sm">
           <thead class="border-b border-neutral-800 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
