@@ -41,6 +41,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--source")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--labeled-by", default="cli")
+    parser.add_argument("--shuffle", action="store_true")
     args = parser.parse_args(argv)
 
     label_store = (
@@ -51,7 +52,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     with SessionLocal() as session:
         result = run_label_session(
-            CategoryLabelQueue(session, label_store, source=args.source),
+            CategoryLabelQueue(session, label_store, source=args.source, shuffle=args.shuffle),
             label_store,
             limit=args.limit,
             labeled_by=args.labeled_by,

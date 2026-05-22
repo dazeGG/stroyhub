@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -43,11 +44,13 @@ class CategoryLabelQueue:
         *,
         candidate_count: int = 3,
         source: str | None = None,
+        shuffle: bool = False,
     ) -> None:
         self._session = session
         self._label_store = label_store
         self._candidate_count = candidate_count
         self._source = source
+        self._shuffle = shuffle
         self._categorizer = RuleBasedCategorizer()
 
     def next_item(
@@ -59,9 +62,13 @@ class CategoryLabelQueue:
         if len(categories) < self._candidate_count:
             return None
 
-        excluded_product_ids = excluded_product_ids or set()
         labeled_pairs = self._label_store.labeled_pairs()
+        labeled_product_ids = {product_id for product_id, _ in labeled_pairs}
+        excluded_product_ids = (excluded_product_ids or set()) | labeled_product_ids
         products = self._products()
+        if self._shuffle:
+            products = list(products)
+            random.shuffle(products)
         for product in products:
             if product.id in excluded_product_ids:
                 continue

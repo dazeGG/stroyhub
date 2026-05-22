@@ -107,7 +107,7 @@ def test_category_label_queue_uses_text_signal_without_current_category(
     assert item.candidates[0].reason == "text_signal"
 
 
-def test_category_label_queue_skips_already_labeled_pairs(
+def test_category_label_queue_excludes_already_labeled_products(
     db_session: Session,
     tmp_path,
 ) -> None:
@@ -131,7 +131,52 @@ def test_category_label_queue_skips_already_labeled_pairs(
     label_store.append(
         CategoryLabelRecord(
             product_id=product.id,
-            candidate_category_ids=(categories["cement"],),
+            candidate_category_ids=tuple(categories.values()),
+            selected_category_ids=(categories["cement"],),
+        )
+    )
+
+    item = CategoryLabelQueue(db_session, label_store, source=source).next_item()
+
+    assert item is None
+
+
+def test_category_label_queue_only_excludes_labeled_products(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    categories = _seed_categories(db_session, prefix="queue-partial")
+    source = "queue-partial-source"
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source=source, source_id="queue-partial-shop", name="Queue Shop")
+    )
+    labeled_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source=source,
+            source_product_id="queue-partial-labeled",
+            title="Цемент М500",
+            normalized_title="цемент м500",
+            category_id=categories["cement"],
+            category_raw="Цемент",
+        )
+    )
+    unlabeled_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source=source,
+            source_product_id="queue-partial-unlabeled",
+            title="Кирпич красный",
+            normalized_title="кирпич красный",
+            category_id=categories["brick"],
+            category_raw="Кирпич",
+        )
+    )
+    label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
+    label_store.append(
+        CategoryLabelRecord(
+            product_id=labeled_product.id,
+            candidate_category_ids=tuple(categories.values()),
             selected_category_ids=(categories["cement"],),
         )
     )
@@ -139,7 +184,38 @@ def test_category_label_queue_skips_already_labeled_pairs(
     item = CategoryLabelQueue(db_session, label_store, source=source).next_item()
 
     assert item is not None
-    assert categories["cement"] not in {candidate.id for candidate in item.candidates}
+    assert item.product.id == unlabeled_product.id
+
+
+def test_category_label_queue_shuffle_returns_product(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    categories = _seed_categories(db_session, prefix="queue-shuffle")
+    source = "queue-shuffle-source"
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source=source, source_id="queue-shuffle-shop", name="Queue Shop")
+    )
+    SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source=source,
+            source_product_id="queue-shuffle-product",
+            title="Цемент М500",
+            normalized_title="цемент м500",
+            category_id=categories["cement"],
+            category_raw="Цемент",
+        )
+    )
+
+    item = CategoryLabelQueue(
+        db_session,
+        CategoryLabelStore(tmp_path / "labels.jsonl"),
+        source=source,
+        shuffle=True,
+    ).next_item()
+
+    assert item is not None
     assert len(item.candidates) == 3
 
 
