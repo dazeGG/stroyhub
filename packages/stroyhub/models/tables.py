@@ -94,6 +94,52 @@ class Shop(TimestampMixin, Base):
     scrape_runs: Mapped[list["ScrapeRun"]] = relationship(back_populates="shop")
 
 
+class ShopSourceCandidate(TimestampMixin, Base):
+    __tablename__ = "shop_source_candidates"
+    __table_args__: Any = (
+        UniqueConstraint("source", "source_id", name="uq_shop_source_candidates_source_source_id"),
+        CheckConstraint(
+            "source = '2gis'",
+            name="ck_shop_source_candidates_source_known",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'stale', 'hidden', 'archived', 'approved')",
+            name="ck_shop_source_candidates_status_known",
+        ),
+        Index("ix_shop_source_candidates_status", "status"),
+        Index("ix_shop_source_candidates_priority", "priority"),
+        Index("ix_shop_source_candidates_last_seen_at", "last_seen_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    source_id: Mapped[str] = mapped_column(Text, nullable=False)
+    source_type: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'2gis'"))
+    display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    address: Mapped[str | None] = mapped_column(Text)
+    website_url: Mapped[str | None] = mapped_column(Text)
+    rubrics: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'pending'"))
+    has_products: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    has_prices: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    has_website: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    product_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    priced_product_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    priority_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    missing_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    approved_shop_id: Mapped[int | None] = mapped_column(ForeignKey("shops.id"))
+    raw: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+
+    approved_shop: Mapped[Shop | None] = relationship()
+
+
 class Category(TimestampMixin, Base):
     __tablename__ = "categories"
     __table_args__: Any = (

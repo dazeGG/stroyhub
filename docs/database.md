@@ -95,6 +95,65 @@ Source type policy:
   use an explicit integration type such as official API/HTML or a future
   partner/merchant integration.
 
+### `shop_source_candidates`
+
+Stores discovered shop/source candidates before an operator approves them into
+tracked `shops` rows.
+
+Core fields:
+
+- `id`: `bigint` primary key
+- `source`: `text`, required
+- `source_id`: `text`, required
+- `source_type`: `text`, required, default `2gis`
+- `display_name`: `text`, required
+- `address`: `text`, nullable
+- `website_url`: `text`, nullable
+- `rubrics`: `text`, nullable
+- `status`: `text`, required, default `pending`
+- `has_products`: `boolean`, required, default `false`
+- `has_prices`: `boolean`, required, default `false`
+- `has_website`: `boolean`, required, default `false`
+- `product_count`: `integer`, required, default `0`
+- `priced_product_count`: `integer`, required, default `0`
+- `priority`: `integer`, required, default `0`
+- `priority_reason`: `text`, required
+- `last_seen_at`: `timestamp with time zone`, nullable
+- `last_checked_at`: `timestamp with time zone`, nullable
+- `missing_since`: `timestamp with time zone`, nullable
+- `approved_shop_id`: `bigint`, nullable reference to `shops.id`
+- `raw`: `jsonb`, nullable
+- `created_at`: `timestamp with time zone`, required
+- `updated_at`: `timestamp with time zone`, required
+
+Rules:
+
+- Candidate approval is only for not-yet-tracked shops/sources.
+- Already approved `shops` must stay out of the pending candidate queue.
+- If an unapproved candidate disappears from the latest discovery refresh, mark
+  it `stale` instead of deleting it immediately.
+- If an already approved tracked source disappears from discovery, it should
+  become a tracked-source attention signal, not a candidate again.
+- Current candidate discovery uses 2GIS construction-material shop signals.
+  Future discovery sources may be added without changing the approved `shops`
+  table.
+
+Priority order:
+
+1. Has both observed prices/products and a website/catalog URL signal.
+2. Has observed prices/products only.
+3. Has a website/catalog URL signal only.
+4. Other construction-material shop candidates, marked as no prices found.
+
+Constraints and indexes:
+
+- Unique: `source`, `source_id`
+- Check: known `source`
+- Check: known `status`
+- Index: `status`
+- Index: `priority`
+- Index: `last_seen_at`
+
 ### `categories`
 
 Stores StroyHub's normalized category tree.

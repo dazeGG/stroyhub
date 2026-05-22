@@ -8,6 +8,7 @@ from stroyhub.models import (
     ScrapeRun,
     Shop,
     ShopIdentity,
+    ShopSourceCandidate,
     SourceProduct,
 )
 
@@ -16,6 +17,7 @@ def test_m1_tables_are_registered_in_metadata() -> None:
     assert set(Base.metadata.tables) >= {
         "shops",
         "shop_identities",
+        "shop_source_candidates",
         "categories",
         "source_products",
         "price_snapshots",
@@ -41,6 +43,7 @@ def test_source_product_partial_unique_indexes_are_declared() -> None:
 def test_models_match_expected_table_names() -> None:
     assert Shop.__tablename__ == "shops"
     assert ShopIdentity.__tablename__ == "shop_identities"
+    assert ShopSourceCandidate.__tablename__ == "shop_source_candidates"
     assert Category.__tablename__ == "categories"
     assert SourceProduct.__tablename__ == "source_products"
     assert PriceSnapshot.__tablename__ == "price_snapshots"
@@ -69,6 +72,20 @@ def test_shop_identity_has_source_management_columns() -> None:
     assert "preferred_source" in columns
     assert "status" in columns
     assert "locked_fields" in columns
+
+
+def test_shop_source_candidate_has_review_queue_columns() -> None:
+    columns = ShopSourceCandidate.__table__.columns
+
+    assert "source_id" in columns
+    assert "display_name" in columns
+    assert "website_url" in columns
+    assert "status" in columns
+    assert "has_prices" in columns
+    assert "has_website" in columns
+    assert "priority" in columns
+    assert "missing_since" in columns
+    assert "approved_shop_id" in columns
 
 
 def test_product_match_accepted_unique_index_is_declared() -> None:

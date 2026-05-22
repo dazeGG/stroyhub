@@ -12,7 +12,6 @@ if str(SCRIPT_DIR) not in sys.path:
 seed_categories = importlib.import_module("seed_categories").main
 seed_metalltorg_source = importlib.import_module("seed_metalltorg_source").main
 seed_unicom_source = importlib.import_module("seed_unicom_source").main
-seed_twogis_whitelist = importlib.import_module("seed_twogis_whitelist").main
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -27,11 +26,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     category_args = ["--dry-run"] if args.dry_run else []
-    whitelist_args = ["--scrape-interval", str(args.scrape_interval)]
     metalltorg_args = ["--scrape-interval", str(args.scrape_interval)]
     unicom_args = ["--scrape-interval", str(args.scrape_interval)]
     if args.dry_run:
-        whitelist_args.append("--dry-run")
         metalltorg_args.append("--dry-run")
         unicom_args.append("--dry-run")
 
@@ -50,8 +47,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if metalltorg_result != 0:
         return metalltorg_result
 
-    print("== Seed initial 2GIS whitelist ==")
-    return seed_twogis_whitelist(whitelist_args)
+    print("== 2GIS candidates are approved through admin candidate review ==")
+    return 0
 
 
 if __name__ == "__main__":

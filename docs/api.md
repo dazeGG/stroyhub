@@ -314,6 +314,70 @@ catalogs, or manual price snapshots. Owner-managed shop behavior should be
 modeled later as ownership and management state, not as a generic `manual`
 source type.
 
+## Shop Source Candidates
+
+### `GET /shop-source-candidates`
+
+Lists discovered shop/source candidates that are not yet approved into tracked
+`shops` rows. By default approved candidates are hidden.
+
+Query params:
+
+- `status`: optional candidate status filter: `pending`, `stale`, `hidden`,
+  `archived`, or `approved`.
+- `include_approved`: optional boolean, default `false`.
+
+Example response:
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "source": "2gis",
+      "source_id": "70000001007229923",
+      "source_type": "2gis",
+      "display_name": "Build Shop",
+      "address": "Yakutsk",
+      "website_url": "https://example.test/catalog/",
+      "rubrics": "Стройматериалы; доставка",
+      "status": "pending",
+      "has_products": true,
+      "has_prices": true,
+      "has_website": true,
+      "product_count": 42,
+      "priced_product_count": 40,
+      "priority": 100,
+      "priority_reason": "есть цены и сайт",
+      "last_seen_at": "2026-05-23T00:00:00Z",
+      "last_checked_at": "2026-05-23T00:00:00Z",
+      "missing_since": null,
+      "approved_shop_id": null
+    }
+  ]
+}
+```
+
+Priority order:
+
+1. Has both observed prices/products and a website/catalog URL signal.
+2. Has observed prices/products only.
+3. Has a website/catalog URL signal only.
+4. Other construction-material shop candidates, marked as no prices found.
+
+### `POST /shop-source-candidates/refresh`
+
+Refreshes the candidate queue from the 2GIS discovery source. New candidates are
+added, existing unapproved candidates are updated, and unapproved candidates
+missing from the latest refresh are marked `stale` instead of being deleted.
+Already approved `shops` are skipped and stay out of the pending queue.
+
+### `POST /shop-source-candidates/{candidate_id}/approve`
+
+Approves a candidate into tracked data. The endpoint creates a `shop_identity`,
+creates a linked `shops` row for the 2GIS source, marks the candidate
+`approved`, and returns the updated candidate.
+
 ## Scrapes
 
 ### `GET /scrapes/health`
