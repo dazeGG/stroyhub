@@ -9,6 +9,7 @@ from stroyhub.catalog.shop_candidates import (
     CandidateDiscoverySeed,
     CandidateListFilters,
     ShopCandidateCatalog,
+    _discover_twogis_filtered_candidates,
     _extract_firm_website,
     _search_page_url,
     parse_twogis_search_candidates,
@@ -276,6 +277,31 @@ def test_search_page_url_uses_single_discovery_query_with_filters() -> None:
     )
 
 
+def test_filtered_discovery_stops_when_page_repeats_without_new_sources() -> None:
+    page_one = """
+    <a href="/yakutsk/firm/1" class="_1rehek"><span class="_lvwrwt"><span>Первый</span></span></a>
+    <div>Якутск Стройматериалы</div>
+    """
+    page_two = """
+    <a href="/yakutsk/firm/2" class="_1rehek"><span class="_lvwrwt"><span>Второй</span></span></a>
+    <div>Якутск Стройматериалы</div>
+    """
+    client = _FakeSearchClient([page_one, page_two, page_two])
+
+    seeds = _discover_twogis_filtered_candidates(
+        client=client,
+        query="стройматериалы",
+        max_pages=50,
+        base_url="https://2gis.ru/yakutsk/search",
+        filters="sorting_has_goods",
+        has_prices_signal=True,
+        has_website_signal=False,
+    )
+
+    assert [seed.source_id for seed in seeds] == ["1", "2"]
+    assert client.request_count == 3
+
+
 def test_parse_twogis_search_candidates_preserves_filter_signals() -> None:
     page_html = """
     <a href="/yakutsk/firm/70000001007229923" class="_1rehek">
@@ -346,3 +372,22 @@ def test_extract_firm_website_keeps_full_redirect_target_and_skips_messengers() 
 
     assert _extract_firm_website(page_html) == "https://example.test/catalog/?utm_source=2gis"
     assert _extract_firm_website(messenger_html) is None
+
+
+class _FakeSearchResponse:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def raise_for_status(self) -> None:
+        return None
+
+
+class _FakeSearchClient:
+    def __init__(self, pages: list[str]) -> None:
+        self._pages = pages
+        self.request_count = 0
+
+    def get(self, url: str) -> _FakeSearchResponse:
+        self.request_count += 1
+        index = min(self.request_count - 1, len(self._pages) - 1)
+        return _FakeSearchResponse(self._pages[index])

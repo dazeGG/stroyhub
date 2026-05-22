@@ -295,11 +295,16 @@ def _discover_twogis_filtered_candidates(
         if not page_seeds:
             break
 
+        has_new_seed = False
         for seed in page_seeds:
             existing = seeds_by_source_id.get(seed.source_id)
+            if existing is None:
+                has_new_seed = True
             seeds_by_source_id[seed.source_id] = (
                 seed if existing is None else _merge_seed(existing, seed)
             )
+        if not has_new_seed:
+            break
 
     return list(seeds_by_source_id.values())
 
