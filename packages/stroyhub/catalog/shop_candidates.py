@@ -18,15 +18,8 @@ from stroyhub.models import Shop, ShopSourceCandidate
 TWOGIS_SOURCE = "2gis"
 CandidateDiscoverer = Callable[[], Iterable["CandidateDiscoverySeed"]]
 TWOGIS_SEARCH_BASE_URL = "https://2gis.ru/yakutsk/search"
-TWOGIS_DISCOVERY_QUERIES = (
-    "стройматериалы",
-    "строительные материалы",
-    "пиломатериалы",
-    "крепеж",
-    "сантехника",
-    "электрика",
-)
-TWOGIS_DISCOVERY_MAX_PAGES = 5
+TWOGIS_DISCOVERY_QUERY = "стройматериалы"
+TWOGIS_DISCOVERY_MAX_PAGES = 50
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -242,7 +235,7 @@ class ShopCandidateCatalog:
 
 def discover_twogis_candidates(
     *,
-    queries: Iterable[str] = TWOGIS_DISCOVERY_QUERIES,
+    query: str = TWOGIS_DISCOVERY_QUERY,
     max_pages: int = TWOGIS_DISCOVERY_MAX_PAGES,
     base_url: str = TWOGIS_SEARCH_BASE_URL,
 ) -> list[CandidateDiscoverySeed]:
@@ -258,21 +251,20 @@ def discover_twogis_candidates(
         follow_redirects=True,
         headers={"User-Agent": "Mozilla/5.0"},
     ) as client:
-        for query in queries:
-            for filters, has_prices_signal, has_website_signal in discovery_layers:
-                for seed in _discover_twogis_filtered_candidates(
-                    client=client,
-                    query=query,
-                    max_pages=max_pages,
-                    base_url=base_url,
-                    filters=filters,
-                    has_prices_signal=has_prices_signal,
-                    has_website_signal=has_website_signal,
-                ):
-                    existing = seeds_by_source_id.get(seed.source_id)
-                    seeds_by_source_id[seed.source_id] = (
-                        seed if existing is None else _merge_seed(existing, seed)
-                    )
+        for filters, has_prices_signal, has_website_signal in discovery_layers:
+            for seed in _discover_twogis_filtered_candidates(
+                client=client,
+                query=query,
+                max_pages=max_pages,
+                base_url=base_url,
+                filters=filters,
+                has_prices_signal=has_prices_signal,
+                has_website_signal=has_website_signal,
+            ):
+                existing = seeds_by_source_id.get(seed.source_id)
+                seeds_by_source_id[seed.source_id] = (
+                    seed if existing is None else _merge_seed(existing, seed)
+                )
 
     return list(seeds_by_source_id.values())
 

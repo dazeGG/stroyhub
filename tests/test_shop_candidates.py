@@ -10,6 +10,7 @@ from stroyhub.catalog.shop_candidates import (
     CandidateListFilters,
     ShopCandidateCatalog,
     _extract_firm_website,
+    _search_page_url,
     parse_twogis_search_candidates,
 )
 from stroyhub.core.config import settings
@@ -258,6 +259,21 @@ def test_parse_twogis_search_candidates_extracts_real_search_cards() -> None:
             rubrics="Стройматериалы",
         ),
     ]
+
+
+def test_search_page_url_uses_single_discovery_query_with_filters() -> None:
+    url = _search_page_url(
+        base_url="https://2gis.ru/yakutsk/search",
+        query="стройматериалы",
+        page=3,
+        filters="has_site%2Csorting_has_goods",
+    )
+
+    assert url == (
+        "https://2gis.ru/yakutsk/search/"
+        "%D1%81%D1%82%D1%80%D0%BE%D0%B9%D0%BC%D0%B0%D1%82%D0%B5%D1%80%D0%B8%D0%B0%D0%BB%D1%8B"
+        "/filters/has_site%2Csorting_has_goods/page/3"
+    )
 
 
 def test_parse_twogis_search_candidates_preserves_filter_signals() -> None:
