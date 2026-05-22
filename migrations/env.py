@@ -11,6 +11,7 @@ from stroyhub.models import (
     ProductMatch,
     ScrapeRun,
     Shop,
+    ShopSourceCandidate,
     SourceProduct,
 )
 
@@ -23,7 +24,16 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Keep model imports visible to static analysis and ensure metadata is populated.
-_MODELS = (CanonicalProduct, Category, PriceSnapshot, ProductMatch, ScrapeRun, Shop, SourceProduct)
+_MODELS = (
+    CanonicalProduct,
+    Category,
+    PriceSnapshot,
+    ProductMatch,
+    ScrapeRun,
+    Shop,
+    ShopSourceCandidate,
+    SourceProduct,
+)
 
 
 def run_migrations_offline() -> None:

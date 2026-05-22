@@ -5,6 +5,7 @@ from apps.api.categories import router as categories_router
 from apps.api.matches import router as matches_router
 from apps.api.products import router as products_router
 from apps.api.scrapes import router as scrapes_router
+from apps.api.shop_candidates import router as shop_candidates_router
 from apps.api.shops import identity_router
 from apps.api.shops import router as shops_router
 
@@ -15,6 +16,7 @@ def create_app() -> FastAPI:
     app.include_router(matches_router)
     app.include_router(products_router)
     app.include_router(scrapes_router)
+    app.include_router(shop_candidates_router)
     app.include_router(shops_router)
     app.include_router(identity_router)
 

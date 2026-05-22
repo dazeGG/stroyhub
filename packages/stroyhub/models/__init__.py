@@ -9,6 +9,7 @@ from stroyhub.models.tables import (
     ScrapeRun,
     Shop,
     ShopIdentity,
+    ShopSourceCandidate,
     SourceProduct,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     "ScrapeRun",
     "Shop",
     "ShopIdentity",
+    "ShopSourceCandidate",
     "SourceProduct",
 ]

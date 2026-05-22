@@ -45,8 +45,7 @@ uv run alembic upgrade head
 
 ## 3. Seed Local Collection Inputs
 
-Seed normalized categories, official shop sources, and the initial 2GIS shop
-whitelist:
+Seed normalized categories and official shop sources:
 
 ```bash
 uv run python scripts/setup_data_collection.py
@@ -63,9 +62,11 @@ The setup flow runs:
 1. `scripts/seed_categories.py`
 2. `scripts/seed_unicom_source.py`
 3. `scripts/seed_metalltorg_source.py`
-4. `scripts/seed_twogis_whitelist.py`
 
 These seed flows are idempotent and can be repeated.
+
+2GIS shops are no longer auto-approved through the setup script. They should be
+loaded through the admin candidate review flow, then approved by an operator.
 
 To configure only the official Unicom source:
 
@@ -114,16 +115,18 @@ This command should not write products, price snapshots, or scrape runs.
 
 ## 5. Persist Baseline Product Data
 
-Run the initial 2GIS whitelist scrape:
+After 2GIS candidates have been approved into tracked `shops`, scrape due shops
+or a specific approved source:
 
 ```bash
-uv run python scripts/scrape_twogis_whitelist.py
+uv run python scripts/scrape_shop_sources.py due --source 2gis
 ```
 
-Expected output includes one `shop scrape summary` per whitelisted shop and a
-final `whitelist scrape summary`.
+The legacy `scripts/seed_twogis_whitelist.py` and
+`scripts/scrape_twogis_whitelist.py` scripts are retained for historical/debug
+use, but they are no longer part of the normal empty-database setup flow.
 
-For the 2026-05-17 baseline, the initial run produced:
+For the 2026-05-17 historical whitelist baseline, the initial run produced:
 
 - `shops_total=6`
 - `shops_scraped=6`
