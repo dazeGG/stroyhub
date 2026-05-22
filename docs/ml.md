@@ -137,6 +137,16 @@ metadata. Current planned thresholds are:
 The shared feature builder used during training must also be used at runtime.
 This keeps training behavior and production behavior aligned.
 
+Feature building lives in `packages/stroyhub/ml/features.py`. The verifier
+feature contract is versioned as `category_verifier_features/v1` and turns one
+product/category pair into deterministic string features. The current contract
+includes product source, shop id, title, normalized title, raw source category,
+description, candidate category id, slug, name, parent id, category path names
+and slugs, combined product/category context text, and simple pair flags such as
+whether the product's current category is the candidate and whether product text
+mentions the category. Training and runtime verification must import this shared
+builder instead of recreating feature strings separately.
+
 ## Category Predictor
 
 The future category predictor proposes likely categories for a product. It can
