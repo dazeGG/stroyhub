@@ -128,6 +128,56 @@ def test_run_label_session_quit_does_not_write_label(tmp_path) -> None:
     assert label_store.read_records() == []
 
 
+def test_run_label_session_shows_progress_counter(tmp_path) -> None:
+    label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
+    output = FakeOutput()
+
+    run_label_session(
+        FakeQueue([_queue_item(product_id=1)]),  # type: ignore[arg-type]
+        label_store,
+        limit=1,
+        input_fn=FakeInput(["1"]),
+        output=output,
+    )
+
+    assert "labeled" in output.text
+    assert "remaining" in output.text
+
+
+def test_run_label_session_shows_shop_name(tmp_path) -> None:
+    label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
+    output = FakeOutput()
+
+    run_label_session(
+        FakeQueue([_queue_item(product_id=1, shop_name="Евролайн")]),  # type: ignore[arg-type]
+        label_store,
+        limit=1,
+        input_fn=FakeInput(["1"]),
+        output=output,
+    )
+
+    assert "Евролайн" in output.text
+
+
+def test_run_label_session_shows_session_stats_in_prompt(tmp_path) -> None:
+    label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
+    captured_prompts: list[str] = []
+
+    def capturing_input(prompt: str) -> str:
+        captured_prompts.append(prompt)
+        return "1"
+
+    run_label_session(
+        FakeQueue([_queue_item(product_id=1)]),  # type: ignore[arg-type]
+        label_store,
+        limit=1,
+        input_fn=capturing_input,
+        output=FakeOutput(),
+    )
+
+    assert any("session" in p and "saved" in p for p in captured_prompts)
+
+
 def test_run_label_session_recovers_from_undecodable_input(tmp_path) -> None:
     label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
     output = FakeOutput()
@@ -160,6 +210,12 @@ class FakeQueue:
                 return item
         return None
 
+    def labeled_count(self) -> int:
+        return 0
+
+    def unlabeled_count(self) -> int:
+        return len(self._items)
+
 
 class FakeInput:
     def __init__(self, answers: Iterable[str]) -> None:
@@ -190,7 +246,7 @@ class UndecodableThenValidInput:
         return self._answer
 
 
-def _queue_item(*, product_id: int) -> CategoryLabelQueueItem:
+def _queue_item(*, product_id: int, shop_name: str | None = None) -> CategoryLabelQueueItem:
     return CategoryLabelQueueItem(
         product=CategoryLabelProduct(
             id=product_id,
@@ -199,6 +255,7 @@ def _queue_item(*, product_id: int) -> CategoryLabelQueueItem:
             normalized_title=f"product {product_id}",
             category_id=None,
             category_raw=None,
+            shop_name=shop_name,
         ),
         candidates=(
             CategoryLabelCandidate(

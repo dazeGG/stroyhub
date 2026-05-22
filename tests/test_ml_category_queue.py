@@ -187,6 +187,118 @@ def test_category_label_queue_only_excludes_labeled_products(
     assert item.product.id == unlabeled_product.id
 
 
+def test_category_label_queue_category_raw_filter(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    _seed_categories(db_session, prefix="queue-raw-filter")
+    source = "queue-raw-filter-source"
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source=source, source_id="queue-raw-filter-shop", name="Queue Shop")
+    )
+    SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source=source,
+            source_product_id="queue-raw-filter-cement",
+            title="Цемент М500",
+            normalized_title="цемент м500",
+            category_raw="Цемент строительный",
+        )
+    )
+    panel_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source=source,
+            source_product_id="queue-raw-filter-panel",
+            title="Сиппанели 200мм",
+            normalized_title="сиппанели 200мм",
+            category_raw="Сиппанели",
+        )
+    )
+
+    item = CategoryLabelQueue(
+        db_session,
+        CategoryLabelStore(tmp_path / "labels.jsonl"),
+        source=source,
+        category_raw="панели",
+    ).next_item()
+
+    assert item is not None
+    assert item.product.id == panel_product.id
+
+
+def test_category_label_queue_category_raw_filter_case_insensitive(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    _seed_categories(db_session, prefix="queue-raw-case")
+    source = "queue-raw-case-source"
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source=source, source_id="queue-raw-case-shop", name="Queue Shop")
+    )
+    panel_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source=source,
+            source_product_id="queue-raw-case-panel",
+            title="Сиппанели 200мм",
+            normalized_title="сиппанели 200мм",
+            category_raw="Сиппанели",
+        )
+    )
+
+    item_lower = CategoryLabelQueue(
+        db_session,
+        CategoryLabelStore(tmp_path / "labels.jsonl"),
+        source=source,
+        category_raw="панели",
+    ).next_item()
+
+    item_upper = CategoryLabelQueue(
+        db_session,
+        CategoryLabelStore(tmp_path / "labels.jsonl"),
+        source=source,
+        category_raw="Панели",
+    ).next_item()
+
+    assert item_lower is not None
+    assert item_upper is not None
+    assert item_lower.product.id == panel_product.id
+    assert item_upper.product.id == panel_product.id
+
+
+def test_category_label_queue_includes_shop_name(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    categories = _seed_categories(db_session, prefix="queue-shop-name")
+    source = "queue-shop-name-source"
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source=source, source_id="queue-shop-name-shop", name="Евролайн")
+    )
+    SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source=source,
+            source_product_id="queue-shop-name-product",
+            title="Цемент М500",
+            normalized_title="цемент м500",
+            category_id=categories["cement"],
+            category_raw="Цемент",
+        )
+    )
+
+    item = CategoryLabelQueue(
+        db_session,
+        CategoryLabelStore(tmp_path / "labels.jsonl"),
+        source=source,
+    ).next_item()
+
+    assert item is not None
+    assert item.product.shop_name == "Евролайн"
+
+
 def test_category_label_queue_shuffle_returns_product(
     db_session: Session,
     tmp_path,
