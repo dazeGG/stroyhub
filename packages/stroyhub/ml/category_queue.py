@@ -93,6 +93,9 @@ class CategoryLabelQueue:
 
         return None
 
+    def labeled_count(self) -> int:
+        return len(self._labeled_product_ids)
+
     def unlabeled_count(self) -> int:
         return sum(
             1

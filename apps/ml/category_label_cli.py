@@ -20,7 +20,6 @@ _CYAN = "\033[36m"
 _YELLOW = "\033[33m"
 _GREEN = "\033[32m"
 _BLUE = "\033[34m"
-_MAGENTA = "\033[35m"
 
 _REASON_COLOURS: dict[str, str] = {
     "current_category": _GREEN,
@@ -112,7 +111,7 @@ def run_label_session(
     skipped = 0
     excluded_product_ids: set[int] = set()
     output = output or _Stdout()
-    labeled_total = len(label_store.labeled_pairs())
+    labeled_total = queue.labeled_count()
     unlabeled_total = queue.unlabeled_count()
 
     while limit is None or saved < limit:
@@ -125,7 +124,7 @@ def run_label_session(
                 exhausted=True,
             )
 
-        remaining = max(0, unlabeled_total - saved - skipped)
+        remaining = max(0, unlabeled_total - saved)
         _print_item(item, output, labeled=labeled_total + saved, remaining=remaining)
         action = _read_action(item, input_fn=input_fn, output=output, saved=saved, skipped=skipped)
         if action.kind == "quit":

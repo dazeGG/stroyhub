@@ -210,6 +210,9 @@ class FakeQueue:
                 return item
         return None
 
+    def labeled_count(self) -> int:
+        return 0
+
     def unlabeled_count(self) -> int:
         return len(self._items)
 
