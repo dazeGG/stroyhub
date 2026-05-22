@@ -3,7 +3,7 @@ import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import httpx
 from sqlalchemy import select
@@ -310,6 +310,59 @@ def discover_twogis_candidates(
                 for seed in page_seeds:
                     seeds_by_source_id.setdefault(seed.source_id, seed)
 
+            for seed in _discover_twogis_site_candidates(
+                client=client,
+                query=query,
+                max_pages=max_pages,
+                base_url=base_url,
+            ):
+                existing = seeds_by_source_id.get(seed.source_id)
+                if existing is None:
+                    seeds_by_source_id[seed.source_id] = seed
+                elif existing.website_url is None and seed.website_url is not None:
+                    seeds_by_source_id[seed.source_id] = CandidateDiscoverySeed(
+                        source_id=existing.source_id,
+                        display_name=existing.display_name,
+                        address=existing.address,
+                        rubrics=existing.rubrics,
+                        website_url=seed.website_url,
+                    )
+
+    return list(seeds_by_source_id.values())
+
+
+def _discover_twogis_site_candidates(
+    *,
+    client: httpx.Client,
+    query: str,
+    max_pages: int,
+    base_url: str,
+) -> list[CandidateDiscoverySeed]:
+    seeds_by_source_id: dict[str, CandidateDiscoverySeed] = {}
+
+    for page in range(1, max_pages + 1):
+        response = client.get(
+            _search_page_url(base_url=base_url, query=query, page=page, filters="has_site")
+        )
+        response.raise_for_status()
+        page_seeds = parse_twogis_search_candidates(response.text, fallback_rubrics=query)
+        if not page_seeds:
+            break
+
+        for seed in page_seeds:
+            if seed.source_id in seeds_by_source_id:
+                continue
+            website_url = _fetch_twogis_firm_website(client, seed.source_id)
+            if website_url is None:
+                continue
+            seeds_by_source_id[seed.source_id] = CandidateDiscoverySeed(
+                source_id=seed.source_id,
+                display_name=seed.display_name,
+                address=seed.address,
+                rubrics=seed.rubrics,
+                website_url=website_url,
+            )
+
     return list(seeds_by_source_id.values())
 
 
@@ -354,11 +407,25 @@ def parse_twogis_search_candidates(
     return list(seeds_by_source_id.values())
 
 
-def _search_page_url(*, base_url: str, query: str, page: int) -> str:
+def _search_page_url(
+    *,
+    base_url: str,
+    query: str,
+    page: int,
+    filters: str | None = None,
+) -> str:
     url = f"{base_url.rstrip('/')}/{quote(query)}"
+    if filters is not None:
+        url = f"{url}/filters/{filters}"
     if page > 1:
         url = f"{url}/page/{page}"
     return url
+
+
+def _fetch_twogis_firm_website(client: httpx.Client, source_id: str) -> str | None:
+    response = client.get(f"https://2gis.ru/yakutsk/firm/{source_id}")
+    response.raise_for_status()
+    return _extract_firm_website(response.text)
 
 
 def _html_text(value: str) -> str:
@@ -386,18 +453,30 @@ def _extract_rubrics(text: str, *, fallback: str) -> str:
 
 
 def _extract_website(card_html: str) -> str | None:
-    match = re.search(r'"type":"website","value":"(?P<value>[^"]+)"', card_html)
+    match = re.search(r'\{[^{}]*"type":"website"[^{}]*"value":"(?P<value>[^"]+)"', card_html)
+    if match is None:
+        match = re.search(r'\{[^{}]*"value":"(?P<value>[^"]+)"[^{}]*"type":"website"', card_html)
     if match is None:
         return None
 
     value = html.unescape(match.group("value"))
     if value.startswith("http://link.2gis.ru") and "?" in value:
-        value = value.rsplit("?", maxsplit=1)[-1]
+        value = value.split("?", maxsplit=1)[-1]
     if not value.startswith(("http://", "https://")):
         value = f"https://{value}"
-    if any(host in value for host in ("2gis.ru", "dgis.ru")):
+    hostname = urlparse(value).hostname or ""
+    if (
+        not hostname
+        or any(host in hostname for host in ("2gis.ru", "dgis.ru"))
+        or hostname == "max.ru"
+    ):
         return None
     return value
+
+
+def _extract_firm_website(page_html: str) -> str | None:
+    own_firm_html = page_html.split('"servicing"', maxsplit=1)[0]
+    return _extract_website(own_firm_html)
 
 
 def _priority(*, has_prices: bool, has_website: bool) -> tuple[int, str]:

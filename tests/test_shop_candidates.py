@@ -11,6 +11,7 @@ from stroyhub.catalog.shop_candidates import (
     CandidateDiscoverySeed,
     CandidateListFilters,
     ShopCandidateCatalog,
+    _extract_firm_website,
     parse_twogis_search_candidates,
 )
 from stroyhub.core.config import settings
@@ -277,6 +278,37 @@ def test_parse_twogis_search_candidates_ignores_app_state_contacts_after_cards()
             rubrics="Стройматериалы",
         )
     ]
+
+
+def test_extract_firm_website_ignores_servicing_contacts() -> None:
+    page_html = """
+    {"contacts":[
+      {"url":"http://metalltorg.biz","type":"website",
+       "value":"http://link.2gis.ru/1.2/demo?http://metalltorg.biz"}
+    ],
+    "servicing":{"items":[
+      {"contacts":[{"type":"website","value":"pochta.ru/offices/677007"}]}
+    ]}}
+    """
+
+    assert _extract_firm_website(page_html) == "http://metalltorg.biz"
+
+
+def test_extract_firm_website_keeps_full_redirect_target_and_skips_messengers() -> None:
+    page_html = """
+    {"contacts":[
+      {"type":"website",
+       "value":"http://link.2gis.ru/1.2/demo?https://example.test/catalog/?utm_source=2gis"}
+    ]}
+    """
+    messenger_html = """
+    {"contacts":[
+      {"type":"website","value":"http://link.2gis.ru/1.2/demo?http://max.ru/u/demo"}
+    ]}
+    """
+
+    assert _extract_firm_website(page_html) == "https://example.test/catalog/?utm_source=2gis"
+    assert _extract_firm_website(messenger_html) is None
 
 
 def _fake_scraper(price_counts: dict[str, int]):  # type: ignore[no-untyped-def]
