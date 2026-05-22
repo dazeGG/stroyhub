@@ -66,30 +66,6 @@ function statusClass(status: ShopSourceCandidateStatus): string {
   return 'border-neutral-700 bg-neutral-900 text-neutral-400'
 }
 
-function priorityClass(candidate: ShopSourceCandidate): string {
-  if (candidate.has_prices && candidate.has_website) {
-    return 'border-amber-400/40 bg-amber-400/10 text-amber-100'
-  }
-  if (candidate.has_prices) {
-    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
-  }
-  if (candidate.has_website) {
-    return 'border-sky-400/30 bg-sky-400/10 text-sky-200'
-  }
-
-  return 'border-neutral-700 bg-neutral-900 text-neutral-400'
-}
-
-function candidateSignalLabel(candidate: ShopSourceCandidate): string {
-  if (candidate.has_prices && candidate.has_website) {
-    return 'есть цены и сайт'
-  }
-  if (!candidate.has_prices) {
-    return candidate.has_website ? 'есть сайт' : 'нет цен и сайта'
-  }
-  return 'есть цены'
-}
-
 function canApprove(candidate: ShopSourceCandidate): boolean {
   return candidate.status === 'pending' || candidate.status === 'stale'
 }
@@ -297,9 +273,6 @@ onMounted(() => {
               <h3 class="text-base font-semibold text-white">{{ candidate.display_name }}</h3>
               <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="statusClass(candidate.status)">
                 {{ statusLabel(candidate.status) }}
-              </span>
-              <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="priorityClass(candidate)">
-                {{ candidateSignalLabel(candidate) }}
               </span>
             </div>
             <p class="mt-2 text-sm text-neutral-500">{{ candidate.address || 'Адрес не указан' }}</p>
