@@ -160,6 +160,35 @@ The due-shop dispatcher currently supports:
 For a one-off worker dispatch from Python/Celery internals, use the existing
 `stroyhub.scrape_due_shops` task rather than adding live network calls to tests.
 
+Source-aware one-off controls are available through:
+
+```bash
+uv run python scripts/scrape_shop_sources.py due --source-type official_api
+uv run python scripts/scrape_shop_sources.py due --source 2gis --limit 3
+uv run python scripts/scrape_shop_sources.py shop --shop-id 775
+uv run python scripts/scrape_shop_sources.py shop --source unicom --source-id unicom-yakutsk
+```
+
+By default these commands enqueue `stroyhub.scrape_shop` tasks for a running
+Celery worker. Add `--sync` only for an intentional local smoke run in the
+current process:
+
+```bash
+uv run python scripts/scrape_shop_sources.py shop --shop-id 775 --sync
+```
+
+Accepted MVP source types are only `2gis`, `official_api`, and
+`official_html`. There is no generic `manual` scrape source: admin/manual work
+may manage source metadata, links, status, and locks, but products, prices, and
+price snapshots must come from external source records. A source record with
+`scrape_status=disabled` is skipped by the worker, so an official source can
+stay enabled while a noisy 2GIS fallback record is held out of collection.
+
+Command output is intentionally explicit about source type and partial runs. A
+due run prints one `source scrape result` line per selected source record plus a
+final `due source scrape summary`; synchronous runs include `status=partial`
+when a large catalog hits page limits before the source reports completion.
+
 ## 7. Inspect Results
 
 Recent scrape runs:

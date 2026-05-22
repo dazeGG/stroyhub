@@ -14,10 +14,16 @@ def list_due_shops(
     *,
     now: datetime | None = None,
     source: str | None = None,
+    source_type: str | None = None,
     limit: int | None = None,
 ) -> list[Shop]:
     due_at = now or datetime.now(UTC)
-    return ShopRepository(session).list_due_for_scraping(now=due_at, source=source, limit=limit)
+    return ShopRepository(session).list_due_for_scraping(
+        now=due_at,
+        source=source,
+        source_type=source_type,
+        limit=limit,
+    )
 
 
 def next_successful_scrape_at(

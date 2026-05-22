@@ -25,24 +25,54 @@ from apps.worker.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 SUPPORTED_SCHEDULED_SOURCES = frozenset({"2gis", METALLTORG_SOURCE, UNICOM_SOURCE})
+SUPPORTED_SCHEDULED_SOURCE_TYPES = frozenset({"2gis", "official_api", "official_html"})
 
 
 @celery_app.task(name="stroyhub.scrape_due_shops")  # type: ignore[untyped-decorator]
-def scrape_due_shops(*, limit: int | None = None) -> dict[str, Any]:
+def scrape_due_shops(
+    *,
+    source: str | None = None,
+    source_type: str | None = None,
+    limit: int | None = None,
+) -> dict[str, Any]:
+    if source_type is not None and source_type not in SUPPORTED_SCHEDULED_SOURCE_TYPES:
+        raise ValueError(f"unsupported source_type: {source_type}")
+
     started_at = datetime.now(UTC)
     with SessionLocal() as session:
-        shops = [
-            shop
-            for shop in list_due_shops(session, now=started_at, limit=limit)
-            if shop.source in SUPPORTED_SCHEDULED_SOURCES
-        ]
+        due_shops = list_due_shops(
+            session,
+            now=started_at,
+            source=source,
+            source_type=source_type,
+            limit=limit,
+        )
+        shops = [shop for shop in due_shops if shop.source in SUPPORTED_SCHEDULED_SOURCES]
         shop_ids = [shop.id for shop in shops]
+        skipped_unsupported_shop_ids = [
+            shop.id for shop in due_shops if shop.source not in SUPPORTED_SCHEDULED_SOURCES
+        ]
 
         for shop_id in shop_ids:
             scrape_shop.delay(shop_id)
 
-    logger.info("scheduled due shops", extra={"shop_count": len(shop_ids), "shop_ids": shop_ids})
-    return {"scheduled": len(shop_ids), "shop_ids": shop_ids}
+    logger.info(
+        "scheduled due shops",
+        extra={
+            "shop_count": len(shop_ids),
+            "shop_ids": shop_ids,
+            "source": source,
+            "source_type": source_type,
+            "skipped_unsupported_shop_ids": skipped_unsupported_shop_ids,
+        },
+    )
+    return {
+        "scheduled": len(shop_ids),
+        "shop_ids": shop_ids,
+        "source": source,
+        "source_type": source_type,
+        "skipped_unsupported_shop_ids": skipped_unsupported_shop_ids,
+    }
 
 
 @celery_app.task(name="stroyhub.scrape_shop")  # type: ignore[untyped-decorator]
@@ -53,6 +83,19 @@ def scrape_shop(shop_id: int) -> dict[str, Any]:
         if shop is None:
             logger.error("shop not found for scraping", extra={"shop_id": shop_id})
             return {"shop_id": shop_id, "status": "failed", "error": "shop_not_found"}
+
+        if shop.scrape_status == "disabled":
+            logger.info(
+                "shop source disabled; skipping scrape",
+                extra={"shop_id": shop.id, "source": shop.source, "source_type": shop.source_type},
+            )
+            return {
+                "shop_id": shop.id,
+                "source": shop.source,
+                "source_type": shop.source_type,
+                "status": "skipped",
+                "reason": "source_disabled",
+            }
 
         if shop.source not in SUPPORTED_SCHEDULED_SOURCES:
             error = f"unsupported source: {shop.source}"
@@ -147,6 +190,7 @@ def scrape_shop(shop_id: int) -> dict[str, Any]:
         extra={
             "shop_id": shop.id,
             "source": shop.source,
+            "source_type": shop.source_type,
             "duration_seconds": round(duration_seconds, 3),
             "products_seen": products_seen,
             "products_saved": products_saved,
@@ -157,6 +201,7 @@ def scrape_shop(shop_id: int) -> dict[str, Any]:
     return {
         "shop_id": shop.id,
         "source": shop.source,
+        "source_type": shop.source_type,
         "status": scrape_status,
         "duration_seconds": round(duration_seconds, 3),
         "products_seen": products_seen,
