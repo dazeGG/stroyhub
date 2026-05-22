@@ -201,12 +201,17 @@ Example response:
 
 ### `GET /shops`
 
-Lists known shops with scrape metadata. Raw source payloads are not exposed.
+Lists source-specific shop records with scrape and management metadata. Raw
+source payloads are not exposed.
 
 Query params:
 
 - `source`: optional source filter.
 - `status`: optional scrape status filter.
+- `source_type`: optional source type filter. Accepted MVP source types are
+  `2gis`, `official_api`, and `official_html`.
+- `identity_id`: optional shop identity id filter.
+- `identity`: optional relationship filter, `linked` or `unlinked`.
 
 Example response:
 
@@ -215,17 +220,99 @@ Example response:
   "items": [
     {
       "id": 3,
+      "shop_identity_id": 9,
+      "identity": {
+        "id": 9,
+        "display_name": "Build Shop",
+        "status": "active",
+        "preferred_source": "unicom"
+      },
       "source": "2gis",
       "source_id": "70000001007229923",
+      "source_type": "2gis",
       "name": "Build Shop",
       "address": "Yakutsk",
+      "url": null,
       "scrape_status": "ok",
       "last_scraped_at": "2026-05-17T09:00:00Z",
-      "next_scrape_at": "2026-05-18T00:00:00Z"
+      "next_scrape_at": "2026-05-18T00:00:00Z",
+      "scrape_interval": 86400,
+      "error_count": 0,
+      "is_preferred_source": false
     }
   ]
 }
 ```
+
+Shop records are source-specific scrape targets. A linked `identity` groups
+multiple source records that describe the same real-world shop/location.
+
+### `GET /shop-identities`
+
+Lists StroyHub-owned shop identity records for admin grouping and source
+governance.
+
+Query params:
+
+- `status`: optional identity status filter: `active`, `hold`, `disabled`, or
+  `out_of_scope`.
+
+Example response:
+
+```json
+{
+  "items": [
+    {
+      "id": 9,
+      "display_name": "Build Shop",
+      "address": "Yakutsk",
+      "website_url": "https://example.test/catalog/",
+      "preferred_source": "unicom",
+      "status": "active",
+      "notes": "Official catalog first",
+      "locked_fields": {"display_name": true},
+      "source_count": 2
+    }
+  ]
+}
+```
+
+### `POST /shop-identities`
+
+Creates a shop identity. This is admin metadata for grouping source records; it
+does not create products, prices, or a manual catalog.
+
+Request body:
+
+- `display_name`: required.
+- `address`: optional.
+- `website_url`: optional.
+- `preferred_source`: optional source slug. `manual` is rejected.
+- `status`: optional, defaults to `active`.
+- `notes`: optional.
+- `locked_fields`: optional object used to mark admin-owned fields that should
+  not be overwritten by source refresh logic.
+
+### `PATCH /shop-identities/{identity_id}`
+
+Updates shop identity metadata. Locked fields are preserved by the repository
+layer; for example, a locked `display_name` is not overwritten by an update
+payload.
+
+### `POST /shop-identities/{identity_id}/sources/{shop_id}`
+
+Links a source-specific shop record to a shop identity. Returns the updated shop
+source response shape from `GET /shops`.
+
+### `DELETE /shops/{shop_id}/identity`
+
+Unlinks a source-specific shop record from its current identity. Returns the
+updated shop source response shape from `GET /shops`.
+
+M13 does not expose endpoints for manual products, manual prices, manual
+catalogs, or manual price snapshots. Owner-managed shop behavior should be
+modeled later as ownership and management state, not as a generic `manual`
+source type.
 
 ## Scrapes
 
