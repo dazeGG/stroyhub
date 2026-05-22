@@ -190,18 +190,6 @@ onMounted(() => {
       </div>
 
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <select
-          v-model="selectedStatus"
-          aria-label="Фильтр кандидатов по статусу"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
-          @change="loadCandidates"
-        >
-          <option value="">Все кандидаты</option>
-          <option value="pending">Ожидают решения</option>
-          <option value="stale">Не найдены в последнем обновлении</option>
-          <option value="hidden">Скрытые</option>
-          <option value="archived">Архив</option>
-        </select>
         <button
           type="button"
           class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
@@ -270,15 +258,27 @@ onMounted(() => {
         <h3 class="text-base font-semibold text-white">Магазины 2GIS</h3>
         <p class="mt-1 text-sm text-neutral-500">Кандидаты из поиска 2GIS с полезными сигналами для добавления источников.</p>
       </div>
-      <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <label class="inline-flex h-9 cursor-pointer items-center gap-3 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 text-sm text-neutral-300 transition hover:border-amber-300/40 hover:text-white">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <select
+          v-model="selectedStatus"
+          aria-label="Фильтр кандидатов по статусу"
+          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          @change="loadCandidates"
+        >
+          <option value="">Все кандидаты</option>
+          <option value="pending">Ожидают решения</option>
+          <option value="stale">Не найдены в последнем обновлении</option>
+          <option value="hidden">Скрытые</option>
+          <option value="archived">Архив</option>
+        </select>
+        <label class="inline-flex h-9 cursor-pointer items-center gap-3 text-sm text-neutral-300 transition hover:text-white">
           <input v-model="onlyWithPrices" type="checkbox" class="peer sr-only">
           <span class="relative h-5 w-9 rounded-full bg-neutral-800 transition peer-checked:bg-emerald-500/80">
             <span class="absolute left-0.5 top-0.5 size-4 rounded-full bg-neutral-400 transition peer-checked:translate-x-4 peer-checked:bg-white" />
           </span>
           Есть товары и цены
         </label>
-        <label class="inline-flex h-9 cursor-pointer items-center gap-3 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 text-sm text-neutral-300 transition hover:border-amber-300/40 hover:text-white">
+        <label class="inline-flex h-9 cursor-pointer items-center gap-3 text-sm text-neutral-300 transition hover:text-white">
           <input v-model="onlyWithWebsite" type="checkbox" class="peer sr-only">
           <span class="relative h-5 w-9 rounded-full bg-neutral-800 transition peer-checked:bg-sky-500/80">
             <span class="absolute left-0.5 top-0.5 size-4 rounded-full bg-neutral-400 transition peer-checked:translate-x-4 peer-checked:bg-white" />
