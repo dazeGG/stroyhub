@@ -1,5 +1,16 @@
 """Scraping orchestration services."""
 
+from stroyhub.scraping.metalltorg import (
+    MetalltorgPersistResult,
+    MetalltorgScrapeResult,
+    MetalltorgShopScrapeConfig,
+    MetalltorgShopScrapeResult,
+    metalltorg_shop_scrape_config,
+    persist_metalltorg_scrape_failure,
+    persist_metalltorg_scrape_result,
+    scrape_metalltorg_category,
+    scrape_metalltorg_shop,
+)
 from stroyhub.scraping.twogis import (
     TwogisPersistResult,
     TwogisScrapeResult,
@@ -21,13 +32,22 @@ from stroyhub.scraping.unicom import (
 __all__ = [
     "TwogisPersistResult",
     "TwogisScrapeResult",
+    "MetalltorgPersistResult",
+    "MetalltorgScrapeResult",
+    "MetalltorgShopScrapeConfig",
+    "MetalltorgShopScrapeResult",
     "UnicomShopScrapeConfig",
     "UnicomShopScrapeResult",
     "UnicomPersistResult",
     "UnicomScrapeResult",
+    "metalltorg_shop_scrape_config",
+    "persist_metalltorg_scrape_failure",
+    "persist_metalltorg_scrape_result",
     "persist_unicom_scrape_failure",
     "persist_twogis_scrape_result",
     "persist_unicom_scrape_result",
+    "scrape_metalltorg_category",
+    "scrape_metalltorg_shop",
     "scrape_twogis_branch",
     "scrape_unicom_category",
     "scrape_unicom_shop",
