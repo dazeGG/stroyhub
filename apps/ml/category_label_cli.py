@@ -87,6 +87,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             limit=args.limit,
             labeled_by=args.labeled_by,
         )
+        session.commit()
 
     print(
         "labeling summary: "
