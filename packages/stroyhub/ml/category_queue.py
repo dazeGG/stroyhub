@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from stroyhub.catalog.categorization import RuleBasedCategorizer
 from stroyhub.ml.labels import CategoryLabelStore
-from stroyhub.models import Category, SourceProduct
+from stroyhub.models import Category, Shop, SourceProduct
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -28,6 +28,7 @@ class CategoryLabelProduct:
     normalized_title: str
     category_id: int | None
     category_raw: str | None
+    shop_name: str | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -45,12 +46,14 @@ class CategoryLabelQueue:
         candidate_count: int = 3,
         source: str | None = None,
         shuffle: bool = False,
+        category_raw: str | None = None,
     ) -> None:
         self._session = session
         self._label_store = label_store
         self._candidate_count = candidate_count
         self._source = source
         self._shuffle = shuffle
+        self._category_raw = category_raw
         self._categorizer = RuleBasedCategorizer()
         labeled_pairs = label_store.labeled_pairs()
         self._labeled_pairs = labeled_pairs
@@ -74,6 +77,7 @@ class CategoryLabelQueue:
                 continue
             candidates = self._candidates_for_product(product, categories, self._labeled_pairs)
             if len(candidates) == self._candidate_count:
+                shop = self._session.get(Shop, product.shop_id)
                 return CategoryLabelQueueItem(
                     product=CategoryLabelProduct(
                         id=product.id,
@@ -82,11 +86,19 @@ class CategoryLabelQueue:
                         normalized_title=product.normalized_title,
                         category_id=product.category_id,
                         category_raw=product.category_raw,
+                        shop_name=shop.name if shop is not None else None,
                     ),
                     candidates=tuple(candidates),
                 )
 
         return None
+
+    def unlabeled_count(self) -> int:
+        return sum(
+            1
+            for p in self._products()
+            if p.id not in self._labeled_product_ids
+        )
 
     def _products(self) -> list[SourceProduct]:
         statement = (
@@ -96,6 +108,10 @@ class CategoryLabelQueue:
         )
         if self._source is not None:
             statement = statement.where(SourceProduct.source == self._source)
+        if self._category_raw is not None:
+            statement = statement.where(
+                SourceProduct.category_raw.ilike(f"%{self._category_raw}%")
+            )
         return list(self._session.scalars(statement))
 
     def _leaf_categories(self) -> list[Category]:

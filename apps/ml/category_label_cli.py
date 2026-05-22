@@ -12,6 +12,28 @@ from stroyhub.ml.labels import CategoryLabelRecord, CategoryLabelStore
 
 LabelActionKind = Literal["save", "skip", "quit"]
 
+# ANSI colour helpers
+_RESET = "\033[0m"
+_BOLD = "\033[1m"
+_DIM = "\033[2m"
+_CYAN = "\033[36m"
+_YELLOW = "\033[33m"
+_GREEN = "\033[32m"
+_BLUE = "\033[34m"
+_MAGENTA = "\033[35m"
+
+_REASON_COLOURS: dict[str, str] = {
+    "current_category": _GREEN,
+    "rule_prediction": _CYAN,
+    "text_signal": _YELLOW,
+    "nearby_category": _BLUE,
+    "fallback": _DIM,
+}
+
+
+def _c(colour: str, text: str) -> str:
+    return f"{colour}{text}{_RESET}"
+
 
 class Writer(Protocol):
     def write(self, text: str) -> object:
@@ -42,6 +64,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--labeled-by", default="cli")
     parser.add_argument("--shuffle", action="store_true")
+    parser.add_argument("--category-raw", type=str)
     args = parser.parse_args(argv)
 
     label_store = (
@@ -51,8 +74,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     with SessionLocal() as session:
+        queue = CategoryLabelQueue(
+            session,
+            label_store,
+            source=args.source,
+            shuffle=args.shuffle,
+            category_raw=args.category_raw,
+        )
         result = run_label_session(
-            CategoryLabelQueue(session, label_store, source=args.source, shuffle=args.shuffle),
+            queue,
             label_store,
             limit=args.limit,
             labeled_by=args.labeled_by,
@@ -82,6 +112,8 @@ def run_label_session(
     skipped = 0
     excluded_product_ids: set[int] = set()
     output = output or _Stdout()
+    labeled_total = len(label_store.labeled_pairs())
+    unlabeled_total = queue.unlabeled_count()
 
     while limit is None or saved < limit:
         item = queue.next_item(excluded_product_ids=excluded_product_ids)
@@ -93,8 +125,9 @@ def run_label_session(
                 exhausted=True,
             )
 
-        _print_item(item, output)
-        action = _read_action(item, input_fn=input_fn, output=output)
+        remaining = max(0, unlabeled_total - saved - skipped)
+        _print_item(item, output, labeled=labeled_total + saved, remaining=remaining)
+        action = _read_action(item, input_fn=input_fn, output=output, saved=saved, skipped=skipped)
         if action.kind == "quit":
             return LabelSessionResult(
                 saved=saved,
@@ -158,11 +191,14 @@ def _read_action(
     *,
     input_fn: Callable[[str], str],
     output: Writer,
+    saved: int,
+    skipped: int,
 ) -> LabelAction:
     candidate_ids = tuple(candidate.id for candidate in item.candidates)
+    prompt = f"[session: {saved} saved, {skipped} skipped] Choose numbers, n=none, s=skip, q=quit: "
     while True:
         try:
-            answer = input_fn("Choose category numbers, n=none, s=skip, q=quit: ")
+            answer = input_fn(prompt)
         except UnicodeDecodeError:
             output.write("Could not decode input. Use 1-3, n, s, or q.\n")
             continue
@@ -172,17 +208,28 @@ def _read_action(
             output.write(f"{error}\n")
 
 
-def _print_item(item: CategoryLabelQueueItem, output: Writer) -> None:
+def _print_item(
+    item: CategoryLabelQueueItem,
+    output: Writer,
+    *,
+    labeled: int,
+    remaining: int,
+) -> None:
     output.write("\n")
-    output.write("-" * 72)
+    output.write(_c(_DIM, "-" * 72) + "\n")
+    output.write(_c(_DIM, f"[{labeled} labeled / ~{remaining} remaining]") + "\n")
+    output.write(_c(_BOLD, f"Product #{item.product.id}: {item.product.title}") + "\n")
+    output.write(f"Source: {_c(_CYAN, item.product.source)}")
+    if item.product.shop_name:
+        output.write(f"  Shop: {_c(_CYAN, item.product.shop_name)}")
     output.write("\n")
-    output.write(f"Product #{item.product.id}: {item.product.title}\n")
-    output.write(f"Source: {item.product.source}\n")
     if item.product.category_raw:
-        output.write(f"Raw category: {item.product.category_raw}\n")
+        output.write(f"Raw category: {_c(_YELLOW, item.product.category_raw)}\n")
     output.write("Candidates:\n")
     for index, candidate in enumerate(item.candidates, start=1):
-        output.write(f"  {index}. {candidate.name} [{candidate.reason}]\n")
+        colour = _REASON_COLOURS.get(candidate.reason, "")
+        reason_str = _c(colour, f"[{candidate.reason}]") if colour else f"[{candidate.reason}]"
+        output.write(f"  {_c(_GREEN, str(index))}. {candidate.name} {reason_str}\n")
 
 
 def _configure_stdin() -> None:
