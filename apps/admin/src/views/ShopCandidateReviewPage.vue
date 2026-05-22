@@ -280,6 +280,13 @@ onMounted(() => {
               <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="statusClass(candidate.status)">
                 {{ statusLabel(candidate.status) }}
               </span>
+              <span
+                v-if="candidate.official_strategy"
+                class="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-xs font-medium text-amber-100"
+              >
+                <Icon :icon="icons.shieldLock" class="size-3.5" aria-hidden="true" />
+                {{ candidate.official_strategy.label }}
+              </span>
             </div>
             <p class="mt-2 text-sm text-neutral-500">{{ candidate.address || 'Адрес не указан' }}</p>
             <p class="mt-1 font-mono text-xs text-neutral-600">2GIS · {{ candidate.source_id }}</p>
@@ -290,13 +297,6 @@ onMounted(() => {
           <div>
             <p class="text-xs uppercase tracking-wide text-neutral-600">Сигналы 2GIS</p>
             <div class="mt-2 flex flex-wrap gap-2">
-              <span
-                v-if="candidate.official_strategy"
-                class="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-xs font-medium text-amber-100"
-              >
-                <Icon :icon="icons.shieldLock" class="size-3.5" aria-hidden="true" />
-                {{ candidate.official_strategy.label }}
-              </span>
               <span
                 v-if="candidate.has_prices"
                 class="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-200"
