@@ -203,8 +203,6 @@ def test_run_label_session_recovers_from_undecodable_input(tmp_path) -> None:
 
 def test_run_label_session_undo_save(tmp_path) -> None:
     label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
-    # product1 saved with candidate 1, then undone, then re-saved with candidate 2
-    # product2 saved afterward to reach limit=2
     queue = FakeQueue([_queue_item(product_id=1), _queue_item(product_id=2)])
 
     result = run_label_session(
@@ -276,7 +274,6 @@ def test_run_label_session_undo_empty_stack_shows_message(tmp_path) -> None:
 
 def test_run_label_session_undo_multiple_levels(tmp_path) -> None:
     label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
-    # save product1, skip product2, undo skip, undo save, re-save product1 and product2
     queue = FakeQueue([
         _queue_item(product_id=1),
         _queue_item(product_id=2),
