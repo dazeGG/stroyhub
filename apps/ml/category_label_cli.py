@@ -10,7 +10,7 @@ from stroyhub.db import SessionLocal
 from stroyhub.ml.category_queue import CategoryLabelQueue, CategoryLabelQueueItem
 from stroyhub.ml.labels import CategoryLabelRecord, CategoryLabelStore
 
-LabelActionKind = Literal["save", "skip", "quit"]
+LabelActionKind = Literal["save", "skip", "quit", "not_product"]
 
 # ANSI colour helpers
 _RESET = "\033[0m"
@@ -49,6 +49,7 @@ class LabelAction:
 class LabelSessionResult:
     saved: int
     skipped: int
+    not_product: int
     quit_requested: bool
     exhausted: bool
 
@@ -86,11 +87,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             limit=args.limit,
             labeled_by=args.labeled_by,
         )
+        session.commit()
 
     print(
         "labeling summary: "
         f"saved={result.saved} "
         f"skipped={result.skipped} "
+        f"not_product={result.not_product} "
         f"quit={result.quit_requested} "
         f"exhausted={result.exhausted} "
         f"labels_path={label_store.path}"
@@ -109,6 +112,7 @@ def run_label_session(
 ) -> LabelSessionResult:
     saved = 0
     skipped = 0
+    not_product_count = 0
     excluded_product_ids: set[int] = set()
     output = output or _Stdout()
     labeled_total = queue.labeled_count()
@@ -120,6 +124,7 @@ def run_label_session(
             return LabelSessionResult(
                 saved=saved,
                 skipped=skipped,
+                not_product=not_product_count,
                 quit_requested=False,
                 exhausted=True,
             )
@@ -131,12 +136,18 @@ def run_label_session(
             return LabelSessionResult(
                 saved=saved,
                 skipped=skipped,
+                not_product=not_product_count,
                 quit_requested=True,
                 exhausted=False,
             )
         if action.kind == "skip":
             excluded_product_ids.add(item.product.id)
             skipped += 1
+            continue
+        if action.kind == "not_product":
+            queue.mark_not_product(item.product.id)
+            excluded_product_ids.add(item.product.id)
+            not_product_count += 1
             continue
 
         label_store.append(
@@ -153,6 +164,7 @@ def run_label_session(
     return LabelSessionResult(
         saved=saved,
         skipped=skipped,
+        not_product=not_product_count,
         quit_requested=False,
         exhausted=False,
     )
@@ -164,6 +176,8 @@ def parse_label_answer(answer: str, candidate_category_ids: tuple[int, ...]) -> 
         return LabelAction(kind="quit")
     if normalized in {"s", "skip", ""}:
         return LabelAction(kind="skip")
+    if normalized in {"x", "not_product"}:
+        return LabelAction(kind="not_product")
     if normalized in {"n", "none", "0"}:
         return LabelAction(kind="save")
 
@@ -194,7 +208,10 @@ def _read_action(
     skipped: int,
 ) -> LabelAction:
     candidate_ids = tuple(candidate.id for candidate in item.candidates)
-    prompt = f"[session: {saved} saved, {skipped} skipped] Choose numbers, n=none, s=skip, q=quit: "
+    prompt = (
+        f"[session: {saved} saved, {skipped} skipped] "
+        "Choose numbers, n=none, s=skip, x=not_product, q=quit: "
+    )
     while True:
         try:
             answer = input_fn(prompt)
