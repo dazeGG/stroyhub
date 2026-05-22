@@ -12,6 +12,13 @@ from stroyhub.ml.datasets import (
     CategoryVerifierSnapshot,
     CategoryVerifierSnapshotMetadata,
 )
+from stroyhub.ml.features import (
+    CATEGORY_VERIFIER_FEATURE_SCHEMA_VERSION,
+    CategoryVerifierCategoryInput,
+    CategoryVerifierFeatureRow,
+    CategoryVerifierProductInput,
+    build_category_verifier_features,
+)
 from stroyhub.ml.labels import (
     CategoryLabelRecord,
     CategoryLabelStore,
@@ -38,10 +45,15 @@ __all__ = [
     "CategoryLabelStore",
     "CategoryVerifierDatasetStatus",
     "CategoryVerifierDatasetStore",
+    "CategoryVerifierCategoryInput",
+    "CategoryVerifierFeatureRow",
+    "CategoryVerifierProductInput",
     "CategoryVerifierSnapshot",
     "CategoryVerifierSnapshotMetadata",
+    "CATEGORY_VERIFIER_FEATURE_SCHEMA_VERSION",
     "PredictorTarget",
     "SourceProductLike",
     "VerifierPairLabel",
+    "build_category_verifier_features",
     "generate_product_match_candidates",
 ]
