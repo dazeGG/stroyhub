@@ -4,6 +4,21 @@ StroyHub ML work is separated from the operational admin app. The admin app is
 for catalog operations and human review. The ML workspace is for building
 datasets, training models, evaluating them, and managing model artifacts.
 
+## MVP Release Status
+
+ML is deferred from the first MVP release. The existing workspace, docs, tests,
+and local artifacts are treated as experimental/offline infrastructure for a
+later release, not as product dependencies for MVP.
+
+Until the first MVP release is complete:
+
+- `apps/api`, `apps/worker`, and `apps/admin` should not require trained model
+  artifacts or `.var/ml` runtime files.
+- Category behavior should rely on source data, rule/alias categorization,
+  manual category overrides, and human review workflows.
+- New ML work should be limited to clearly optional experiments or maintenance
+  that does not block release work.
+
 ## Boundaries
 
 - `apps/ml` owns CLI commands for labeling, dataset snapshots, training,
@@ -56,7 +71,9 @@ The operator can choose:
 - multiple categories;
 - nothing fits;
 - skip;
-- quit.
+- mark the source card as not a product;
+- undo previous session actions;
+- stop the session with `Ctrl+C`.
 
 Selected categories become verifier `match` labels. Candidate categories that
 were shown but not selected become verifier `no_match` labels. Selected
@@ -64,6 +81,12 @@ categories are also recorded as positive targets for the future category
 predictor. If the operator chooses nothing fits, all shown candidates become
 verifier `no_match` labels and the product receives no positive predictor
 target for that item.
+
+Skipping a product does not write labels. Marking a card as not a product sets
+`source_products.is_not_product` so the card is skipped by future labeling
+queues; it does not remove the source record. Undo can reverse labels saved in
+the current session, skipped items, and not-product marks made in the current
+session.
 
 Labels do not directly mutate `source_products.category_id`. They train models.
 Operational category changes still go through manual category overrides or

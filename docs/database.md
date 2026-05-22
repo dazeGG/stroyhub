@@ -96,6 +96,7 @@ Core fields:
 - `first_seen_at`: `timestamp with time zone`, required
 - `last_seen_at`: `timestamp with time zone`, required
 - `is_active`: `boolean`, required, default `true`
+- `is_not_product`: `boolean`, required, default `false`
 - `created_at`: `timestamp with time zone`, required
 - `updated_at`: `timestamp with time zone`, required
 
@@ -107,6 +108,16 @@ Category fields:
   grouping category.
 
 Both fields are needed. `category_raw` preserves source context and supports reprocessing/debugging. `category_id` gives stable filtering for API and UI.
+
+Product validity flag:
+
+- `is_not_product` marks source cards that were observed in a product feed but
+  should be excluded from product labeling/review workflows because they are
+  not real sellable product cards for the catalog.
+- Rescraping should preserve `is_not_product` unless a caller explicitly
+  provides a new value.
+- The flag should not delete source data or price history; it only changes
+  downstream selection/review behavior.
 
 Manual category overrides:
 

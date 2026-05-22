@@ -211,6 +211,29 @@ verifier training and a future category predictor. Operational category changes
 continue to use manual overrides or accepted suggestion review, not raw ML
 labels.
 
+## 2026-05-22: Defer ML From the First MVP Release
+
+Context:
+The first category verifier experiment (`v001`) was trained on 100 labeled
+products. It showed useful signal, but the dataset, thresholds, and evaluation
+coverage are not mature enough to influence the first release. The MVP still
+needs reliable scraping, price history, catalog search, category review, and
+manual correction workflows before ML adds enough operational value.
+
+Decision:
+Do not include ML-driven category verification, prediction, suggestions, or
+automatic category changes in the first MVP release scope. Keep the existing
+`apps/ml` and `packages/stroyhub/ml` code as experimental/offline workspace
+infrastructure, but treat it as post-MVP work unless a later release decision
+reopens it.
+
+Consequences:
+MVP product behavior should rely on source data, rule/alias categorization,
+manual category overrides, and admin review workflows. API, worker, and admin
+features for the first release should not depend on trained model artifacts or
+`.var/ml` runtime files. ML docs and code may stay in the repository for later
+experimentation, but ML tasks should not block the first release.
+
 ## 2026-05-18: Accept Conservative Product Matching Schema
 
 Context:

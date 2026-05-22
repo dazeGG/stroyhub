@@ -6,8 +6,9 @@ StroyHub starts as a Python monorepo with thin applications and one reusable dom
 
 - `apps/api` owns the HTTP entrypoint and API composition.
 - `apps/admin` owns the Vue-based admin/review UI.
-- `apps/ml` owns dataset labeling, dataset snapshots, training, evaluation,
-  and model artifact management commands.
+- `apps/ml` owns experimental/offline dataset labeling, dataset snapshots,
+  training, evaluation, and model artifact management commands. ML is deferred
+  from the first MVP release.
 - `apps/worker` owns Celery startup and background task registration.
 - `packages/stroyhub` owns reusable parsing, catalog, persistence, and scraping logic.
 - `infra` owns local infrastructure definitions.
@@ -77,4 +78,5 @@ uv run celery -A apps.worker.celery_app:celery_app beat --loglevel=info
 
 ML commands are run explicitly through `apps/ml`. They read product data from
 PostgreSQL and store ML runtime artifacts under `.var/ml`, which is ignored by
-git.
+git. These workflows are post-MVP experiments and should not be required by the
+first release runtime.
