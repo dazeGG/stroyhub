@@ -181,23 +181,19 @@ def test_run_label_session_shows_shop_name(tmp_path) -> None:
     assert "Евролайн" in output.text
 
 
-def test_run_label_session_shows_session_stats_in_prompt(tmp_path) -> None:
+def test_run_label_session_shows_session_stats_in_output(tmp_path) -> None:
     label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
-    captured_prompts: list[str] = []
-
-    def capturing_input(prompt: str) -> str:
-        captured_prompts.append(prompt)
-        return "1"
+    output = FakeOutput()
 
     run_label_session(
         FakeQueue([_queue_item(product_id=1)]),  # type: ignore[arg-type]
         label_store,
         limit=1,
-        input_fn=capturing_input,
-        output=FakeOutput(),
+        input_fn=FakeInput(["1"]),
+        output=output,
     )
 
-    assert any("session" in p and "saved" in p for p in captured_prompts)
+    assert "session" in output.text and "saved" in output.text
 
 
 def test_run_label_session_recovers_from_undecodable_input(tmp_path) -> None:

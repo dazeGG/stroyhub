@@ -130,8 +130,12 @@ def run_label_session(
             )
 
         remaining = max(0, unlabeled_total - saved)
-        _print_item(item, output, labeled=labeled_total + saved, remaining=remaining)
-        action = _read_action(item, input_fn=input_fn, output=output, saved=saved, skipped=skipped)
+        _print_item(
+            item, output,
+            labeled=labeled_total + saved, remaining=remaining,
+            saved=saved, skipped=skipped,
+        )
+        action = _read_action(item, input_fn=input_fn, output=output)
         if action.kind == "quit":
             return LabelSessionResult(
                 saved=saved,
@@ -204,14 +208,9 @@ def _read_action(
     *,
     input_fn: Callable[[str], str],
     output: Writer,
-    saved: int,
-    skipped: int,
 ) -> LabelAction:
     candidate_ids = tuple(candidate.id for candidate in item.candidates)
-    prompt = (
-        f"[session: {saved} saved, {skipped} skipped] "
-        "Choose numbers, n=none, s=skip, x=not_product, q=quit: "
-    )
+    prompt = "Choose numbers, n=none, s=skip, x=not_product, q=quit: "
     while True:
         try:
             answer = input_fn(prompt)
@@ -230,10 +229,14 @@ def _print_item(
     *,
     labeled: int,
     remaining: int,
+    saved: int,
+    skipped: int,
 ) -> None:
     output.write("\n")
     output.write(_c(_DIM, "-" * 72) + "\n")
     output.write(_c(_DIM, f"[{labeled} labeled / ~{remaining} remaining]") + "\n")
+    output.write(_c(_DIM, f"[session: {saved} saved, {skipped} skipped]") + "\n")
+    output.write("\n")
     output.write(_c(_BOLD, f"Product #{item.product.id}: {item.product.title}") + "\n")
     output.write(f"Source: {_c(_CYAN, item.product.source)}")
     if item.product.shop_name:
@@ -241,11 +244,13 @@ def _print_item(
     output.write("\n")
     if item.product.category_raw:
         output.write(f"Raw category: {_c(_YELLOW, item.product.category_raw)}\n")
+    output.write("\n")
     output.write("Candidates:\n")
     for index, candidate in enumerate(item.candidates, start=1):
         colour = _REASON_COLOURS.get(candidate.reason, "")
         reason_str = _c(colour, f"[{candidate.reason}]") if colour else f"[{candidate.reason}]"
         output.write(f"  {_c(_GREEN, str(index))}. {candidate.name} {reason_str}\n")
+    output.write("\n")
 
 
 def _configure_stdin() -> None:
