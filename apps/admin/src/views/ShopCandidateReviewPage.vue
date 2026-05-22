@@ -273,7 +273,7 @@ onMounted(() => {
         :key="candidate.id"
         class="flex min-h-[260px] flex-col rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
       >
-        <div class="flex min-h-[92px] flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div class="min-h-[92px]">
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
               <h3 class="text-base font-semibold text-white">{{ candidate.display_name }}</h3>
@@ -284,16 +284,6 @@ onMounted(() => {
             <p class="mt-2 text-sm text-neutral-500">{{ candidate.address || 'Адрес не указан' }}</p>
             <p class="mt-1 font-mono text-xs text-neutral-600">2GIS · {{ candidate.source_id }}</p>
           </div>
-
-          <button
-            type="button"
-            class="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-emerald-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
-            @click="approveCandidate(candidate)"
-          >
-            <Icon :icon="icons.check" class="size-3.5" aria-hidden="true" />
-            {{ approvingCandidateId === candidate.id ? 'Добавляем...' : 'Утвердить' }}
-          </button>
         </div>
 
         <div class="mt-4 grid flex-1 gap-4 border-t border-neutral-800 pt-4 text-sm text-neutral-400">
@@ -326,6 +316,18 @@ onMounted(() => {
               Не найден с {{ formatDateTime(candidate.missing_since) }}
             </p>
           </div>
+        </div>
+
+        <div class="mt-4 flex justify-end">
+          <button
+            type="button"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
+            @click="approveCandidate(candidate)"
+          >
+            <Icon :icon="icons.check" class="size-3.5" aria-hidden="true" />
+            {{ approvingCandidateId === candidate.id ? 'Добавляем...' : 'Утвердить' }}
+          </button>
         </div>
       </article>
     </div>
