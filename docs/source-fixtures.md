@@ -23,6 +23,7 @@ Use the source slug that appears in parser code and persisted records:
 
 - `tests/fixtures/unicom/`
 - `tests/fixtures/metalltorg/`
+- `tests/fixtures/sibnord/` for the accepted SibNord parser follow-up.
 - `tests/fixtures/twogis/` if future 2GIS tests need captured samples.
 
 Filename pattern:
@@ -113,3 +114,14 @@ Metalltorg uses focused HTML fixtures for parser and CLI tests:
 
 Add smaller edge-case fixtures later when Metalltorg exposes missing prices,
 pagination changes, or selector changes that need regression coverage.
+
+SibNord research fixtures were captured on 2026-05-22 for the accepted parser
+follow-up:
+
+- `tests/fixtures/sibnord/category-tsement-peskobeton-page1.html`;
+- `tests/fixtures/sibnord/product-63008.html`.
+
+These are focused HTML fragments, not full page dumps. They preserve the Bitrix
+product-card/detail selectors, embedded `JCCatalogItem`/`JCCatalogElement`
+objects, prices, availability text, image paths, product ids, and category
+breadcrumbs needed for parser characterization.

@@ -398,6 +398,98 @@ Notes:
 - Parser health should track branch id, page count, item count, failures, and last successful scrape.
 - Source timestamps and parser timestamps must be stored separately.
 
+## SibNord
+
+Accepted official HTML source candidate. Parser implementation is not yet
+scheduled for collection.
+
+Research date: 2026-05-22.
+
+Base URL:
+
+```text
+https://sibnord.ru
+```
+
+Observed strategy:
+
+- Bitrix-powered server-rendered HTML catalog.
+- No stable public JSON catalog API was identified during focused research.
+- Product listing pages embed Bitrix JavaScript objects such as
+  `JCCatalogItem`; product detail pages embed `JCCatalogElement` and schema.org
+  offer metadata.
+- `sitemap-iblock-3.xml` exposed 12,665 catalog URLs during research: 405
+  section URLs and 12,260 product URLs.
+
+Representative pages:
+
+| Page | URL | Observed notes |
+| --- | --- | --- |
+| Catalog root | `https://sibnord.ru/catalog/` | Category navigation page. |
+| Cement/peskobeton category | `https://sibnord.ru/catalog/stroitelstvo_konstruktsiy/sukhie_smesi/tsement_peskobeton/` | Product listing with priced cards and availability text. |
+| Large drill/bits category | `https://sibnord.ru/catalog/instrument_/raskhodnye_materialy_dlya_ruchnogo_i_elektroinstrumenta/bury_sverla_koronki/` | 40 products on page 1; Bitrix pagination reported 12 pages. |
+| Cement product | `https://sibnord.ru/catalog/stroitelstvo_konstruktsiy/sukhie_smesi/tsement_peskobeton/63008/` | Product detail page for source product id `63008`, code `УТ-8435`, price `500` RUB. |
+
+Observed listing selectors and signals:
+
+| Field | Selector or extraction hint |
+| --- | --- |
+| Product card | `div.product-card` inside `div[data-entity="item"]` |
+| Source product id | `PRODUCT.ID` in `JCCatalogItem`, or trailing numeric product URL segment |
+| Product detail URL | Product link under the card, or `PRODUCT.DETAIL_PAGE_URL` |
+| Title | Product card link text, or `PRODUCT.NAME` |
+| Price | `.price` text, or `ITEM_PRICES[0].PRICE` in `JCCatalogItem` |
+| Currency | `ITEM_PRICES[0].CURRENCY`, observed as `RUB` |
+| Unit | `.measure`, observed as `/ шт.` |
+| Availability | `.product-item-quantity`, observed as `Наличие: много` |
+| Quantity hint | `MAX_QUANTITY` in `JCCatalogItem` |
+| Image | `img[src]`, or `PICT.SRC` in `JCCatalogItem` |
+| Category path | Breadcrumb links above the listing/detail content |
+
+Observed detail selectors and signals:
+
+| Field | Selector or extraction hint |
+| --- | --- |
+| Title | `h1` |
+| Source product id | Product URL segment, `JCCatalogElement.PRODUCT.ID` |
+| Source article/code | `#bx_*_article`, observed as `Код товара: УТ-8435` |
+| Price | `meta[itemprop="price"]`, `.price`, or `ITEM_PRICES[0].PRICE` |
+| Currency | `meta[itemprop="priceCurrency"]`, observed as `RUB` |
+| Availability | `link[itemprop="availability"]`, plus visible `.product-item-quantity` text |
+| Unit | `.measure`, observed as `/ шт.` |
+| Description | `[itemprop="description"]` |
+| Image | product image element or `JCCatalogElement.PICT.SRC` |
+
+Pagination notes:
+
+- Large category pages returned 40 product cards per page during research.
+- Bitrix infinite scroll loads the same category URL with `?PAGEN_1=N`.
+- `https://sibnord.ru/robots.txt` disallows `/*PAGEN`, so scheduled broad
+  pagination must not be enabled without an explicit policy decision.
+- A future parser can start with focused fixture-driven HTML extraction and
+  conservative configured category/product URLs. Full-site crawling should be
+  deferred until pacing, robots policy, and sitemap-vs-pagination behavior are
+  reviewed.
+
+Source precedence:
+
+- SibNord official catalog should supersede 2GIS for SibNord product prices,
+  titles, availability, images, and category context once parser health is
+  accepted.
+- 2GIS should remain a fallback/comparison source because the observed 2GIS
+  candidate had no priced products, while the official catalog exposes priced
+  cards and detail pages.
+
+Focused fixtures:
+
+- `tests/fixtures/sibnord/category-tsement-peskobeton-page1.html`;
+- `tests/fixtures/sibnord/product-63008.html`.
+
+Implementation follow-up:
+
+- [#203](https://github.com/dazeGG/stroyhub/issues/203): implement SibNord
+  official HTML parser.
+
 ## Unicom Yakutsk
 
 Secondary JSON source.
