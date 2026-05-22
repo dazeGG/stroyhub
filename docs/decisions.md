@@ -234,6 +234,27 @@ features for the first release should not depend on trained model artifacts or
 `.var/ml` runtime files. ML docs and code may stay in the repository for later
 experimentation, but ML tasks should not block the first release.
 
+## 2026-05-22: Prefer Official Shop Catalogs Over 2GIS When Available
+
+Context:
+2GIS helped bootstrap the first Yakutsk product dataset, but it is an
+unofficial source for product cards. Some shops expose their own public catalogs
+or APIs, which are more likely to have fresher prices, better category context,
+and clearer ownership of product data.
+
+Decision:
+For M13 and later product work, prefer official shop APIs or official shop
+catalog pages over 2GIS for shops where those official sources are usable. Keep
+2GIS as a discovery, fallback, and coverage source, especially for shops without
+a usable official catalog.
+
+Consequences:
+Source product cards remain source-specific and should not be destructively
+merged when the same real-world shop appears in both 2GIS and an official
+source. M13 should define shop identity and source priority rules before the
+public MVP site depends on shop/product display choices. The detailed policy is
+tracked in `docs/sources.md`.
+
 ## 2026-05-18: Accept Conservative Product Matching Schema
 
 Context:

@@ -8,9 +8,81 @@ behavior.
 Source fixture conventions are tracked in
 [`docs/source-fixtures.md`](source-fixtures.md).
 
+## Source Precedence Policy
+
+Decision date: 2026-05-22.
+
+M13 changes the source strategy from "2GIS first for every shop" to
+"official shop catalogs first where they exist." 2GIS remains valuable for
+discovery, fallback coverage, and shops without usable official catalogs, but it
+should not be treated as the authoritative catalog for a shop that exposes its
+own public catalog or API.
+
+Precedence order for MVP shop/source work:
+
+1. Official shop API or structured catalog endpoint.
+2. Official shop HTML catalog, when selectors and pagination are understood.
+3. 2GIS product endpoint for discovery, fallback coverage, or shops without a
+   usable official catalog.
+4. Manual/admin decisions for source status, holds, and temporary exclusions.
+
+For the same real-world shop, official source records and 2GIS source records
+should remain separate source-specific records. Do not merge or rewrite
+`source_products` across sources. M13 should instead define source priority and
+shop identity rules so admin and future public-site flows can choose which
+source is preferred for display, QA, and scheduling.
+
+When the same shop is available through both an official source and 2GIS:
+
+- prefer the official source for prices, product titles, availability, and raw
+  category context;
+- keep 2GIS data as fallback or comparison data unless the official source is
+  missing prices, stale, unreachable, or narrower than the 2GIS catalog;
+- record duplicate/source-overlap decisions in docs or admin metadata instead of
+  deleting source records;
+- make source preference explicit before exposing merged shop/product views in
+  the public MVP site.
+
+Source priority should consider:
+
+- freshness: observed update timestamps, last successful scrape, and scrape
+  cadence;
+- category quality: narrow official category paths are preferred over broad or
+  noisy source categories;
+- price availability: priced product cards are preferred over empty catalog
+  listings;
+- reliability: stable APIs and predictable pagination are preferred over brittle
+  HTML or unofficial endpoints;
+- catalog completeness: complete official catalogs are preferred over partial
+  slices from large 2GIS catalogs.
+
+M13 follow-up work:
+
+- [#186](https://github.com/dazeGG/stroyhub/issues/186): audit Yakutsk shop
+  source inventory for official catalogs.
+- [#187](https://github.com/dazeGG/stroyhub/issues/187): wire Unicom official
+  catalog into scheduled collection.
+- [#188](https://github.com/dazeGG/stroyhub/issues/188): wire Metalltorg
+  official catalog into scheduled collection.
+- [#189](https://github.com/dazeGG/stroyhub/issues/189): research SibNord
+  official catalog source contract.
+- [#190](https://github.com/dazeGG/stroyhub/issues/190): research
+  Vostoktechtorg official catalog source contract.
+- [#191](https://github.com/dazeGG/stroyhub/issues/191): design shop identity
+  across official sources and 2GIS.
+- [#192](https://github.com/dazeGG/stroyhub/issues/192): expose shop/source
+  management details in API.
+- [#193](https://github.com/dazeGG/stroyhub/issues/193): add admin shop/source
+  management view.
+- [#194](https://github.com/dazeGG/stroyhub/issues/194): add source-aware
+  scrape controls for shops.
+- [#195](https://github.com/dazeGG/stroyhub/issues/195): create M13 shop
+  readiness checklist.
+
 ## 2GIS
 
-Primary MVP source. Expected to provide most initial product cards.
+Initial MVP bootstrap source. Expected to provide broad early product-card
+coverage, but it is not authoritative for shops with usable official catalogs.
 
 Known endpoint:
 
