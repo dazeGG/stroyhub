@@ -7,11 +7,13 @@ import HelpPage from './views/HelpPage.vue'
 import MatchReviewPage from './views/MatchReviewPage.vue'
 import ProductDetailPage from './views/ProductDetailPage.vue'
 import ScrapeStatusPage from './views/ScrapeStatusPage.vue'
+import ShopSourceManagementPage from './views/ShopSourceManagementPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'catalog', component: CatalogPage },
+    { path: '/shops', name: 'shops', component: ShopSourceManagementPage },
     { path: '/products/:productId', name: 'product-detail', component: ProductDetailPage },
     { path: '/scrapes', name: 'scrapes', component: ScrapeStatusPage },
     { path: '/categories', name: 'categories', component: CategoryDirectoryPage },

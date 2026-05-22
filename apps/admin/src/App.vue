@@ -7,6 +7,7 @@ import { icons } from './lib/icons'
 
 const navItems = [
   { label: 'Каталог', to: '/', icon: icons.package },
+  { label: 'Магазины', to: '/shops', icon: icons.buildingStore },
   { label: 'Скрейпы', to: '/scrapes', icon: icons.activity },
   { label: 'Категории', to: '/categories', icon: icons.category },
   { label: 'Матчинг', to: '/matches', icon: icons.gitCompare },
@@ -46,7 +47,7 @@ const isFullPage = computed(() => route.meta.fullPage === true)
           <header class="sticky top-0 z-10 border-b border-neutral-800 bg-neutral-950/90 backdrop-blur">
             <div class="flex min-h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
               <div>
-                <p class="text-xs font-medium uppercase tracking-wide text-neutral-500">M12 админка</p>
+                <p class="text-xs font-medium uppercase tracking-wide text-neutral-500">Админка</p>
                 <p class="text-sm text-neutral-300">Данные по стройматериалам Якутска</p>
               </div>
               <UBadge color="neutral" variant="subtle">Локальный API</UBadge>

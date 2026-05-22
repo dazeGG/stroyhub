@@ -74,6 +74,11 @@ terminal commands:
 - `/`: product catalog inspection with search, shop/category filters,
   normalized category, raw category, latest price, last-seen metadata, and
   links into price history.
+- `/shops`: shop/source management for M13. It shows real shop identities,
+  linked 2GIS/official source records, source priority, scrape status,
+  last/next scrape times, error counts, hold/disabled/out-of-scope states, and
+  link/unlink controls. It manages metadata only and does not expose manual
+  product, price, catalog, or price snapshot editing.
 - `/prices`: selected source-product detail plus ordered price snapshots from
   `GET /products/{product_id}/prices`. Repeated same-price observations stay
   visible because snapshots are observations, not only price changes.
