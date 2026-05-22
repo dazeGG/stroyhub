@@ -99,6 +99,7 @@ def persist_twogis_scrape_result(
         ShopUpsert(
             source=TWOGIS_SOURCE,
             source_id=result.branch_id,
+            source_type="2gis",
             name=shop_name or f"2GIS branch {result.branch_id}",
             raw=_shop_raw(result),
             last_scraped_at=completed_at,

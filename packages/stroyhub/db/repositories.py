@@ -14,12 +14,20 @@ from stroyhub.models.tables import (
     ProductMatch,
     ScrapeRun,
     Shop,
+    ShopIdentity,
     SourceProduct,
 )
 
 JsonObject = dict[str, Any]
 PRODUCT_MATCH_STATUSES = frozenset({"accepted", "candidate", "rejected", "superseded"})
 CATEGORY_OVERRIDE_STATUSES = frozenset({"active", "replaced", "reverted"})
+SHOP_IDENTITY_STATUSES = frozenset({"active", "hold", "disabled", "out_of_scope"})
+SHOP_SOURCE_TYPES = frozenset({"2gis", "official_api", "official_html"})
+_DEFAULT_SOURCE_TYPES = {
+    "2gis": "2gis",
+    "unicom": "official_api",
+    "metalltorg": "official_html",
+}
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -27,6 +35,8 @@ class ShopUpsert:
     source: str
     source_id: str
     name: str
+    shop_identity_id: int | None = None
+    source_type: str | None = None
     address: str | None = None
     url: str | None = None
     raw: JsonObject | None = None
@@ -35,6 +45,28 @@ class ShopUpsert:
     scrape_interval: int | None = None
     scrape_status: str | None = None
     error_count: int | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class ShopIdentityCreate:
+    display_name: str
+    address: str | None = None
+    website_url: str | None = None
+    preferred_source: str | None = None
+    status: str = "active"
+    notes: str | None = None
+    locked_fields: JsonObject | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class ShopIdentityUpdate:
+    display_name: str | None = None
+    address: str | None = None
+    website_url: str | None = None
+    preferred_source: str | None = None
+    status: str | None = None
+    notes: str | None = None
+    locked_fields: JsonObject | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -133,15 +165,23 @@ class ShopRepository:
 
     def upsert(self, data: ShopUpsert) -> Shop:
         shop = self.get_by_source_id(source=data.source, source_id=data.source_id)
+        source_type = _validated_source_type(data.source_type, source=data.source)
 
         if shop is None:
             shop = Shop(
                 source=data.source,
                 source_id=data.source_id,
+                source_type=source_type,
                 name=data.name,
             )
             self._session.add(shop)
 
+        if data.shop_identity_id is not None:
+            if self._session.get(ShopIdentity, data.shop_identity_id) is None:
+                raise ValueError("shop identity not found")
+            shop.shop_identity_id = data.shop_identity_id
+
+        shop.source_type = source_type
         shop.name = data.name
         shop.address = data.address
         shop.url = data.url
@@ -176,6 +216,93 @@ class ShopRepository:
         if limit is not None:
             statement = statement.limit(limit)
 
+        return list(self._session.scalars(statement))
+
+
+class ShopIdentityRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get(self, identity_id: int) -> ShopIdentity | None:
+        return self._session.get(ShopIdentity, identity_id)
+
+    def create(self, data: ShopIdentityCreate) -> ShopIdentity:
+        display_name = data.display_name.strip()
+        if not display_name:
+            raise ValueError("display_name must not be empty")
+        _validate_shop_identity_status(data.status)
+        preferred_source = _normalize_preferred_source(data.preferred_source)
+
+        identity = ShopIdentity(
+            display_name=display_name,
+            address=data.address,
+            website_url=data.website_url,
+            preferred_source=preferred_source,
+            status=data.status,
+            notes=data.notes,
+            locked_fields=data.locked_fields,
+        )
+        self._session.add(identity)
+        self._session.flush()
+        return identity
+
+    def update(self, identity_id: int, data: ShopIdentityUpdate) -> ShopIdentity:
+        identity = self.get(identity_id)
+        if identity is None:
+            raise ValueError("shop identity not found")
+
+        locked_fields = set(identity.locked_fields or {})
+
+        if data.display_name is not None and "display_name" not in locked_fields:
+            display_name = data.display_name.strip()
+            if not display_name:
+                raise ValueError("display_name must not be empty")
+            identity.display_name = display_name
+        if data.address is not None and "address" not in locked_fields:
+            identity.address = data.address
+        if data.website_url is not None and "website_url" not in locked_fields:
+            identity.website_url = data.website_url
+        if data.preferred_source is not None:
+            identity.preferred_source = _normalize_preferred_source(data.preferred_source)
+        if data.status is not None:
+            _validate_shop_identity_status(data.status)
+            identity.status = data.status
+        if data.notes is not None:
+            identity.notes = data.notes
+        if data.locked_fields is not None:
+            identity.locked_fields = data.locked_fields
+
+        self._session.flush()
+        return identity
+
+    def link_shop(self, *, identity_id: int, shop_id: int) -> Shop:
+        identity = self.get(identity_id)
+        if identity is None:
+            raise ValueError("shop identity not found")
+
+        shop = self._session.get(Shop, shop_id)
+        if shop is None:
+            raise ValueError("shop not found")
+
+        shop.shop_identity_id = identity.id
+        self._session.flush()
+        return shop
+
+    def unlink_shop(self, *, shop_id: int) -> Shop:
+        shop = self._session.get(Shop, shop_id)
+        if shop is None:
+            raise ValueError("shop not found")
+
+        shop.shop_identity_id = None
+        self._session.flush()
+        return shop
+
+    def list_source_shops(self, identity_id: int) -> list[Shop]:
+        statement = (
+            select(Shop)
+            .where(Shop.shop_identity_id == identity_id)
+            .order_by(Shop.source_type.asc(), Shop.name.asc(), Shop.id.asc())
+        )
         return list(self._session.scalars(statement))
 
 
@@ -524,3 +651,31 @@ def _validate_product_match_status(status: str) -> None:
     if status not in PRODUCT_MATCH_STATUSES:
         allowed = ", ".join(sorted(PRODUCT_MATCH_STATUSES))
         raise ValueError(f"unknown product match status {status!r}; expected one of: {allowed}")
+
+
+def _validated_source_type(source_type: str | None, *, source: str) -> str:
+    selected = source_type.strip() if source_type is not None else _DEFAULT_SOURCE_TYPES.get(source)
+    if not selected:
+        selected = "official_html"
+    if selected not in SHOP_SOURCE_TYPES:
+        allowed = ", ".join(sorted(SHOP_SOURCE_TYPES))
+        raise ValueError(f"unknown shop source type {selected!r}; expected one of: {allowed}")
+    return selected
+
+
+def _validate_shop_identity_status(status: str) -> None:
+    if status not in SHOP_IDENTITY_STATUSES:
+        allowed = ", ".join(sorted(SHOP_IDENTITY_STATUSES))
+        raise ValueError(f"unknown shop identity status {status!r}; expected one of: {allowed}")
+
+
+def _normalize_preferred_source(preferred_source: str | None) -> str | None:
+    if preferred_source is None:
+        return None
+
+    normalized = preferred_source.strip()
+    if not normalized:
+        return None
+    if normalized == "manual":
+        raise ValueError("manual is not an accepted shop source")
+    return normalized
