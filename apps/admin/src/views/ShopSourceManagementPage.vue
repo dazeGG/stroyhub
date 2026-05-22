@@ -323,7 +323,6 @@ async function createIdentity(): Promise<void> {
 async function linkSource(shop: ShopListItem): Promise<void> {
   const identityId = linkTargets[shop.id]
   if (!identityId) {
-    errorMessage.value = 'Выберите магазин для привязки источника'
     return
   }
 
@@ -467,7 +466,7 @@ onMounted(() => {
           class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200"
           @click="openCreateModal"
         >
-          <Icon :icon="icons.check" class="size-4" aria-hidden="true" />
+          <Icon :icon="icons.plus" class="size-4" aria-hidden="true" />
           Создать
         </button>
       </div>
@@ -514,9 +513,10 @@ onMounted(() => {
               <td class="px-4 py-4">
                 <button
                   type="button"
-                  class="inline-flex h-8 items-center rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-white"
+                  class="inline-flex h-8 items-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-xs font-medium text-amber-100 transition hover:border-amber-300 hover:bg-amber-300/15 hover:text-amber-50"
                   @click="openEditModal(identity)"
                 >
+                  <Icon :icon="icons.pencil" class="size-3.5" aria-hidden="true" />
                   Редактировать
                 </button>
               </td>
@@ -613,22 +613,15 @@ onMounted(() => {
                   <select
                     v-model.number="linkTargets[shop.id]"
                     :aria-label="`Магазин для источника ${shop.source_id}`"
-                    class="h-9 rounded-md border border-neutral-800 bg-neutral-950 px-2 text-xs text-white outline-none transition focus:border-amber-400"
+                    class="h-9 rounded-md border border-neutral-800 bg-neutral-950 px-2 text-xs text-white outline-none transition focus:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="linkingShopId === shop.id"
+                    @change="linkSource(shop)"
                   >
                     <option value="">Выбрать магазин</option>
                     <option v-for="identity in identities" :key="identity.id" :value="identity.id">
                       {{ identity.display_name }}
                     </option>
                   </select>
-                  <button
-                    type="button"
-                    class="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-white disabled:opacity-50"
-                    :disabled="linkingShopId === shop.id"
-                    @click="linkSource(shop)"
-                  >
-                    <Icon :icon="icons.link" class="size-3.5" aria-hidden="true" />
-                    Привязать
-                  </button>
                 </div>
               </td>
             </tr>
@@ -694,7 +687,7 @@ onMounted(() => {
             class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="savingIdentityId === 0"
           >
-            <Icon :icon="icons.check" class="size-4" aria-hidden="true" />
+            <Icon :icon="icons.plus" class="size-4" aria-hidden="true" />
             Создать
           </button>
         </div>

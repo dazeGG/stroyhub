@@ -19,6 +19,8 @@ import historyIcon from '@iconify-icons/tabler/history'
 import linkIcon from '@iconify-icons/tabler/link'
 import listCheckIcon from '@iconify-icons/tabler/list-check'
 import packageIcon from '@iconify-icons/tabler/package'
+import pencilIcon from '@iconify-icons/tabler/pencil'
+import plusIcon from '@iconify-icons/tabler/plus'
 import reportAnalyticsIcon from '@iconify-icons/tabler/report-analytics'
 import restoreIcon from '@iconify-icons/tabler/restore'
 import searchIcon from '@iconify-icons/tabler/search'
@@ -49,6 +51,8 @@ export const icons = {
   link: linkIcon,
   listCheck: listCheckIcon,
   package: packageIcon,
+  pencil: pencilIcon,
+  plus: plusIcon,
   reportAnalytics: reportAnalyticsIcon,
   restore: restoreIcon,
   search: searchIcon,
