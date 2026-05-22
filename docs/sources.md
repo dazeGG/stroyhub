@@ -79,6 +79,88 @@ M13 follow-up work:
 - [#195](https://github.com/dazeGG/stroyhub/issues/195): create M13 shop
   readiness checklist.
 
+## Shop Identity Policy
+
+Decision date: 2026-05-22.
+
+The same real-world shop or store location can appear as multiple source records:
+for example an official catalog source and a 2GIS branch. StroyHub should keep
+those source records separate, because their product cards, categories, prices,
+raw payloads, and scrape health are source-specific. However, admin and future
+public-site flows also need a stable way to say "these source records describe
+the same shop/location."
+
+M13 should introduce an explicit grouping concept rather than relying only on
+name/address conventions in the existing `shops` table.
+
+Proposed model:
+
+- `shop_identities`: StroyHub-owned real-world shop/location records.
+- `shops`: source-specific shop/source records, optionally linked to a
+  `shop_identity_id`.
+
+The source-specific `shops` table remains the scrape target and source fidelity
+record. A shop identity is a display/grouping and governance record, not a
+replacement for source-specific shops.
+
+Identity rules:
+
+- Link source records only when they represent the same real seller/location or
+  an intentionally accepted same-shop grouping.
+- Preserve `shops.source` and `shops.source_id` uniqueness.
+- Preserve all `source_products` under their original source-specific `shop_id`.
+- Do not use shop identity grouping to perform cross-shop product canonical
+  matching.
+- When identity is uncertain, leave source records ungrouped until reviewed.
+
+Recommended `shop_identities` fields for the M13 schema follow-up:
+
+- `id`: primary key.
+- `display_name`: StroyHub-facing shop/location name.
+- `address`: normalized address, nullable.
+- `website_url`: preferred official website/catalog URL, nullable.
+- `preferred_source`: source slug to prefer for product display when available,
+  nullable.
+- `status`: `active`, `hold`, `disabled`, or `out_of_scope`.
+- `notes`: reviewer/operator notes, nullable.
+- timestamps.
+
+Source priority inside a shop identity:
+
+1. Prefer an official source with recent successful scrapes, prices, and usable
+   category paths.
+2. Use 2GIS as fallback/comparison data when the official source is stale,
+   missing prices, unreachable, or incomplete for the category being inspected.
+3. Let admin metadata override the default priority when a source is known to be
+   temporarily broken or intentionally held.
+
+Admin display rules:
+
+- Show the shop identity as the human-facing shop row where grouping exists.
+- Show linked source records underneath it with source, source id, scrape status,
+  last/next scrape time, and whether the source is preferred or fallback.
+- Show ungrouped source records separately so operators can decide whether to
+  link, hold, disable, or leave them as standalone shops.
+
+Public MVP site rules:
+
+- Prefer `shop_identities.display_name` for shop display when present.
+- Prefer products/prices from the identity's preferred official source when the
+  data is fresh enough.
+- Avoid showing merged product claims across sources until canonical product
+  matching is explicitly implemented and reviewed.
+
+Required follow-up work:
+
+- [#198](https://github.com/dazeGG/stroyhub/issues/198): add shop identity
+  grouping schema.
+- [#192](https://github.com/dazeGG/stroyhub/issues/192): expose shop/source
+  management details in API.
+- [#193](https://github.com/dazeGG/stroyhub/issues/193): add admin shop/source
+  management view.
+- [#195](https://github.com/dazeGG/stroyhub/issues/195): create M13 shop
+  readiness checklist.
+
 ## 2GIS
 
 Initial MVP bootstrap source. Expected to provide broad early product-card

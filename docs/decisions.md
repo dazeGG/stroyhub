@@ -255,6 +255,28 @@ source. M13 should define shop identity and source priority rules before the
 public MVP site depends on shop/product display choices. The detailed policy is
 tracked in `docs/sources.md`.
 
+## 2026-05-22: Add Shop Identity Grouping Before Public Shop Display
+
+Context:
+The same real-world shop or store location can appear as multiple source-specific
+records, such as an official catalog source and a 2GIS branch. Keeping those
+records separate preserves source fidelity, but admin and public-site flows need
+a stable human-facing shop identity for display, review, and source priority.
+
+Decision:
+Design M13 around an explicit shop identity grouping concept. Source-specific
+`shops` records remain scrape targets and retain their source/source-id
+identity. A future `shop_identities` grouping layer should connect source
+records that represent the same real-world shop/location and record preferred
+source behavior for admin and public-site display.
+
+Consequences:
+M13 needs a database follow-up for the grouping schema and API/admin follow-ups
+for managing linked source records. `source_products` stay attached to
+source-specific `shops`; shop identity grouping must not become product
+canonical matching or destructive source merging. The detailed policy is tracked
+in `docs/sources.md`.
+
 ## 2026-05-18: Accept Conservative Product Matching Schema
 
 Context:
