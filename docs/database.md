@@ -134,15 +134,21 @@ Rules:
   it `stale` instead of deleting it immediately.
 - If an already approved tracked source disappears from discovery, it should
   become a tracked-source attention signal, not a candidate again.
-- Current candidate discovery uses 2GIS construction-material shop signals.
+- Current candidate discovery uses 2GIS construction-material search filters as
+  signals, not full product scraping during refresh.
+- Candidate approval creates only a tracked source-specific `shops` row. It does
+  not automatically create or link a `shop_identity`; real shop identities are
+  created manually by an operator.
+- Website URLs are resolved only when a website-signaled candidate is approved,
+  so search-page contact noise does not pollute pending candidates.
   Future discovery sources may be added without changing the approved `shops`
   table.
 
 Priority order:
 
-1. Has both observed prices/products and a website/catalog URL signal.
-2. Has observed prices/products only.
-3. Has a website/catalog URL signal only.
+1. Has both a 2GIS goods/prices signal and a website signal.
+2. Has a 2GIS goods/prices signal only.
+3. Has a website signal only.
 4. Other construction-material shop candidates, marked as no prices found.
 
 Constraints and indexes:

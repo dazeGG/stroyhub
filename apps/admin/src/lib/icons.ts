@@ -33,6 +33,7 @@ import shieldLockIcon from '@iconify-icons/tabler/shield-lock'
 import shoppingBagIcon from '@iconify-icons/tabler/shopping-bag'
 import tagsIcon from '@iconify-icons/tabler/tags'
 import timelineIcon from '@iconify-icons/tabler/timeline'
+import trashIcon from '@iconify-icons/tabler/trash'
 import xIcon from '@iconify-icons/tabler/x'
 
 export const icons = {
@@ -71,5 +72,6 @@ export const icons = {
   shoppingBag: shoppingBagIcon,
   tags: tagsIcon,
   timeline: timelineIcon,
+  trash: trashIcon,
   x: xIcon,
 }

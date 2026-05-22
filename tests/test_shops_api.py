@@ -261,6 +261,17 @@ def test_shop_identity_endpoints_create_update_link_and_unlink_sources(
     assert unlink_response.json()["shop_identity_id"] is None
     assert unlink_response.json()["identity"] is None
 
+    relink_response = client.post(f"/shop-identities/{identity['id']}/sources/{shop.id}")
+    assert relink_response.status_code == 200
+
+    delete_response = client.delete(f"/shop-identities/{identity['id']}")
+    assert delete_response.status_code == 204
+    remaining_identities = client.get("/shop-identities").json()["items"]
+    assert identity["id"] not in {item["id"] for item in remaining_identities}
+    remaining_shops = client.get("/shops").json()["items"]
+    target_shop = next(item for item in remaining_shops if item["id"] == shop.id)
+    assert target_shop["shop_identity_id"] is None
+
 
 def test_shop_identity_api_rejects_manual_source_boundary(client: TestClient) -> None:
     response = client.post(

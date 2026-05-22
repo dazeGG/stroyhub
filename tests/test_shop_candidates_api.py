@@ -1,6 +1,4 @@
 from collections.abc import Iterator
-from decimal import Decimal
-from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -66,10 +64,10 @@ def test_shop_source_candidate_api_lists_candidates(
                 display_name="Candidate API",
                 address="Yakutsk",
                 rubrics="Стройматериалы",
-                website_url="https://candidate.example.test/",
+                has_prices_signal=True,
+                has_website_signal=True,
             )
         ],
-        scraper=_fake_scraper,
     )
 
     response = client.get("/shop-source-candidates")
@@ -83,14 +81,14 @@ def test_shop_source_candidate_api_lists_candidates(
             "source_type": "2gis",
             "display_name": "Candidate API",
             "address": "Yakutsk",
-            "website_url": "https://candidate.example.test/",
+            "website_url": None,
             "rubrics": "Стройматериалы",
             "status": "pending",
             "has_products": True,
             "has_prices": True,
             "has_website": True,
-            "product_count": 1,
-            "priced_product_count": 1,
+            "product_count": 0,
+            "priced_product_count": 0,
             "priority": 100,
             "priority_reason": "есть цены и сайт",
             "last_seen_at": response.json()["items"][0]["last_seen_at"],
@@ -105,14 +103,14 @@ def test_shop_source_candidate_api_refresh_uses_twogis_discovery(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(candidate_module, "_default_scraper", _fake_scraper)
     discovered = [
         CandidateDiscoverySeed(
             source_id="discovered-api",
             display_name="Discovered API",
             address="Yakutsk",
             rubrics="Стройматериалы",
-            website_url="https://discovered.example.test/",
+            has_prices_signal=True,
+            has_website_signal=True,
         )
     ]
 
@@ -139,9 +137,9 @@ def test_shop_source_candidate_api_approves_candidate(
                 display_name="Approve API",
                 address="Yakutsk",
                 rubrics="Стройматериалы",
+                has_prices_signal=True,
             )
         ],
-        scraper=_fake_scraper,
     )
     candidate_id = client.get("/shop-source-candidates").json()["items"][0]["id"]
 
@@ -154,12 +152,3 @@ def test_shop_source_candidate_api_approves_candidate(
     assert client.get("/shop-source-candidates").json() == {"items": []}
     approved = client.get("/shop-source-candidates", params={"include_approved": True}).json()
     assert approved["items"][0]["source_id"] == "candidate-api-approve"
-
-
-def _fake_scraper(source_id: str):  # type: ignore[no-untyped-def]
-    return SimpleNamespace(
-        total=1,
-        products=[SimpleNamespace(price=Decimal("100"))],
-        completeness="complete",
-        stop_reason="source_total_reached",
-    )

@@ -10,16 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from stroyhub.db.repositories import (
-    ShopIdentityCreate,
-    ShopIdentityRepository,
     ShopRepository,
     ShopUpsert,
 )
 from stroyhub.models import Shop, ShopSourceCandidate
-from stroyhub.scraping import TwogisScrapeResult, scrape_twogis_branch
 
 TWOGIS_SOURCE = "2gis"
-CandidateScraper = Callable[[str], TwogisScrapeResult]
 CandidateDiscoverer = Callable[[], Iterable["CandidateDiscoverySeed"]]
 TWOGIS_SEARCH_BASE_URL = "https://2gis.ru/yakutsk/search"
 TWOGIS_DISCOVERY_QUERIES = (
@@ -40,6 +36,8 @@ class CandidateDiscoverySeed:
     address: str
     rubrics: str
     website_url: str | None = None
+    has_prices_signal: bool = False
+    has_website_signal: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -58,7 +56,6 @@ class CandidateRefreshSummary:
 
 
 SHOP_CANDIDATE_STATUSES = frozenset({"pending", "stale", "hidden", "archived", "approved"})
-
 
 
 class ShopCandidateCatalog:
@@ -87,7 +84,6 @@ class ShopCandidateCatalog:
         *,
         seeds: Iterable[CandidateDiscoverySeed] | None = None,
         discoverer: CandidateDiscoverer | None = None,
-        scraper: CandidateScraper | None = None,
         refreshed_at: datetime | None = None,
     ) -> CandidateRefreshSummary:
         now = refreshed_at or datetime.now(UTC)
@@ -96,7 +92,6 @@ class ShopCandidateCatalog:
         updated = 0
         skipped_approved = 0
         seen_source_ids: set[str] = set()
-        scrape = scraper or _default_scraper
         discovery = discoverer or discover_twogis_candidates
         discovery_seeds = seeds if seeds is not None else discovery()
 
@@ -114,10 +109,9 @@ class ShopCandidateCatalog:
 
             candidate = self._get_or_create(seed)
             was_new = candidate.id is None
-            signal = _candidate_signal(seed, scrape)
             priority, reason = _priority(
-                has_prices=signal.priced_product_count > 0,
-                has_website=seed.website_url is not None,
+                has_prices=seed.has_prices_signal,
+                has_website=seed.has_website_signal,
             )
 
             candidate.display_name = seed.display_name
@@ -126,11 +120,11 @@ class ShopCandidateCatalog:
             candidate.rubrics = seed.rubrics
             if candidate.status not in {"hidden", "archived"}:
                 candidate.status = "pending"
-            candidate.has_products = signal.product_count > 0
-            candidate.has_prices = signal.priced_product_count > 0
-            candidate.has_website = seed.website_url is not None
-            candidate.product_count = signal.product_count
-            candidate.priced_product_count = signal.priced_product_count
+            candidate.has_products = seed.has_prices_signal
+            candidate.has_prices = seed.has_prices_signal
+            candidate.has_website = seed.has_website_signal
+            candidate.product_count = 0
+            candidate.priced_product_count = 0
             candidate.priority = priority
             candidate.priority_reason = reason
             candidate.last_seen_at = now
@@ -140,10 +134,10 @@ class ShopCandidateCatalog:
                 "source": TWOGIS_SOURCE,
                 "source_id": seed.source_id,
                 "rubrics": seed.rubrics,
-                "total": signal.total,
-                "completeness": signal.completeness,
-                "stop_reason": signal.stop_reason,
-                "error": signal.error,
+                "signals": {
+                    "has_prices": seed.has_prices_signal,
+                    "has_website": seed.has_website_signal,
+                },
             }
             self._session.flush()
             if was_new:
@@ -170,29 +164,29 @@ class ShopCandidateCatalog:
         if candidate.status in {"hidden", "archived"}:
             raise ValueError("hidden or archived candidate cannot be approved")
 
-        identity = ShopIdentityRepository(self._session).create(
-            ShopIdentityCreate(
-                display_name=candidate.display_name,
-                address=candidate.address,
-                website_url=candidate.website_url,
-                preferred_source=TWOGIS_SOURCE,
-            )
-        )
+        website_url = candidate.website_url
+        if website_url is None and candidate.has_website:
+            website_url = _resolve_candidate_website(candidate.source_id)
+            candidate.website_url = website_url
+
         shop = ShopRepository(self._session).upsert(
             ShopUpsert(
                 source=TWOGIS_SOURCE,
                 source_id=candidate.source_id,
                 source_type="2gis",
-                shop_identity_id=identity.id,
                 name=candidate.display_name,
                 address=candidate.address,
-                url=candidate.website_url,
+                url=website_url,
                 scrape_status="scheduled",
                 raw={
                     "source": TWOGIS_SOURCE,
                     "source_id": candidate.source_id,
                     "candidate_id": candidate.id,
                     "rubrics": candidate.rubrics,
+                    "signals": {
+                        "has_prices": candidate.has_prices,
+                        "has_website": candidate.has_website,
+                    },
                 },
             )
         )
@@ -246,45 +240,6 @@ class ShopCandidateCatalog:
         return count
 
 
-@dataclass(frozen=True, kw_only=True)
-class _CandidateSignal:
-    product_count: int
-    priced_product_count: int
-    total: int | None
-    completeness: str | None
-    stop_reason: str | None
-    error: str | None = None
-
-
-def _candidate_signal(
-    seed: CandidateDiscoverySeed,
-    scrape: CandidateScraper,
-) -> _CandidateSignal:
-    try:
-        result = scrape(seed.source_id)
-    except Exception as exc:
-        return _CandidateSignal(
-            product_count=0,
-            priced_product_count=0,
-            total=None,
-            completeness="failed",
-            stop_reason=type(exc).__name__,
-            error=str(exc),
-        )
-
-    return _CandidateSignal(
-        product_count=len(result.products),
-        priced_product_count=sum(1 for product in result.products if product.price is not None),
-        total=result.total,
-        completeness=result.completeness,
-        stop_reason=result.stop_reason,
-    )
-
-
-def _default_scraper(source_id: str) -> TwogisScrapeResult:
-    return scrape_twogis_branch(branch_id=source_id, page_size=50, max_pages=3)
-
-
 def discover_twogis_candidates(
     *,
     queries: Iterable[str] = TWOGIS_DISCOVERY_QUERIES,
@@ -292,75 +247,66 @@ def discover_twogis_candidates(
     base_url: str = TWOGIS_SEARCH_BASE_URL,
 ) -> list[CandidateDiscoverySeed]:
     seeds_by_source_id: dict[str, CandidateDiscoverySeed] = {}
+    discovery_layers = (
+        ("has_site%2Csorting_has_goods", True, True),
+        ("sorting_has_goods", True, False),
+        ("has_site", False, True),
+        (None, False, False),
+    )
     with httpx.Client(
         timeout=20.0,
         follow_redirects=True,
         headers={"User-Agent": "Mozilla/5.0"},
     ) as client:
         for query in queries:
-            for page in range(1, max_pages + 1):
-                response = client.get(_search_page_url(base_url=base_url, query=query, page=page))
-                response.raise_for_status()
-                page_seeds = parse_twogis_search_candidates(
-                    response.text,
-                    fallback_rubrics=query,
-                )
-                if not page_seeds:
-                    break
-                for seed in page_seeds:
-                    seeds_by_source_id.setdefault(seed.source_id, seed)
-
-            for seed in _discover_twogis_site_candidates(
-                client=client,
-                query=query,
-                max_pages=max_pages,
-                base_url=base_url,
-            ):
-                existing = seeds_by_source_id.get(seed.source_id)
-                if existing is None:
-                    seeds_by_source_id[seed.source_id] = seed
-                elif existing.website_url is None and seed.website_url is not None:
-                    seeds_by_source_id[seed.source_id] = CandidateDiscoverySeed(
-                        source_id=existing.source_id,
-                        display_name=existing.display_name,
-                        address=existing.address,
-                        rubrics=existing.rubrics,
-                        website_url=seed.website_url,
+            for filters, has_prices_signal, has_website_signal in discovery_layers:
+                for seed in _discover_twogis_filtered_candidates(
+                    client=client,
+                    query=query,
+                    max_pages=max_pages,
+                    base_url=base_url,
+                    filters=filters,
+                    has_prices_signal=has_prices_signal,
+                    has_website_signal=has_website_signal,
+                ):
+                    existing = seeds_by_source_id.get(seed.source_id)
+                    seeds_by_source_id[seed.source_id] = (
+                        seed if existing is None else _merge_seed(existing, seed)
                     )
 
     return list(seeds_by_source_id.values())
 
 
-def _discover_twogis_site_candidates(
+def _discover_twogis_filtered_candidates(
     *,
     client: httpx.Client,
     query: str,
     max_pages: int,
     base_url: str,
+    filters: str | None,
+    has_prices_signal: bool,
+    has_website_signal: bool,
 ) -> list[CandidateDiscoverySeed]:
     seeds_by_source_id: dict[str, CandidateDiscoverySeed] = {}
 
     for page in range(1, max_pages + 1):
         response = client.get(
-            _search_page_url(base_url=base_url, query=query, page=page, filters="has_site")
+            _search_page_url(base_url=base_url, query=query, page=page, filters=filters)
         )
         response.raise_for_status()
-        page_seeds = parse_twogis_search_candidates(response.text, fallback_rubrics=query)
+        page_seeds = parse_twogis_search_candidates(
+            response.text,
+            fallback_rubrics=query,
+            has_prices_signal=has_prices_signal,
+            has_website_signal=has_website_signal,
+        )
         if not page_seeds:
             break
 
         for seed in page_seeds:
-            if seed.source_id in seeds_by_source_id:
-                continue
-            website_url = _fetch_twogis_firm_website(client, seed.source_id)
-            if website_url is None:
-                continue
-            seeds_by_source_id[seed.source_id] = CandidateDiscoverySeed(
-                source_id=seed.source_id,
-                display_name=seed.display_name,
-                address=seed.address,
-                rubrics=seed.rubrics,
-                website_url=website_url,
+            existing = seeds_by_source_id.get(seed.source_id)
+            seeds_by_source_id[seed.source_id] = (
+                seed if existing is None else _merge_seed(existing, seed)
             )
 
     return list(seeds_by_source_id.values())
@@ -370,6 +316,8 @@ def parse_twogis_search_candidates(
     page_html: str,
     *,
     fallback_rubrics: str,
+    has_prices_signal: bool = False,
+    has_website_signal: bool = False,
 ) -> list[CandidateDiscoverySeed]:
     anchors = list(
         re.finditer(
@@ -387,8 +335,6 @@ def parse_twogis_search_candidates(
             continue
 
         next_start = anchors[index + 1].start() if index + 1 < len(anchors) else len(page_html)
-        # Search pages append a large JSON state after the visible cards. Keep the website
-        # scan close to the card so nearby service contacts do not leak into candidates.
         next_start = min(next_start, match.start() + 8_000)
         card_html = page_html[match.start() : next_start]
         name = _html_text(match.group("name"))
@@ -401,7 +347,8 @@ def parse_twogis_search_candidates(
             display_name=name,
             address=_extract_address(card_text),
             rubrics=_extract_rubrics(card_text, fallback=fallback_rubrics),
-            website_url=_extract_website(card_html),
+            has_prices_signal=has_prices_signal,
+            has_website_signal=has_website_signal,
         )
 
     return list(seeds_by_source_id.values())
@@ -426,6 +373,33 @@ def _fetch_twogis_firm_website(client: httpx.Client, source_id: str) -> str | No
     response = client.get(f"https://2gis.ru/yakutsk/firm/{source_id}")
     response.raise_for_status()
     return _extract_firm_website(response.text)
+
+
+def _resolve_candidate_website(source_id: str) -> str | None:
+    try:
+        with httpx.Client(
+            timeout=20.0,
+            follow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0"},
+        ) as client:
+            return _fetch_twogis_firm_website(client, source_id)
+    except httpx.HTTPError:
+        return None
+
+
+def _merge_seed(
+    existing: CandidateDiscoverySeed,
+    incoming: CandidateDiscoverySeed,
+) -> CandidateDiscoverySeed:
+    return CandidateDiscoverySeed(
+        source_id=existing.source_id,
+        display_name=existing.display_name or incoming.display_name,
+        address=existing.address or incoming.address,
+        rubrics=existing.rubrics or incoming.rubrics,
+        website_url=existing.website_url or incoming.website_url,
+        has_prices_signal=existing.has_prices_signal or incoming.has_prices_signal,
+        has_website_signal=existing.has_website_signal or incoming.has_website_signal,
+    )
 
 
 def _html_text(value: str) -> str:

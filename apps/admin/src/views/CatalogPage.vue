@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import {
   fetchCategories,
@@ -14,6 +15,8 @@ import {
 import { icons } from '../lib/icons'
 
 const pageSize = 50
+const route = useRoute()
+const router = useRouter()
 const searchQuery = ref('')
 const selectedCategoryId = ref('')
 const selectedShopId = ref('')
@@ -29,6 +32,7 @@ const filterErrorMessage = ref('')
 
 let productRequest: AbortController | null = null
 let searchTimer: number | undefined
+let syncingShopQuery = false
 
 const categoryOptions = computed(() => {
   const options: { id: number; label: string }[] = []
@@ -117,6 +121,17 @@ function resetPaginationAndLoad(): void {
   resetPagination()
 }
 
+function syncSelectedShopFromRoute(): void {
+  const routeShop = route.query.shop
+  const nextShopId = typeof routeShop === 'string' ? routeShop : ''
+  if (selectedShopId.value === nextShopId) {
+    return
+  }
+
+  syncingShopQuery = true
+  selectedShopId.value = nextShopId
+}
+
 async function loadFilters(): Promise<void> {
   isLoadingFilters.value = true
   filterErrorMessage.value = ''
@@ -183,6 +198,23 @@ watch([selectedCategoryId, selectedShopId, sort], () => {
   resetPaginationAndLoad()
 })
 
+watch(selectedShopId, (shopId) => {
+  if (syncingShopQuery) {
+    syncingShopQuery = false
+    return
+  }
+
+  const nextQuery = { ...route.query }
+  if (shopId) {
+    nextQuery.shop = shopId
+  } else {
+    delete nextQuery.shop
+  }
+  void router.replace({ query: nextQuery })
+})
+
+watch(() => route.query.shop, syncSelectedShopFromRoute)
+
 watch(offset, () => {
   void loadProducts()
 })
@@ -195,6 +227,7 @@ watch(searchQuery, () => {
 })
 
 onMounted(() => {
+  syncSelectedShopFromRoute()
   void loadFilters()
   void loadProducts()
 })

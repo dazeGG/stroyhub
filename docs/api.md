@@ -309,6 +309,12 @@ source response shape from `GET /shops`.
 Unlinks a source-specific shop record from its current identity. Returns the
 updated shop source response shape from `GET /shops`.
 
+### `DELETE /shop-identities/{identity_id}`
+
+Deletes a StroyHub-owned shop identity and detaches any linked source-specific
+shop records. Source rows, source products, price snapshots, and scrape history
+are preserved.
+
 M13 does not expose endpoints for manual products, manual prices, manual
 catalogs, or manual price snapshots. Owner-managed shop behavior should be
 modeled later as ownership and management state, not as a generic `manual`
@@ -339,14 +345,14 @@ Example response:
       "source_type": "2gis",
       "display_name": "Build Shop",
       "address": "Yakutsk",
-      "website_url": "https://example.test/catalog/",
+      "website_url": null,
       "rubrics": "Стройматериалы; доставка",
       "status": "pending",
       "has_products": true,
       "has_prices": true,
       "has_website": true,
-      "product_count": 42,
-      "priced_product_count": 40,
+      "product_count": 0,
+      "priced_product_count": 0,
       "priority": 100,
       "priority_reason": "есть цены и сайт",
       "last_seen_at": "2026-05-23T00:00:00Z",
@@ -360,23 +366,27 @@ Example response:
 
 Priority order:
 
-1. Has both observed prices/products and a website/catalog URL signal.
-2. Has observed prices/products only.
-3. Has a website/catalog URL signal only.
+1. Has both a 2GIS goods/prices signal and a website signal.
+2. Has a 2GIS goods/prices signal only.
+3. Has a website signal only.
 4. Other construction-material shop candidates, marked as no prices found.
 
 ### `POST /shop-source-candidates/refresh`
 
-Refreshes the candidate queue from 2GIS search discovery pages. New candidates are
-added, existing unapproved candidates are updated, and unapproved candidates
-missing from the latest refresh are marked `stale` instead of being deleted.
-Already approved `shops` are skipped and stay out of the pending queue.
+Refreshes the candidate queue from 2GIS search discovery pages using search
+filters for goods/prices and website signals. It does not scrape product cards
+or resolve real website URLs during refresh. New candidates are added, existing
+unapproved candidates are updated, and unapproved candidates missing from the
+latest refresh are marked `stale` instead of being deleted. Already approved
+`shops` are skipped and stay out of the pending queue.
 
 ### `POST /shop-source-candidates/{candidate_id}/approve`
 
-Approves a candidate into tracked data. The endpoint creates a `shop_identity`,
-creates a linked `shops` row for the 2GIS source, marks the candidate
-`approved`, and returns the updated candidate.
+Approves a candidate into tracked data. The endpoint creates an unlinked `shops`
+row for the 2GIS source, resolves the website URL only when the candidate had a
+website signal, marks the candidate `approved`, and returns the updated
+candidate. A `shop_identity` is created manually later from the admin UI when an
+operator wants to group a real shop.
 
 ## Scrapes
 

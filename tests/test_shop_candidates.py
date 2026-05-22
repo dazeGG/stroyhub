@@ -1,7 +1,5 @@
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from decimal import Decimal
-from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine, select, text
@@ -52,20 +50,22 @@ def test_candidate_refresh_prioritizes_prices_then_website(db_session: Session) 
             display_name="Prices Website",
             address="Yakutsk",
             rubrics="Стройматериалы",
-            website_url="https://both.example.test/",
+            has_prices_signal=True,
+            has_website_signal=True,
         ),
         CandidateDiscoverySeed(
             source_id="prices",
             display_name="Prices Only",
             address="Yakutsk",
             rubrics="Стройматериалы",
+            has_prices_signal=True,
         ),
         CandidateDiscoverySeed(
             source_id="website",
             display_name="Website Only",
             address="Yakutsk",
             rubrics="Стройматериалы",
-            website_url="https://website.example.test/",
+            has_website_signal=True,
         ),
         CandidateDiscoverySeed(
             source_id="none",
@@ -77,7 +77,6 @@ def test_candidate_refresh_prioritizes_prices_then_website(db_session: Session) 
 
     summary = catalog.refresh_from_twogis(
         seeds=seeds,
-        scraper=_fake_scraper({"both": 2, "prices": 1, "website": 0, "none": 0}),
         refreshed_at=datetime(2026, 5, 23, 1, 0, tzinfo=UTC),
     )
     items = catalog.list_candidates(CandidateListFilters())
@@ -89,6 +88,7 @@ def test_candidate_refresh_prioritizes_prices_then_website(db_session: Session) 
     assert items[0].priority_reason == "есть цены и сайт"
     assert items[2].priority_reason == "есть сайт"
     assert items[3].priority_reason == "нет цен и сайта"
+    assert [item.product_count for item in items] == [0, 0, 0, 0]
 
 
 def test_candidate_refresh_skips_approved_shops_and_marks_missing_stale(
@@ -112,7 +112,6 @@ def test_candidate_refresh_skips_approved_shops_and_marks_missing_stale(
                 rubrics="Стройматериалы",
             ),
         ],
-        scraper=_fake_scraper({"will-go-stale": 0, "approved-source": 1}),
         refreshed_at=first_seen,
     )
     approved = ShopRepository(db_session).upsert(
@@ -128,7 +127,6 @@ def test_candidate_refresh_skips_approved_shops_and_marks_missing_stale(
                 rubrics="Стройматериалы",
             )
         ],
-        scraper=_fake_scraper({"approved-source": 1}),
         refreshed_at=second_seen,
     )
     stale = db_session.scalar(
@@ -168,7 +166,6 @@ def test_candidate_refresh_preserves_hidden_and_archived_statuses(
     ]
     catalog.refresh_from_twogis(
         seeds=seeds,
-        scraper=_fake_scraper({"hidden-source": 1, "archived-source": 1}),
     )
     hidden = db_session.scalar(
         select(ShopSourceCandidate).where(ShopSourceCandidate.source_id == "hidden-source")
@@ -183,15 +180,21 @@ def test_candidate_refresh_preserves_hidden_and_archived_statuses(
 
     catalog.refresh_from_twogis(
         seeds=seeds,
-        scraper=_fake_scraper({"hidden-source": 1, "archived-source": 1}),
     )
 
     assert hidden.status == "hidden"
     assert archived.status == "archived"
 
 
-def test_candidate_approval_creates_identity_and_tracked_shop(db_session: Session) -> None:
+def test_candidate_approval_creates_unlinked_tracked_shop(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     catalog = ShopCandidateCatalog(db_session)
+    monkeypatch.setattr(
+        "stroyhub.catalog.shop_candidates._resolve_candidate_website",
+        lambda source_id: f"https://{source_id}.example.test/",
+    )
     catalog.refresh_from_twogis(
         seeds=[
             CandidateDiscoverySeed(
@@ -199,10 +202,10 @@ def test_candidate_approval_creates_identity_and_tracked_shop(db_session: Sessio
                 display_name="Approve Me",
                 address="Yakutsk",
                 rubrics="Стройматериалы",
-                website_url="https://approve.example.test/",
+                has_prices_signal=True,
+                has_website_signal=True,
             )
         ],
-        scraper=_fake_scraper({"approve-me": 1}),
     )
     candidate = catalog.list_candidates(CandidateListFilters())[0]
 
@@ -214,10 +217,9 @@ def test_candidate_approval_creates_identity_and_tracked_shop(db_session: Sessio
     assert shop.source == "2gis"
     assert shop.source_type == "2gis"
     assert shop.name == "Approve Me"
-    assert shop.url == "https://approve.example.test/"
-    assert shop.shop_identity is not None
-    assert shop.shop_identity.display_name == "Approve Me"
-    assert shop.shop_identity.preferred_source == "2gis"
+    assert shop.url == "https://approve-me.example.test/"
+    assert shop.shop_identity_id is None
+    assert shop.shop_identity is None
 
 
 def test_parse_twogis_search_candidates_extracts_real_search_cards() -> None:
@@ -254,9 +256,28 @@ def test_parse_twogis_search_candidates_extracts_real_search_cards() -> None:
             display_name="Металл Торг",
             address="Проспект Михаила Николаева, 1",
             rubrics="Стройматериалы",
-            website_url="https://metalltorg.biz",
         ),
     ]
+
+
+def test_parse_twogis_search_candidates_preserves_filter_signals() -> None:
+    page_html = """
+    <a href="/yakutsk/firm/70000001007229923" class="_1rehek">
+      <span class="_lvwrwt"><span>Евролайн</span></span>
+    </a>
+    <div>Якутск Стройматериалы</div>
+    """
+
+    seeds = parse_twogis_search_candidates(
+        page_html,
+        fallback_rubrics="стройматериалы",
+        has_prices_signal=True,
+        has_website_signal=True,
+    )
+
+    assert seeds[0].has_prices_signal is True
+    assert seeds[0].has_website_signal is True
+    assert seeds[0].website_url is None
 
 
 def test_parse_twogis_search_candidates_ignores_app_state_contacts_after_cards() -> None:
@@ -309,19 +330,3 @@ def test_extract_firm_website_keeps_full_redirect_target_and_skips_messengers() 
 
     assert _extract_firm_website(page_html) == "https://example.test/catalog/?utm_source=2gis"
     assert _extract_firm_website(messenger_html) is None
-
-
-def _fake_scraper(price_counts: dict[str, int]):  # type: ignore[no-untyped-def]
-    def scrape(source_id: str):  # type: ignore[no-untyped-def]
-        priced_count = price_counts[source_id]
-        products = [SimpleNamespace(price=Decimal("100")) for _ in range(priced_count)]
-        if priced_count == 0 and source_id != "none":
-            products = [SimpleNamespace(price=None)]
-        return SimpleNamespace(
-            total=len(products),
-            products=products,
-            completeness="complete" if products else "empty",
-            stop_reason="source_total_reached" if products else "empty_page",
-        )
-
-    return scrape

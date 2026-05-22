@@ -5,6 +5,7 @@ import { RouterLink } from 'vue-router'
 
 import {
   createShopIdentity,
+  deleteShopIdentity,
   fetchShopIdentities,
   fetchShops,
   linkShopSource,
@@ -43,9 +44,12 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 const saveMessage = ref('')
 const savingIdentityId = ref<number | null>(null)
+const deletingIdentityId = ref<number | null>(null)
 const linkingShopId = ref<number | null>(null)
 const isCreateModalOpen = ref(false)
 const editingIdentity = ref<ShopIdentity | null>(null)
+const deletingIdentity = ref<ShopIdentity | null>(null)
+const createFromShopId = ref<number | null>(null)
 const linkTargets = reactive<Record<number, number | ''>>({})
 const editForms = reactive<Record<number, ShopIdentitySavePayload>>({})
 const createForm = reactive<Required<Pick<ShopIdentitySavePayload, 'display_name'>> & ShopIdentitySavePayload>({
@@ -200,8 +204,15 @@ function resetCreateForm(): void {
   createForm.locked_fields = null
 }
 
-function openCreateModal(): void {
+function openCreateModal(shop?: ShopListItem): void {
   resetCreateForm()
+  createFromShopId.value = shop?.id ?? null
+  if (shop) {
+    createForm.display_name = shop.name
+    createForm.address = shop.address || ''
+    createForm.website_url = shop.url || ''
+    createForm.preferred_source = shop.source
+  }
   errorMessage.value = ''
   saveMessage.value = ''
   isCreateModalOpen.value = true
@@ -209,6 +220,7 @@ function openCreateModal(): void {
 
 function closeCreateModal(): void {
   isCreateModalOpen.value = false
+  createFromShopId.value = null
 }
 
 function openEditModal(identity: ShopIdentity): void {
@@ -220,6 +232,16 @@ function openEditModal(identity: ShopIdentity): void {
 
 function closeEditModal(): void {
   editingIdentity.value = null
+}
+
+function openDeleteModal(identity: ShopIdentity): void {
+  deletingIdentity.value = identity
+  errorMessage.value = ''
+  saveMessage.value = ''
+}
+
+function closeDeleteModal(): void {
+  deletingIdentity.value = null
 }
 
 function normalizePayload(payload: ShopIdentitySavePayload): ShopIdentitySavePayload {
@@ -306,18 +328,41 @@ async function createIdentity(): Promise<void> {
   saveMessage.value = ''
 
   try {
+    const sourceShopId = createFromShopId.value
     const created = await createShopIdentity(normalizePayload(createForm))
+    if (sourceShopId !== null) {
+      await linkShopSource(created.id, sourceShopId)
+    }
     identities.value = [...identities.value, created].sort((left, right) =>
       left.display_name.localeCompare(right.display_name, 'ru'),
     )
     resetCreateForm()
     closeCreateModal()
-    saveMessage.value = 'Магазин создан'
+    saveMessage.value = sourceShopId === null
+      ? 'Магазин создан'
+      : 'Магазин создан и привязан к источнику'
     await loadShopManagement()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось создать магазин'
   } finally {
     savingIdentityId.value = null
+  }
+}
+
+async function deleteIdentity(identity: ShopIdentity): Promise<void> {
+  deletingIdentityId.value = identity.id
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    await deleteShopIdentity(identity.id)
+    closeDeleteModal()
+    saveMessage.value = 'Магазин удалён, источники остались в системе'
+    await loadShopManagement()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось удалить магазин'
+  } finally {
+    deletingIdentityId.value = null
   }
 }
 
@@ -437,7 +482,7 @@ onMounted(() => {
         <button
           type="button"
           class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200"
-          @click="openCreateModal"
+          @click="() => openCreateModal()"
         >
           <Icon :icon="icons.plus" class="size-4" aria-hidden="true" />
           Создать
@@ -486,14 +531,24 @@ onMounted(() => {
                 <p class="max-w-[260px] text-neutral-400">{{ placeholder(identity.notes, 'Заметок нет') }}</p>
               </td>
               <td class="px-4 py-4">
-                <button
-                  type="button"
-                  class="inline-flex h-8 items-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-xs font-medium text-amber-100 transition hover:border-amber-300 hover:bg-amber-300/15 hover:text-amber-50"
-                  @click="openEditModal(identity)"
-                >
-                  <Icon :icon="icons.pencil" class="size-3.5" aria-hidden="true" />
-                  Редактировать
-                </button>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    class="inline-flex h-8 items-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-xs font-medium text-amber-100 transition hover:border-amber-300 hover:bg-amber-300/15 hover:text-amber-50"
+                    @click="openEditModal(identity)"
+                  >
+                    <Icon :icon="icons.pencil" class="size-3.5" aria-hidden="true" />
+                    Редактировать
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex h-8 items-center gap-2 rounded-md border border-red-400/30 bg-red-400/10 px-3 text-xs font-medium text-red-100 transition hover:border-red-300 hover:bg-red-300/15 hover:text-red-50"
+                    @click="openDeleteModal(identity)"
+                  >
+                    <Icon :icon="icons.trash" class="size-3.5" aria-hidden="true" />
+                    Удалить
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -623,6 +678,13 @@ onMounted(() => {
               </td>
               <td class="px-4 py-4">
                 <div v-if="shop.identity" class="flex flex-col gap-2">
+                  <RouterLink
+                    :to="{ path: '/', query: { shop: shop.id } }"
+                    class="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
+                  >
+                    <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
+                    Товары
+                  </RouterLink>
                   <button
                     type="button"
                     class="inline-flex h-8 w-fit items-center rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-red-300 hover:text-red-200 disabled:opacity-50"
@@ -645,6 +707,23 @@ onMounted(() => {
                       {{ identity.display_name }}
                     </option>
                   </select>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-xs font-medium text-amber-100 transition hover:border-amber-300 hover:bg-amber-300/15 hover:text-amber-50"
+                      @click="openCreateModal(shop)"
+                    >
+                      <Icon :icon="icons.plus" class="size-3.5" aria-hidden="true" />
+                      Создать магазин
+                    </button>
+                    <RouterLink
+                      :to="{ path: '/', query: { shop: shop.id } }"
+                      class="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
+                    >
+                      <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
+                      Товары
+                    </RouterLink>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -802,6 +881,45 @@ onMounted(() => {
           </button>
         </div>
       </form>
+    </div>
+
+    <div v-if="deletingIdentity" class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/80 p-4">
+      <div class="w-full max-w-lg rounded-lg border border-neutral-800 bg-neutral-950 p-5 shadow-2xl">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-semibold text-white">Удалить магазин</h3>
+            <p class="mt-1 text-sm leading-6 text-neutral-400">
+              {{ deletingIdentity.display_name }} исчезнет из списка магазинов. Источники, товары и история цен останутся, но будут отвязаны.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="inline-flex size-9 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-900 hover:text-white"
+            aria-label="Закрыть окно удаления магазина"
+            @click="closeDeleteModal"
+          >
+            <Icon :icon="icons.x" class="size-5" aria-hidden="true" />
+          </button>
+        </div>
+        <div class="mt-5 flex justify-end gap-3">
+          <button
+            type="button"
+            class="h-10 rounded-md border border-neutral-700 px-4 text-sm font-medium text-neutral-300 transition hover:border-neutral-500 hover:text-white"
+            @click="closeDeleteModal"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-red-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="deletingIdentityId === deletingIdentity.id"
+            @click="deleteIdentity(deletingIdentity)"
+          >
+            <Icon :icon="icons.trash" class="size-4" aria-hidden="true" />
+            Удалить
+          </button>
+        </div>
+      </div>
     </div>
   </section>
 </template>

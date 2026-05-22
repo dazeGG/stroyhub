@@ -278,6 +278,21 @@ class ShopIdentityRepository:
         self._session.flush()
         return identity
 
+    def delete(self, identity_id: int) -> ShopIdentity:
+        identity = self.get(identity_id)
+        if identity is None:
+            raise ValueError("shop identity not found")
+
+        linked_shops = self._session.scalars(
+            select(Shop).where(Shop.shop_identity_id == identity.id)
+        )
+        for shop in linked_shops:
+            shop.shop_identity_id = None
+
+        self._session.delete(identity)
+        self._session.flush()
+        return identity
+
     def link_shop(self, *, identity_id: int, shop_id: int) -> Shop:
         identity = self.get(identity_id)
         if identity is None:
