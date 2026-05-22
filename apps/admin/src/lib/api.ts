@@ -145,6 +145,49 @@ export interface ShopIdentityListResponse {
   items: ShopIdentity[]
 }
 
+export type ShopSourceCandidateStatus = 'pending' | 'stale' | 'hidden' | 'archived' | 'approved'
+
+export interface ShopSourceCandidate {
+  id: number
+  source: string
+  source_id: string
+  source_type: SourceType
+  display_name: string
+  address: string | null
+  website_url: string | null
+  rubrics: string | null
+  status: ShopSourceCandidateStatus
+  has_products: boolean
+  has_prices: boolean
+  has_website: boolean
+  product_count: number
+  priced_product_count: number
+  priority: number
+  priority_reason: string
+  last_seen_at: string | null
+  last_checked_at: string | null
+  missing_since: string | null
+  approved_shop_id: number | null
+}
+
+export interface ShopSourceCandidateListResponse {
+  items: ShopSourceCandidate[]
+}
+
+export interface ShopSourceCandidateRefreshResponse {
+  checked: number
+  created: number
+  updated: number
+  stale: number
+  skipped_approved: number
+  items: ShopSourceCandidate[]
+}
+
+export interface ShopSourceCandidateListParams {
+  status?: ShopSourceCandidateStatus | ''
+  includeApproved?: boolean
+}
+
 export interface ProductSearchParams {
   q?: string
   categoryId?: number
@@ -447,6 +490,44 @@ export function unlinkShopSource(
   return writeJson<ShopListItem>(
     `/shops/${shopId}/identity`,
     { method: 'DELETE' },
+    signal,
+  )
+}
+
+export function fetchShopSourceCandidates(
+  filters: ShopSourceCandidateListParams = {},
+  signal?: AbortSignal,
+): Promise<ShopSourceCandidateListResponse> {
+  const params = new URLSearchParams()
+  appendOptionalParam(params, 'status', filters.status)
+  if (filters.includeApproved !== undefined) {
+    params.set('include_approved', String(filters.includeApproved))
+  }
+  const query = params.toString()
+
+  return fetchJson<ShopSourceCandidateListResponse>(
+    query ? `/shop-source-candidates?${query}` : '/shop-source-candidates',
+    signal,
+  )
+}
+
+export function refreshShopSourceCandidates(
+  signal?: AbortSignal,
+): Promise<ShopSourceCandidateRefreshResponse> {
+  return writeJson<ShopSourceCandidateRefreshResponse>(
+    '/shop-source-candidates/refresh',
+    { method: 'POST' },
+    signal,
+  )
+}
+
+export function approveShopSourceCandidate(
+  candidateId: number,
+  signal?: AbortSignal,
+): Promise<ShopSourceCandidate> {
+  return writeJson<ShopSourceCandidate>(
+    `/shop-source-candidates/${candidateId}/approve`,
+    { method: 'POST' },
     signal,
   )
 }
