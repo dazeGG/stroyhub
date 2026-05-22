@@ -99,6 +99,7 @@ def test_shop_source_candidate_api_lists_candidates(
             "approved_shop_id": None,
             "official_strategy": None,
             "suggested_identity": None,
+            "scrape_result": None,
         }
     ]
 
@@ -161,6 +162,7 @@ def test_shop_source_candidate_api_refresh_uses_twogis_discovery(
 def test_shop_source_candidate_api_approves_candidate(
     client: TestClient,
     db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     ShopCandidateCatalog(db_session).refresh_from_twogis(
         seeds=[
@@ -174,6 +176,21 @@ def test_shop_source_candidate_api_approves_candidate(
         ],
     )
     candidate_id = client.get("/shop-source-candidates").json()["items"][0]["id"]
+    observed_shop_ids: list[int] = []
+
+    def fake_run_shop_scrape(session: Session, shop_id: int) -> dict[str, object]:
+        observed_shop_ids.append(shop_id)
+        return {
+            "shop_id": shop_id,
+            "source": "2gis",
+            "source_type": "2gis",
+            "status": "success",
+            "products_seen": 4,
+            "products_saved": 4,
+            "price_snapshots_saved": 4,
+        }
+
+    monkeypatch.setattr("apps.api.shop_candidates.run_shop_scrape", fake_run_shop_scrape)
 
     response = client.post(f"/shop-source-candidates/{candidate_id}/approve")
 
@@ -181,6 +198,16 @@ def test_shop_source_candidate_api_approves_candidate(
     payload = response.json()
     assert payload["status"] == "approved"
     assert payload["approved_shop_id"] is not None
+    assert observed_shop_ids == [payload["approved_shop_id"]]
+    assert payload["scrape_result"] == {
+        "shop_id": payload["approved_shop_id"],
+        "source": "2gis",
+        "source_type": "2gis",
+        "status": "success",
+        "products_seen": 4,
+        "products_saved": 4,
+        "price_snapshots_saved": 4,
+    }
     assert client.get("/shop-source-candidates").json() == {"items": []}
     approved = client.get("/shop-source-candidates", params={"include_approved": True}).json()
     assert approved["items"][0]["source_id"] == "candidate-api-approve"
@@ -189,6 +216,7 @@ def test_shop_source_candidate_api_approves_candidate(
 def test_shop_source_candidate_api_suggests_identity_and_approves_branch(
     client: TestClient,
     db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     identity = ShopIdentityRepository(db_session).create(
         ShopIdentityCreate(display_name="Металл Торг", address="Якутск")
@@ -214,6 +242,10 @@ def test_shop_source_candidate_api_suggests_identity_and_approves_branch(
         "source_count": 0,
         "reason": "name_match",
     }
+    monkeypatch.setattr(
+        "apps.api.shop_candidates.run_shop_scrape",
+        lambda session, shop_id: {"shop_id": shop_id, "status": "success"},
+    )
 
     response = client.post(
         f"/shop-source-candidates/{candidate['id']}/approve",

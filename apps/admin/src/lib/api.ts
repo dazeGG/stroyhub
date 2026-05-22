@@ -181,6 +181,18 @@ export interface ShopSourceCandidate {
     source_count: number
     reason: string
   } | null
+  scrape_result: {
+    shop_id?: number
+    source?: string
+    source_type?: SourceType
+    status: string
+    duration_seconds?: number
+    products_seen?: number
+    products_saved?: number
+    price_snapshots_saved?: number
+    reason?: string
+    error?: string
+  } | null
 }
 
 export interface ShopSourceCandidateListResponse {
@@ -230,19 +242,6 @@ export interface RecentScrapeRun {
 export interface ScrapeHealthResponse {
   status_counts: ScrapeStatusCount[]
   recent_runs: RecentScrapeRun[]
-}
-
-export interface ShopScrapeRunResponse {
-  shop_id: number
-  source: string | null
-  source_type: SourceType | null
-  status: string
-  duration_seconds: number | null
-  products_seen: number | null
-  products_saved: number | null
-  price_snapshots_saved: number | null
-  reason: string | null
-  error: string | null
 }
 
 export interface ScrapeHealthParams {
@@ -596,17 +595,6 @@ export function fetchScrapeHealth(
   const query = params.toString()
 
   return fetchJson<ScrapeHealthResponse>(query ? `/scrapes/health?${query}` : '/scrapes/health', signal)
-}
-
-export function runShopScrape(
-  shopId: number,
-  signal?: AbortSignal,
-): Promise<ShopScrapeRunResponse> {
-  return writeJson<ShopScrapeRunResponse>(
-    `/scrapes/shops/${shopId}/run`,
-    { method: 'POST' },
-    signal,
-  )
 }
 
 export function fetchCategoryQuality(
