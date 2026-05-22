@@ -98,17 +98,51 @@ export interface CategoryTreeResponse {
 
 export interface ShopListItem {
   id: number
+  shop_identity_id: number | null
+  identity: ShopIdentitySummary | null
   source: string
   source_id: string
+  source_type: SourceType
   name: string
   address: string | null
+  url: string | null
   scrape_status: string
   last_scraped_at: string | null
   next_scrape_at: string | null
+  scrape_interval: number
+  error_count: number
+  is_preferred_source: boolean
 }
 
 export interface ShopListResponse {
   items: ShopListItem[]
+}
+
+export type SourceType = '2gis' | 'official_api' | 'official_html'
+
+export type IdentityStatus = 'active' | 'hold' | 'disabled' | 'out_of_scope'
+
+export interface ShopIdentitySummary {
+  id: number
+  display_name: string
+  status: IdentityStatus
+  preferred_source: string | null
+}
+
+export interface ShopIdentity {
+  id: number
+  display_name: string
+  address: string | null
+  website_url: string | null
+  preferred_source: string | null
+  status: IdentityStatus
+  notes: string | null
+  locked_fields: Record<string, unknown> | null
+  source_count: number | null
+}
+
+export interface ShopIdentityListResponse {
+  items: ShopIdentity[]
 }
 
 export interface ProductSearchParams {
@@ -152,6 +186,23 @@ export interface ScrapeHealthParams {
 export interface ShopListParams {
   source?: string
   status?: string
+  sourceType?: SourceType | ''
+  identityId?: number
+  identity?: 'linked' | 'unlinked' | ''
+}
+
+export interface ShopIdentityListParams {
+  status?: IdentityStatus | ''
+}
+
+export interface ShopIdentitySavePayload {
+  display_name?: string
+  address?: string | null
+  website_url?: string | null
+  preferred_source?: string | null
+  status?: IdentityStatus
+  notes?: string | null
+  locked_fields?: Record<string, unknown> | null
 }
 
 export interface UncategorizedCategoryGroup {
@@ -326,9 +377,78 @@ export function fetchShops(
   const params = new URLSearchParams()
   appendOptionalParam(params, 'source', filters.source)
   appendOptionalParam(params, 'status', filters.status)
+  appendOptionalParam(params, 'source_type', filters.sourceType)
+  appendOptionalParam(params, 'identity_id', filters.identityId)
+  appendOptionalParam(params, 'identity', filters.identity)
   const query = params.toString()
 
   return fetchJson<ShopListResponse>(query ? `/shops?${query}` : '/shops', signal)
+}
+
+export function fetchShopIdentities(
+  filters: ShopIdentityListParams = {},
+  signal?: AbortSignal,
+): Promise<ShopIdentityListResponse> {
+  const params = new URLSearchParams()
+  appendOptionalParam(params, 'status', filters.status)
+  const query = params.toString()
+
+  return fetchJson<ShopIdentityListResponse>(
+    query ? `/shop-identities?${query}` : '/shop-identities',
+    signal,
+  )
+}
+
+export function createShopIdentity(
+  payload: ShopIdentitySavePayload,
+  signal?: AbortSignal,
+): Promise<ShopIdentity> {
+  return writeJson<ShopIdentity>(
+    '/shop-identities',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    signal,
+  )
+}
+
+export function updateShopIdentity(
+  identityId: number,
+  payload: ShopIdentitySavePayload,
+  signal?: AbortSignal,
+): Promise<ShopIdentity> {
+  return writeJson<ShopIdentity>(
+    `/shop-identities/${identityId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+    signal,
+  )
+}
+
+export function linkShopSource(
+  identityId: number,
+  shopId: number,
+  signal?: AbortSignal,
+): Promise<ShopListItem> {
+  return writeJson<ShopListItem>(
+    `/shop-identities/${identityId}/sources/${shopId}`,
+    { method: 'POST' },
+    signal,
+  )
+}
+
+export function unlinkShopSource(
+  shopId: number,
+  signal?: AbortSignal,
+): Promise<ShopListItem> {
+  return writeJson<ShopListItem>(
+    `/shops/${shopId}/identity`,
+    { method: 'DELETE' },
+    signal,
+  )
 }
 
 export function fetchProductPriceHistory(
