@@ -21,6 +21,8 @@ const approvingCandidateId = ref<number | null>(null)
 const errorMessage = ref('')
 const saveMessage = ref('')
 const lastRefresh = ref<ShopSourceCandidateRefreshResponse | null>(null)
+const onlyWithPrices = ref(false)
+const onlyWithWebsite = ref(false)
 
 let candidateRequest: AbortController | null = null
 
@@ -38,6 +40,18 @@ const pricedCount = computed(() => {
 
 const websiteCount = computed(() => {
   return candidates.value.filter((candidate) => candidate.has_website).length
+})
+
+const filteredCandidates = computed(() => {
+  return candidates.value.filter((candidate) => {
+    if (onlyWithPrices.value && !candidate.has_prices) {
+      return false
+    }
+    if (onlyWithWebsite.value && !candidate.has_website) {
+      return false
+    }
+    return true
+  })
 })
 
 function statusLabel(status: ShopSourceCandidateStatus): string {
@@ -251,6 +265,29 @@ onMounted(() => {
       <p>Уже утверждены: <span class="text-neutral-100">{{ lastRefresh.skipped_approved }}</span></p>
     </div>
 
+    <div class="flex flex-col gap-3 border-t border-neutral-800 pt-5 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <h3 class="text-base font-semibold text-white">Магазины 2GIS</h3>
+        <p class="mt-1 text-sm text-neutral-500">Кандидаты из поиска 2GIS с полезными сигналами для добавления источников.</p>
+      </div>
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <label class="inline-flex h-9 cursor-pointer items-center gap-3 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 text-sm text-neutral-300 transition hover:border-amber-300/40 hover:text-white">
+          <input v-model="onlyWithPrices" type="checkbox" class="peer sr-only">
+          <span class="relative h-5 w-9 rounded-full bg-neutral-800 transition peer-checked:bg-emerald-500/80">
+            <span class="absolute left-0.5 top-0.5 size-4 rounded-full bg-neutral-400 transition peer-checked:translate-x-4 peer-checked:bg-white" />
+          </span>
+          Есть товары и цены
+        </label>
+        <label class="inline-flex h-9 cursor-pointer items-center gap-3 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 text-sm text-neutral-300 transition hover:border-amber-300/40 hover:text-white">
+          <input v-model="onlyWithWebsite" type="checkbox" class="peer sr-only">
+          <span class="relative h-5 w-9 rounded-full bg-neutral-800 transition peer-checked:bg-sky-500/80">
+            <span class="absolute left-0.5 top-0.5 size-4 rounded-full bg-neutral-400 transition peer-checked:translate-x-4 peer-checked:bg-white" />
+          </span>
+          Есть сайт
+        </label>
+      </div>
+    </div>
+
     <div v-if="isLoading" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">
       Загружаем кандидатов...
     </div>
@@ -261,9 +298,15 @@ onMounted(() => {
       <p class="mt-2 text-sm text-neutral-500">Обновите список из 2GIS, чтобы загрузить магазины на подтверждение.</p>
     </div>
 
+    <div v-else-if="filteredCandidates.length === 0" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center">
+      <Icon :icon="icons.filter" class="mx-auto mb-3 size-7 text-neutral-600" aria-hidden="true" />
+      <p class="text-sm font-medium text-neutral-200">По выбранным сигналам кандидатов нет</p>
+      <p class="mt-2 text-sm text-neutral-500">Отключите один из фильтров или обновите список из 2GIS.</p>
+    </div>
+
     <div v-else class="grid gap-3">
       <article
-        v-for="candidate in candidates"
+        v-for="candidate in filteredCandidates"
         :key="candidate.id"
         class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
       >
