@@ -1,0 +1,351 @@
+<script setup lang="ts">
+import { Icon } from '@iconify/vue'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+
+import {
+  approveShopSourceCandidate,
+  fetchShopSourceCandidates,
+  refreshShopSourceCandidates,
+  type ShopSourceCandidate,
+  type ShopSourceCandidateRefreshResponse,
+  type ShopSourceCandidateStatus,
+} from '../lib/api'
+import { icons } from '../lib/icons'
+
+const candidates = ref<ShopSourceCandidate[]>([])
+const selectedStatus = ref<ShopSourceCandidateStatus | ''>('')
+const isLoading = ref(false)
+const isRefreshing = ref(false)
+const approvingCandidateId = ref<number | null>(null)
+const errorMessage = ref('')
+const saveMessage = ref('')
+const lastRefresh = ref<ShopSourceCandidateRefreshResponse | null>(null)
+
+let candidateRequest: AbortController | null = null
+
+const pendingCount = computed(() => {
+  return candidates.value.filter((candidate) => candidate.status === 'pending').length
+})
+
+const staleCount = computed(() => {
+  return candidates.value.filter((candidate) => candidate.status === 'stale').length
+})
+
+const pricedCount = computed(() => {
+  return candidates.value.filter((candidate) => candidate.has_prices).length
+})
+
+const websiteCount = computed(() => {
+  return candidates.value.filter((candidate) => candidate.has_website).length
+})
+
+function statusLabel(status: ShopSourceCandidateStatus): string {
+  const labels: Record<ShopSourceCandidateStatus, string> = {
+    pending: 'Ожидает решения',
+    stale: 'Не найден в последнем обновлении',
+    hidden: 'Скрыт',
+    archived: 'В архиве',
+    approved: 'Утвержден',
+  }
+
+  return labels[status]
+}
+
+function statusClass(status: ShopSourceCandidateStatus): string {
+  if (status === 'pending') {
+    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+  }
+  if (status === 'stale') {
+    return 'border-amber-400/30 bg-amber-400/10 text-amber-200'
+  }
+  if (status === 'approved') {
+    return 'border-sky-400/30 bg-sky-400/10 text-sky-200'
+  }
+
+  return 'border-neutral-700 bg-neutral-900 text-neutral-400'
+}
+
+function priorityClass(candidate: ShopSourceCandidate): string {
+  if (candidate.has_prices && candidate.has_website) {
+    return 'border-amber-400/40 bg-amber-400/10 text-amber-100'
+  }
+  if (candidate.has_prices) {
+    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+  }
+  if (candidate.has_website) {
+    return 'border-sky-400/30 bg-sky-400/10 text-sky-200'
+  }
+
+  return 'border-neutral-700 bg-neutral-900 text-neutral-400'
+}
+
+function priceSignal(candidate: ShopSourceCandidate): string {
+  if (candidate.has_prices) {
+    return `${candidate.priced_product_count} с ценой из ${candidate.product_count}`
+  }
+  if (candidate.has_products) {
+    return `Товары есть, цен не найдено (${candidate.product_count})`
+  }
+
+  return 'Цен не найдено'
+}
+
+function canApprove(candidate: ShopSourceCandidate): boolean {
+  return candidate.status === 'pending' || candidate.status === 'stale'
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return 'Нет данных'
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+async function loadCandidates(): Promise<void> {
+  candidateRequest?.abort()
+  const request = new AbortController()
+  candidateRequest = request
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await fetchShopSourceCandidates(
+      {
+        status: selectedStatus.value,
+      },
+      request.signal,
+    )
+    candidates.value = response.items
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return
+    }
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить кандидатов'
+    candidates.value = []
+  } finally {
+    if (candidateRequest === request) {
+      isLoading.value = false
+    }
+  }
+}
+
+async function refreshCandidates(): Promise<void> {
+  isRefreshing.value = true
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    const response = await refreshShopSourceCandidates()
+    lastRefresh.value = response
+    if (selectedStatus.value) {
+      await loadCandidates()
+    } else {
+      candidates.value = response.items
+    }
+    saveMessage.value = `Обновлено из 2GIS: проверено ${response.checked}, новых ${response.created}`
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось обновить кандидатов'
+  } finally {
+    isRefreshing.value = false
+  }
+}
+
+async function approveCandidate(candidate: ShopSourceCandidate): Promise<void> {
+  approvingCandidateId.value = candidate.id
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    await approveShopSourceCandidate(candidate.id)
+    saveMessage.value = `${candidate.display_name} добавлен в магазины`
+    await loadCandidates()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось утвердить кандидата'
+  } finally {
+    approvingCandidateId.value = null
+  }
+}
+
+onMounted(() => {
+  void loadCandidates()
+})
+</script>
+
+<template>
+  <section class="space-y-6">
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div>
+        <RouterLink
+          to="/shops"
+          class="inline-flex items-center gap-2 text-sm font-medium text-neutral-400 transition hover:text-white"
+        >
+          <Icon :icon="icons.arrowLeft" class="size-4" aria-hidden="true" />
+          Магазины
+        </RouterLink>
+        <p class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+          <Icon :icon="icons.databaseImport" class="size-4" aria-hidden="true" />
+          Кандидаты источников
+        </p>
+        <h2 class="mt-2 text-2xl font-semibold text-white">Подтверждение магазинов из 2GIS</h2>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+          Новые магазины попадают сюда перед тем, как стать отслеживаемыми источниками. Приоритет выше у кандидатов с ценами и сайтом.
+        </p>
+      </div>
+
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <select
+          v-model="selectedStatus"
+          aria-label="Фильтр кандидатов по статусу"
+          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          @change="loadCandidates"
+        >
+          <option value="">Все кандидаты</option>
+          <option value="pending">Ожидают решения</option>
+          <option value="stale">Не найдены в последнем обновлении</option>
+          <option value="hidden">Скрытые</option>
+          <option value="archived">Архив</option>
+        </select>
+        <button
+          type="button"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="isRefreshing"
+          @click="refreshCandidates"
+        >
+          <Icon :icon="icons.refresh" class="size-4" aria-hidden="true" />
+          {{ isRefreshing ? 'Обновляем...' : 'Обновить из 2GIS' }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="errorMessage" class="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100">
+      {{ errorMessage }}
+    </div>
+    <div v-if="saveMessage" class="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
+      {{ saveMessage }}
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-4">
+      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.listCheck" class="size-4" aria-hidden="true" />
+          Ожидают
+        </p>
+        <p class="mt-3 text-3xl font-semibold text-white">{{ pendingCount }}</p>
+      </div>
+      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.currencyRubel" class="size-4" aria-hidden="true" />
+          С ценами
+        </p>
+        <p class="mt-3 text-3xl font-semibold text-white">{{ pricedCount }}</p>
+      </div>
+      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.externalLink" class="size-4" aria-hidden="true" />
+          С сайтом
+        </p>
+        <p class="mt-3 text-3xl font-semibold text-white">{{ websiteCount }}</p>
+      </div>
+      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.alertTriangle" class="size-4" aria-hidden="true" />
+          Пропали
+        </p>
+        <p class="mt-3 text-3xl font-semibold" :class="staleCount > 0 ? 'text-amber-200' : 'text-white'">
+          {{ staleCount }}
+        </p>
+      </div>
+    </div>
+
+    <div
+      v-if="lastRefresh"
+      class="grid gap-3 rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-400 md:grid-cols-5"
+    >
+      <p>Проверено: <span class="text-neutral-100">{{ lastRefresh.checked }}</span></p>
+      <p>Новых: <span class="text-neutral-100">{{ lastRefresh.created }}</span></p>
+      <p>Обновлено: <span class="text-neutral-100">{{ lastRefresh.updated }}</span></p>
+      <p>Пропали: <span class="text-neutral-100">{{ lastRefresh.stale }}</span></p>
+      <p>Уже утверждены: <span class="text-neutral-100">{{ lastRefresh.skipped_approved }}</span></p>
+    </div>
+
+    <div v-if="isLoading" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">
+      Загружаем кандидатов...
+    </div>
+
+    <div v-else-if="candidates.length === 0" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center">
+      <Icon :icon="icons.databaseImport" class="mx-auto mb-3 size-7 text-neutral-600" aria-hidden="true" />
+      <p class="text-sm font-medium text-neutral-200">Кандидатов пока нет</p>
+      <p class="mt-2 text-sm text-neutral-500">Обновите список из 2GIS, чтобы загрузить магазины на подтверждение.</p>
+    </div>
+
+    <div v-else class="grid gap-3">
+      <article
+        v-for="candidate in candidates"
+        :key="candidate.id"
+        class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
+      >
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-base font-semibold text-white">{{ candidate.display_name }}</h3>
+              <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="statusClass(candidate.status)">
+                {{ statusLabel(candidate.status) }}
+              </span>
+              <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="priorityClass(candidate)">
+                {{ candidate.priority_reason }}
+              </span>
+            </div>
+            <p class="mt-2 text-sm text-neutral-500">{{ candidate.address || 'Адрес не указан' }}</p>
+            <p class="mt-1 font-mono text-xs text-neutral-600">2GIS · {{ candidate.source_id }}</p>
+          </div>
+
+          <button
+            type="button"
+            class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
+            :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
+            @click="approveCandidate(candidate)"
+          >
+            <Icon :icon="icons.check" class="size-4" aria-hidden="true" />
+            {{ approvingCandidateId === candidate.id ? 'Добавляем...' : 'Утвердить' }}
+          </button>
+        </div>
+
+        <div class="mt-4 grid gap-4 border-t border-neutral-800 pt-4 text-sm text-neutral-400 md:grid-cols-3">
+          <div>
+            <p class="text-xs uppercase tracking-wide text-neutral-600">Цены</p>
+            <p class="mt-2 text-neutral-200">{{ priceSignal(candidate) }}</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wide text-neutral-600">Сайт</p>
+            <a
+              v-if="candidate.website_url"
+              :href="candidate.website_url"
+              target="_blank"
+              rel="noreferrer"
+              class="mt-2 inline-flex max-w-full items-center gap-1 truncate text-amber-200 hover:text-amber-100"
+            >
+              <span class="truncate">{{ candidate.website_url }}</span>
+              <Icon :icon="icons.externalLink" class="size-3.5 shrink-0" aria-hidden="true" />
+            </a>
+            <p v-else class="mt-2 text-neutral-500">Сайт не найден</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wide text-neutral-600">Последняя проверка</p>
+            <p class="mt-2 text-neutral-200">{{ formatDateTime(candidate.last_checked_at) }}</p>
+            <p v-if="candidate.missing_since" class="mt-1 text-xs text-amber-200">
+              Не найден с {{ formatDateTime(candidate.missing_since) }}
+            </p>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+</template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import {
   createShopIdentity,
@@ -506,7 +507,7 @@ onMounted(() => {
           <h3 class="text-base font-semibold text-white">Источники</h3>
           <p class="mt-1 text-sm text-neutral-500">Отдельные scrape targets: 2GIS, официальный API и официальный HTML-каталог.</p>
         </div>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:min-w-[920px] xl:grid-cols-5">
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:min-w-[960px] xl:grid-cols-[repeat(5,minmax(0,1fr))_auto]">
           <select
             v-model="selectedSource"
             aria-label="Фильтр магазинов по источнику"
@@ -554,6 +555,13 @@ onMounted(() => {
               {{ identity.display_name }}
             </option>
           </select>
+          <RouterLink
+            to="/shops/candidates"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 text-sm font-semibold text-amber-100 transition hover:border-amber-300 hover:bg-amber-300/15 hover:text-amber-50"
+          >
+            <Icon :icon="icons.databaseImport" class="size-4" aria-hidden="true" />
+            Кандидаты
+          </RouterLink>
         </div>
       </div>
 

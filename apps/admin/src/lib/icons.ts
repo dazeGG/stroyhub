@@ -12,6 +12,8 @@ import chevronRightIcon from '@iconify-icons/tabler/chevron-right'
 import clockIcon from '@iconify-icons/tabler/clock'
 import copyIcon from '@iconify-icons/tabler/copy'
 import currencyRubelIcon from '@iconify-icons/tabler/currency-rubel'
+import databaseImportIcon from '@iconify-icons/tabler/database-import'
+import externalLinkIcon from '@iconify-icons/tabler/external-link'
 import filesIcon from '@iconify-icons/tabler/files'
 import filterIcon from '@iconify-icons/tabler/filter'
 import gitCompareIcon from '@iconify-icons/tabler/git-compare'
@@ -23,6 +25,7 @@ import listCheckIcon from '@iconify-icons/tabler/list-check'
 import packageIcon from '@iconify-icons/tabler/package'
 import pencilIcon from '@iconify-icons/tabler/pencil'
 import plusIcon from '@iconify-icons/tabler/plus'
+import refreshIcon from '@iconify-icons/tabler/refresh'
 import reportAnalyticsIcon from '@iconify-icons/tabler/report-analytics'
 import restoreIcon from '@iconify-icons/tabler/restore'
 import searchIcon from '@iconify-icons/tabler/search'
@@ -47,6 +50,8 @@ export const icons = {
   clock: clockIcon,
   copy: copyIcon,
   currencyRubel: currencyRubelIcon,
+  databaseImport: databaseImportIcon,
+  externalLink: externalLinkIcon,
   files: filesIcon,
   filter: filterIcon,
   gitCompare: gitCompareIcon,
@@ -58,6 +63,7 @@ export const icons = {
   package: packageIcon,
   pencil: pencilIcon,
   plus: plusIcon,
+  refresh: refreshIcon,
   reportAnalytics: reportAnalyticsIcon,
   restore: restoreIcon,
   search: searchIcon,
