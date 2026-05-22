@@ -32,6 +32,39 @@ select:not([multiple]) {
   box-sizing: border-box;
 }
 
+:where(
+  a[href],
+  button,
+  select,
+  summary,
+  [role="button"],
+  [type="button"],
+  [type="checkbox"],
+  [type="file"],
+  [type="radio"],
+  [type="range"],
+  [type="reset"],
+  [type="submit"]
+) {
+  cursor: pointer;
+}
+
+:where(
+  button,
+  select,
+  [role="button"],
+  [type="button"],
+  [type="checkbox"],
+  [type="file"],
+  [type="radio"],
+  [type="range"],
+  [type="reset"],
+  [type="submit"]
+):disabled,
+:where([aria-disabled="true"]) {
+  cursor: not-allowed;
+}
+
 .admin-markdown {
   color: #d4d4d4;
   font-size: 0.95rem;
