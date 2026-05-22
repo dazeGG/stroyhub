@@ -7,10 +7,37 @@ token-aware keyword matching, title token helpers, attribute extraction,
 category quality reporting, category backfill tooling, taxonomy maintenance
 docs, and follow-up rules from the 2GIS audit.
 
-After the M9 rule updates, local backfill dry-run coverage for the 2026-05-17
-2GIS sample is expected to improve from `614 / 649` categorized (`94.61%`) to
-`636 / 649` categorized (`98.00%`), with `13` products intentionally or still
-unmatched.
+After the M14 readiness review, local backfill coverage for the 2026-05-17 2GIS
+sample improves from `614 / 649` categorized (`94.61%`) to `642 / 649`
+categorized (`98.92%`), with `7` products intentionally or still unmatched.
+
+## 2026-05-22 M14 Readiness Review
+
+Official source smoke results:
+
+- `unicom`: source type `official_api`, linked to the Юником identity,
+  `preferred_source=unicom`, latest scrape `success`, `57` products seen/saved,
+  `57` price snapshots saved, category coverage `57 / 57` (`100.00%`), error
+  count `0`.
+- `metalltorg`: source type `official_html`, linked to the Металл Торг identity,
+  `preferred_source=metalltorg`, latest scrape `success`, `1` product seen/saved
+  for the configured conservative brick-page scope, `1` price snapshot saved,
+  category coverage `1 / 1` (`100.00%`), error count `0`.
+
+Fallback 2GIS review outcome after applying current backfill:
+
+- SIP panels are categorized as `sip_panels`.
+- Межвенцовый утеплитель examples are categorized as
+  `natural_fiber_insulation`.
+- Observed generic `Материалы` and `Специального назначения` examples now
+  classify by title when they contain strong product signals.
+- Additional M14 mineral wool keywords cover observed `ТехноТерм` and `ТИСМА`
+  insulation titles.
+- Remaining uncategorized 2GIS rows are acceptable or explicitly deferred:
+  `Мебель` bathroom vanities (`3`), `Работа` job cards (`2`), food crate (`1`),
+  and `Штакетник` (`1`).
+- Fence/shtaketnik taxonomy handling is tracked separately in
+  [#219](https://github.com/dazeGG/stroyhub/issues/219).
 
 ## 2026-05-17 2GIS Baseline Audit
 

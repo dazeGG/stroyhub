@@ -96,6 +96,21 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _get_or_create_metalltorg_identity(session) -> ShopIdentity:  # type: ignore[no-untyped-def]
     identity = session.scalar(
+        select(ShopIdentity)
+        .where(ShopIdentity.display_name == METALLTORG_DEFAULT_SHOP_NAME)
+        .order_by(ShopIdentity.id.asc())
+        .limit(1)
+    )
+    if identity is not None:
+        identity.preferred_source = METALLTORG_SOURCE
+        identity.website_url = identity.website_url or METALLTORG_DEFAULT_SHOP_URL
+        locked_fields = dict(identity.locked_fields or {})
+        locked_fields.update({"display_name": True, "website_url": True})
+        identity.locked_fields = locked_fields
+        session.flush()
+        return identity
+
+    identity = session.scalar(
         select(ShopIdentity).where(ShopIdentity.preferred_source == METALLTORG_SOURCE).limit(1)
     )
     if identity is not None:

@@ -48,6 +48,7 @@ def test_seed_unicom_source_preserves_existing_scrape_metadata(
 ) -> None:
     monkeypatch.setattr(seed_unicom_source, "UNICOM_SOURCE", "unicom_seed_test")
     monkeypatch.setattr(seed_unicom_source, "UNICOM_DEFAULT_SHOP_SOURCE_ID", "uc-seed-test")
+    monkeypatch.setattr(seed_unicom_source, "UNICOM_DEFAULT_SHOP_NAME", "Юником Seed Test")
 
     scraped_at = datetime(2026, 5, 17, 1, 0, tzinfo=UTC)
     next_scrape_at = datetime(2026, 5, 18, 0, 0, tzinfo=UTC)
@@ -64,6 +65,12 @@ def test_seed_unicom_source_preserves_existing_scrape_metadata(
             raw={"last_scrape_error": "timeout"},
         )
     )
+    existing_identity = ShopIdentity(
+        display_name="Юником Seed Test",
+        preferred_source="2gis",
+        website_url="https://old.example.test/",
+    )
+    db_session.add(existing_identity)
     db_session.commit()
 
     try:
@@ -93,8 +100,10 @@ def test_seed_unicom_source_preserves_existing_scrape_metadata(
         assert result == 0
         assert seeded is not None
         assert identity is not None
+        assert identity.id == existing_identity.id
         assert seeded.shop_identity_id == identity.id
-        assert seeded.name == "Юником"
+        assert identity.website_url == "https://old.example.test/"
+        assert seeded.name == "Юником Seed Test"
         assert seeded.source_type == "official_api"
         assert seeded.last_scraped_at == scraped_at
         assert seeded.next_scrape_at == next_scrape_at

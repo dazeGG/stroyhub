@@ -56,17 +56,46 @@ const emptyLeafCount = computed(() => {
   return directoryRows.value.filter((row) => !row.isRoot && row.productCount === 0).length
 })
 
-const filteredRows = computed(() => {
+const filteredCategoryGroups = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
 
   if (!query) {
-    return directoryRows.value
+    return categories.value
   }
 
-  return directoryRows.value.filter((row) => {
-    return [row.name, row.slug, row.parentName].some((value) => value.toLowerCase().includes(query))
-  })
+  return categories.value
+    .map((category) => {
+      const rootMatches = [category.name, category.slug].some((value) => value.toLowerCase().includes(query))
+      const children = category.children.filter((child) => {
+        return [child.name, child.slug, category.name].some((value) => value.toLowerCase().includes(query))
+      })
+
+      return {
+        ...category,
+        children: rootMatches ? category.children : children,
+      }
+    })
+    .filter((category) => {
+      return [category.name, category.slug].some((value) => value.toLowerCase().includes(query)) || category.children.length > 0
+    })
 })
+
+function groupProductCount(category: CategoryTreeItem): number {
+  return category.children.reduce((total, child) => total + child.product_count, category.product_count)
+}
+
+function visibleChildCount(category: CategoryTreeItem): number {
+  return category.children.length
+}
+
+function childSummary(category: CategoryTreeItem): string {
+  const count = visibleChildCount(category)
+  if (count === 0) {
+    return 'Нет дочерних категорий'
+  }
+
+  return `${count} дочерних категорий`
+}
 
 async function loadCategories(): Promise<void> {
   isLoading.value = true
@@ -165,59 +194,66 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
+    <div class="rounded-lg border border-neutral-800 bg-neutral-900/40">
       <div
-        class="grid min-w-[860px] grid-cols-[minmax(280px,2fr)_minmax(180px,1fr)_170px_120px_120px] border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
+        class="grid gap-3 border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 md:grid-cols-[minmax(280px,1fr)_160px_160px_160px]"
       >
-        <span>Категория</span>
-        <span>Родитель</span>
+        <span>Раздел и категории</span>
         <span>Slug</span>
         <span>Товары</span>
-        <span>Дети</span>
+        <span>Дочерние</span>
       </div>
 
-      <div v-if="isLoading" class="min-w-[860px] px-4 py-14 text-center text-sm text-neutral-500">
+      <div v-if="isLoading" class="px-4 py-14 text-center text-sm text-neutral-500">
         <Icon :icon="icons.category" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         Загружаем категории...
       </div>
 
       <div
-        v-else-if="filteredRows.length === 0"
-        class="min-w-[860px] px-4 py-14 text-center text-sm text-neutral-500"
+        v-else-if="filteredCategoryGroups.length === 0"
+        class="px-4 py-14 text-center text-sm text-neutral-500"
       >
         <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         Категорий по этому поиску нет.
       </div>
 
-      <div v-else class="min-w-[860px] divide-y divide-neutral-800">
-        <div
-          v-for="row in filteredRows"
-          :key="row.id"
-          class="grid grid-cols-[minmax(280px,2fr)_minmax(180px,1fr)_170px_120px_120px] px-4 py-4 text-sm"
+      <div v-else class="divide-y divide-neutral-800">
+        <section
+          v-for="category in filteredCategoryGroups"
+          :key="category.id"
+          class="bg-neutral-950/20"
           data-testid="category-directory-row"
         >
-          <div class="min-w-0 pr-5">
-            <p
-              class="truncate font-medium"
-              :class="row.isRoot ? 'text-white' : 'text-neutral-200'"
-              :title="row.name"
+          <div class="grid gap-3 px-4 py-4 text-sm md:grid-cols-[minmax(280px,1fr)_160px_160px_160px]">
+            <div class="min-w-0">
+              <p class="truncate text-base font-semibold text-white" :title="category.name">{{ category.name }}</p>
+              <p class="mt-1 text-xs text-neutral-500">Родительский раздел</p>
+            </div>
+            <p class="min-w-0 truncate font-mono text-xs text-neutral-400" :title="category.slug">{{ category.slug }}</p>
+            <p class="text-neutral-200">{{ groupProductCount(category) }}</p>
+            <p class="text-neutral-400">{{ childSummary(category) }}</p>
+          </div>
+
+          <div v-if="category.children.length > 0" class="pb-3">
+            <div
+              v-for="child in category.children"
+              :key="child.id"
+              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(280px,1fr)_160px_160px_160px]"
+              data-testid="category-directory-row"
             >
-              <span v-if="!row.isRoot" class="mr-2 text-neutral-600">↳</span>
-              {{ row.name }}
-            </p>
-            <p class="mt-1 text-xs text-neutral-500">
-              {{ row.isRoot ? 'Раздел каталога' : 'Категория товаров' }}
-            </p>
+              <div class="min-w-0 md:pl-6">
+                <p class="truncate font-medium text-neutral-200" :title="child.name">
+                  <span class="mr-2 text-neutral-600">↳</span>
+                  {{ child.name }}
+                </p>
+                <p class="mt-1 text-xs text-neutral-500">Дочерняя категория</p>
+              </div>
+              <p class="min-w-0 truncate font-mono text-xs text-neutral-400" :title="child.slug">{{ child.slug }}</p>
+              <p class="text-neutral-200">{{ child.product_count }}</p>
+              <p class="text-neutral-500">0</p>
+            </div>
           </div>
-          <div class="min-w-0 pr-5">
-            <p class="truncate text-neutral-300" :title="row.parentName">{{ row.parentName }}</p>
-          </div>
-          <div class="min-w-0 pr-5">
-            <p class="truncate font-mono text-xs text-neutral-400" :title="row.slug">{{ row.slug }}</p>
-          </div>
-          <div class="pr-5 text-neutral-200">{{ row.productCount }}</div>
-          <div class="text-neutral-400">{{ row.childCount }}</div>
-        </div>
+        </section>
       </div>
     </div>
   </section>

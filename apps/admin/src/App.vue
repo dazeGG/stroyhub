@@ -6,10 +6,10 @@ import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { icons } from './lib/icons'
 
 const navItems = [
-  { label: 'Каталог', to: '/', icon: icons.package },
   { label: 'Магазины', to: '/shops', icon: icons.buildingStore },
-  { label: 'Скрейпы', to: '/scrapes', icon: icons.activity },
   { label: 'Категории', to: '/categories', icon: icons.category },
+  { label: 'Товары', to: '/', icon: icons.package },
+  { label: 'Скрейпы', to: '/scrapes', icon: icons.activity },
   { label: 'Матчинг', to: '/matches', icon: icons.gitCompare },
 ]
 
@@ -24,9 +24,9 @@ const isFullPage = computed(() => route.meta.fullPage === true)
 
       <template v-else>
         <aside class="fixed inset-y-0 left-0 hidden w-64 border-r border-neutral-800 bg-neutral-950/95 px-5 py-6 lg:block">
-          <RouterLink to="/" class="block">
+          <RouterLink to="/" class="flex items-baseline gap-3">
             <p class="text-xs font-semibold uppercase tracking-wide text-amber-300">StroyHub</p>
-            <h1 class="mt-2 text-xl font-semibold text-white">Админка</h1>
+            <h1 class="text-sm font-medium text-neutral-400">Админка</h1>
           </RouterLink>
 
           <nav class="mt-10 flex flex-col gap-1">

@@ -251,6 +251,16 @@ def test_rule_based_categorizer_covers_insulation_audit_examples() -> None:
             "mineral_wool",
         ),
         (
+            "Утеплитель ТехноТерм TR 040 Aquastatik 7,214*1,22*0,05 2 шт S-17.602м2",
+            "Утеплители",
+            "mineral_wool",
+        ),
+        (
+            "КНАУФ ТИСМА Aquastatic (рулон)(1,2 х16.6м) 19,9 кв.м/0,996 куб.м",
+            "Утеплители",
+            "mineral_wool",
+        ),
+        (
             "Межвенцовый утеплитель ЭКОСТЕН Sintex ПЭ 100мм*20м",
             "Утеплитель межвенцовый",
             "natural_fiber_insulation",

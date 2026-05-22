@@ -206,7 +206,7 @@ onMounted(() => {
       <div>
         <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
           <Icon :icon="icons.package" class="size-4" aria-hidden="true" />
-          Каталог товаров
+          Товары
         </p>
         <h2 class="mt-2 text-2xl font-semibold text-white">Инспекция исходных карточек</h2>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
