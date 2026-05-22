@@ -72,35 +72,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         else CategoryLabelStore.from_path(args.labels_path)
     )
 
-    result = None
-    try:
-        with SessionLocal() as session:
-            queue = CategoryLabelQueue(
-                session,
-                label_store,
-                source=args.source,
-                shuffle=args.shuffle,
-                category_raw=args.category_raw,
-            )
-            result = run_label_session(
-                queue,
-                label_store,
-                limit=args.limit,
-                labeled_by=args.labeled_by,
-            )
-            session.commit()
-    except KeyboardInterrupt:
-        pass
-
-    if result is not None:
-        print(
-            "labeling summary: "
-            f"saved={result.saved} "
-            f"skipped={result.skipped} "
-            f"not_product={result.not_product} "
-            f"exhausted={result.exhausted} "
-            f"labels_path={label_store.path}"
+    with SessionLocal() as session:
+        queue = CategoryLabelQueue(
+            session,
+            label_store,
+            source=args.source,
+            shuffle=args.shuffle,
+            category_raw=args.category_raw,
         )
+        result = run_label_session(
+            queue,
+            label_store,
+            limit=args.limit,
+            labeled_by=args.labeled_by,
+        )
+        session.commit()
+
+    print(
+        "labeling summary: "
+        f"saved={result.saved} "
+        f"skipped={result.skipped} "
+        f"not_product={result.not_product} "
+        f"exhausted={result.exhausted} "
+        f"labels_path={label_store.path}"
+    )
     return 0
 
 
@@ -137,7 +132,16 @@ def run_label_session(
             labeled=labeled_total + saved, remaining=remaining,
             saved=saved, skipped=skipped,
         )
-        action = _read_action(item, input_fn=input_fn, output=output)
+        try:
+            action = _read_action(item, input_fn=input_fn, output=output)
+        except KeyboardInterrupt:
+            output.write("\n")
+            return LabelSessionResult(
+                saved=saved,
+                skipped=skipped,
+                not_product=not_product_count,
+                exhausted=False,
+            )
         if action.kind == "skip":
             excluded_product_ids.add(item.product.id)
             skipped += 1
@@ -201,7 +205,7 @@ def _read_action(
     output: Writer,
 ) -> LabelAction:
     candidate_ids = tuple(candidate.id for candidate in item.candidates)
-    prompt = "Choose numbers, n=none, s=skip, x=not_product, Ctrl+C=quit: "
+    prompt = "Choose numbers, n=none, s=skip, x=not_product: "
     while True:
         try:
             answer = input_fn(prompt)
