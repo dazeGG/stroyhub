@@ -11,6 +11,7 @@ from stroyhub.db import ShopRepository, ShopUpsert
 from stroyhub.models import ScrapeRun, Shop
 
 import apps.worker.tasks as worker_tasks
+import scripts.scrape_shop_sources as scrape_shop_sources
 
 
 @pytest.fixture
@@ -87,6 +88,206 @@ def test_scrape_due_shops_schedules_supported_sources(
 
         assert result["scheduled"] == 3
         assert scheduled_shop_ids == [twogis_shop.id, unicom_shop.id, metalltorg_shop.id]
+    finally:
+        _delete_worker_test_shops(db_session)
+
+
+def test_scrape_due_shops_passes_source_type_filter(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    now = datetime.now(UTC)
+    repository = ShopRepository(db_session)
+    unicom_shop = repository.upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="worker-due-source-type-unicom",
+            source_type="official_api",
+            name="Unicom Source Type Due",
+            next_scrape_at=now - timedelta(minutes=1),
+        )
+    )
+    db_session.commit()
+    scheduled_shop_ids: list[int] = []
+    observed_kwargs: dict[str, object] = {}
+
+    def fake_list_due_shops(*args: object, **kwargs: object) -> list[Shop]:
+        observed_kwargs.update(kwargs)
+        return [unicom_shop]
+
+    monkeypatch.setattr(worker_tasks.scrape_shop, "delay", scheduled_shop_ids.append)
+    monkeypatch.setattr(worker_tasks, "list_due_shops", fake_list_due_shops)
+
+    try:
+        result = worker_tasks.scrape_due_shops.run(source_type="official_api", limit=5)
+
+        assert result["scheduled"] == 1
+        assert result["source_type"] == "official_api"
+        assert observed_kwargs["source_type"] == "official_api"
+        assert observed_kwargs["limit"] == 5
+        assert scheduled_shop_ids == [unicom_shop.id]
+    finally:
+        _delete_worker_test_shops(db_session)
+
+
+def test_scrape_due_shops_rejects_manual_source_type() -> None:
+    with pytest.raises(ValueError, match="unsupported source_type"):
+        worker_tasks.scrape_due_shops.run(source_type="manual")
+
+
+def test_scrape_shop_skips_disabled_source_without_live_network(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="worker-disabled-2gis",
+            source_type="2gis",
+            name="Disabled 2GIS",
+            scrape_status="disabled",
+        )
+    )
+    db_session.commit()
+
+    def fail_if_called(*args: object, **kwargs: object) -> None:
+        raise AssertionError("disabled source should not be scraped")
+
+    monkeypatch.setattr(worker_tasks, "scrape_twogis_branch", fail_if_called)
+
+    try:
+        result = worker_tasks.scrape_shop.run(shop.id)
+
+        assert result == {
+            "shop_id": shop.id,
+            "source": "2gis",
+            "source_type": "2gis",
+            "status": "skipped",
+            "reason": "source_disabled",
+        }
+    finally:
+        _delete_worker_test_shops(db_session)
+
+
+def test_scrape_source_controls_cli_enqueues_due_source_type(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    db_session: Session,
+) -> None:
+    now = datetime.now(UTC)
+    repository = ShopRepository(db_session)
+    unicom_shop = repository.upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="worker-cli-due-unicom",
+            source_type="official_api",
+            name="CLI Unicom Due",
+            next_scrape_at=now - timedelta(minutes=1),
+        )
+    )
+    repository.upsert(
+        ShopUpsert(
+            source="metalltorg",
+            source_id="worker-cli-due-metalltorg",
+            source_type="official_html",
+            name="CLI Metalltorg Due",
+            next_scrape_at=now - timedelta(minutes=1),
+        )
+    )
+    db_session.commit()
+    scheduled_shop_ids: list[int] = []
+    monkeypatch.setattr(
+        scrape_shop_sources.worker_tasks.scrape_shop,
+        "delay",
+        scheduled_shop_ids.append,
+    )
+
+    try:
+        exit_code = scrape_shop_sources.main(["due", "--source-type", "official_api"])
+
+        output = capsys.readouterr().out
+        assert exit_code == 0
+        assert scheduled_shop_ids == [unicom_shop.id]
+        assert "source_type=official_api" in output
+        assert "shops_scheduled=1" in output
+        assert "CLI Unicom Due" in output
+        assert "CLI Metalltorg Due" not in output
+    finally:
+        _delete_worker_test_shops(db_session)
+
+
+def test_scrape_source_controls_cli_skips_disabled_shop(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="worker-cli-disabled-2gis",
+            source_type="2gis",
+            name="CLI Disabled 2GIS",
+            scrape_status="disabled",
+        )
+    )
+    db_session.commit()
+    scheduled_shop_ids: list[int] = []
+    monkeypatch.setattr(
+        scrape_shop_sources.worker_tasks.scrape_shop,
+        "delay",
+        scheduled_shop_ids.append,
+    )
+
+    try:
+        exit_code = scrape_shop_sources.main(["shop", "--shop-id", str(shop.id)])
+
+        output = capsys.readouterr().out
+        assert exit_code == 0
+        assert scheduled_shop_ids == []
+        assert "status=skipped" in output
+        assert "reason=source_disabled" in output
+    finally:
+        _delete_worker_test_shops(db_session)
+
+
+def test_scrape_source_controls_cli_reports_partial_sync_result(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="worker-cli-partial-unicom",
+            source_type="official_api",
+            name="CLI Partial Unicom",
+            raw={"category_uuids": ["category-a"]},
+        )
+    )
+    db_session.commit()
+
+    def fake_scrape_shop(shop_id: int) -> dict[str, object]:
+        return {
+            "shop_id": shop_id,
+            "source": "unicom",
+            "source_type": "official_api",
+            "status": "partial",
+            "products_seen": 100,
+            "products_saved": 90,
+            "price_snapshots_saved": 90,
+        }
+
+    monkeypatch.setattr(scrape_shop_sources.worker_tasks.scrape_shop, "run", fake_scrape_shop)
+
+    try:
+        exit_code = scrape_shop_sources.main(["shop", "--shop-id", str(shop.id), "--sync"])
+
+        output = capsys.readouterr().out
+        assert exit_code == 1
+        assert "mode=sync" in output
+        assert "status=partial" in output
+        assert "products_seen=100" in output
+        assert "price_snapshots_saved=90" in output
     finally:
         _delete_worker_test_shops(db_session)
 
@@ -257,6 +458,12 @@ def _delete_worker_test_shops(session: Session) -> None:
                         "worker-due-unicom",
                         "worker-due-metalltorg",
                         "worker-due-unsupported",
+                        "worker-due-source-type-unicom",
+                        "worker-disabled-2gis",
+                        "worker-cli-due-unicom",
+                        "worker-cli-due-metalltorg",
+                        "worker-cli-disabled-2gis",
+                        "worker-cli-partial-unicom",
                         "worker-unicom-shop",
                         "worker-unicom-failure",
                         "worker-metalltorg-shop",

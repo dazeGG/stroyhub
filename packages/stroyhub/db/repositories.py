@@ -204,6 +204,7 @@ class ShopRepository:
         *,
         now: datetime,
         source: str | None = None,
+        source_type: str | None = None,
         limit: int | None = None,
     ) -> list[Shop]:
         statement = select(Shop).where(
@@ -212,6 +213,8 @@ class ShopRepository:
         )
         if source is not None:
             statement = statement.where(Shop.source == source)
+        if source_type is not None:
+            statement = statement.where(Shop.source_type == source_type)
         statement = statement.order_by(Shop.next_scrape_at.asc().nullsfirst(), Shop.id.asc())
         if limit is not None:
             statement = statement.limit(limit)
