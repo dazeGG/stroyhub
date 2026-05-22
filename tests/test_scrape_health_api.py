@@ -163,5 +163,55 @@ def test_scrape_health_endpoint_handles_empty_results(client: TestClient) -> Non
     assert response.json() == {"status_counts": [], "recent_runs": []}
 
 
+def test_run_shop_scrape_endpoint_runs_one_shop(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="manual-scrape-shop", name="Manual Scrape")
+    )
+    observed_shop_ids: list[int] = []
+
+    def fake_run_shop_scrape(session: Session, shop_id: int) -> dict[str, object]:
+        observed_shop_ids.append(shop_id)
+        return {
+            "shop_id": shop_id,
+            "source": "2gis",
+            "source_type": "2gis",
+            "status": "success",
+            "duration_seconds": 0.1,
+            "products_seen": 3,
+            "products_saved": 3,
+            "price_snapshots_saved": 3,
+        }
+
+    monkeypatch.setattr("apps.api.scrapes.run_shop_scrape", fake_run_shop_scrape)
+
+    response = client.post(f"/scrapes/shops/{shop.id}/run")
+
+    assert response.status_code == 200
+    assert observed_shop_ids == [shop.id]
+    assert response.json() == {
+        "shop_id": shop.id,
+        "source": "2gis",
+        "source_type": "2gis",
+        "status": "success",
+        "duration_seconds": 0.1,
+        "products_seen": 3,
+        "products_saved": 3,
+        "price_snapshots_saved": 3,
+        "reason": None,
+        "error": None,
+    }
+
+
+def test_run_shop_scrape_endpoint_returns_404_for_missing_shop(client: TestClient) -> None:
+    response = client.post("/scrapes/shops/999999/run")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "shop not found"}
+
+
 def payload_ids(response: object) -> list[int]:
     return [item["id"] for item in response.json()["recent_runs"]]

@@ -232,6 +232,19 @@ export interface ScrapeHealthResponse {
   recent_runs: RecentScrapeRun[]
 }
 
+export interface ShopScrapeRunResponse {
+  shop_id: number
+  source: string | null
+  source_type: SourceType | null
+  status: string
+  duration_seconds: number | null
+  products_seen: number | null
+  products_saved: number | null
+  price_snapshots_saved: number | null
+  reason: string | null
+  error: string | null
+}
+
 export interface ScrapeHealthParams {
   source?: string
   shopId?: number
@@ -583,6 +596,17 @@ export function fetchScrapeHealth(
   const query = params.toString()
 
   return fetchJson<ScrapeHealthResponse>(query ? `/scrapes/health?${query}` : '/scrapes/health', signal)
+}
+
+export function runShopScrape(
+  shopId: number,
+  signal?: AbortSignal,
+): Promise<ShopScrapeRunResponse> {
+  return writeJson<ShopScrapeRunResponse>(
+    `/scrapes/shops/${shopId}/run`,
+    { method: 'POST' },
+    signal,
+  )
 }
 
 export function fetchCategoryQuality(

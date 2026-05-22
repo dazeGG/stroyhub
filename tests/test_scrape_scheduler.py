@@ -43,9 +43,10 @@ def db_session() -> Iterator[Session]:
 def test_shop_repository_lists_due_shops_without_disabled_shops(db_session: Session) -> None:
     now = datetime(2026, 5, 17, 15, 0, tzinfo=UTC)
     repository = ShopRepository(db_session)
+    source = "scheduler-test"
     due = repository.upsert(
         ShopUpsert(
-            source="2gis",
+            source=source,
             source_id="due-shop",
             name="Due Shop",
             next_scrape_at=now - timedelta(minutes=1),
@@ -53,7 +54,7 @@ def test_shop_repository_lists_due_shops_without_disabled_shops(db_session: Sess
     )
     repository.upsert(
         ShopUpsert(
-            source="2gis",
+            source=source,
             source_id="future-shop",
             name="Future Shop",
             next_scrape_at=now + timedelta(minutes=1),
@@ -61,7 +62,7 @@ def test_shop_repository_lists_due_shops_without_disabled_shops(db_session: Sess
     )
     repository.upsert(
         ShopUpsert(
-            source="2gis",
+            source=source,
             source_id="disabled-shop",
             name="Disabled Shop",
             next_scrape_at=now - timedelta(minutes=1),
@@ -69,7 +70,7 @@ def test_shop_repository_lists_due_shops_without_disabled_shops(db_session: Sess
         )
     )
 
-    due_shops = list_due_shops(db_session, now=now, source="2gis")
+    due_shops = list_due_shops(db_session, now=now, source=source)
 
     assert [shop.id for shop in due_shops] == [due.id]
 
