@@ -1,13 +1,11 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from stroyhub.db import get_session
-from stroyhub.models import Shop
 from stroyhub.scraping.health import ScrapeHealthCatalog, ScrapeHealthFilters
-from stroyhub.scraping.runner import run_shop_scrape
 
 router = APIRouter(prefix="/scrapes", tags=["scrapes"])
 
@@ -38,19 +36,6 @@ class ScrapeHealthResponse(BaseModel):
     recent_runs: list[RecentScrapeRunResponse]
 
 
-class ShopScrapeRunResponse(BaseModel):
-    shop_id: int
-    source: str | None = None
-    source_type: str | None = None
-    status: str
-    duration_seconds: float | None = None
-    products_seen: int | None = None
-    products_saved: int | None = None
-    price_snapshots_saved: int | None = None
-    reason: str | None = None
-    error: str | None = None
-
-
 @router.get("/health", response_model=ScrapeHealthResponse)
 def get_scrape_health(
     session: Annotated[Session, Depends(get_session)],
@@ -74,15 +59,3 @@ def get_scrape_health(
             RecentScrapeRunResponse.model_validate(item) for item in health.recent_runs
         ],
     )
-
-
-@router.post("/shops/{shop_id}/run", response_model=ShopScrapeRunResponse)
-def run_shop_scrape_now(
-    shop_id: int,
-    session: Annotated[Session, Depends(get_session)],
-) -> ShopScrapeRunResponse:
-    if session.get(Shop, shop_id) is None:
-        raise HTTPException(status_code=404, detail="shop not found")
-
-    result = run_shop_scrape(session, shop_id)
-    return ShopScrapeRunResponse(**result)

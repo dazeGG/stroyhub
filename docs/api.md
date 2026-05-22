@@ -366,7 +366,8 @@ Example response:
         "status": "active",
         "source_count": 1,
         "reason": "name_match"
-      }
+      },
+      "scrape_result": null
     }
   ]
 }
@@ -392,7 +393,8 @@ latest refresh are marked `stale` instead of being deleted. Already approved
 
 Approves a candidate into tracked data. The endpoint creates a `shops` row for
 the 2GIS source, resolves the website URL only when the candidate had a website
-signal, marks the candidate `approved`, and returns the updated candidate.
+signal, marks the candidate `approved`, immediately runs the source scrape, and
+returns the updated candidate with `scrape_result`.
 
 Optional JSON body:
 
@@ -406,6 +408,23 @@ When `shop_identity_id` is provided, the created 2GIS source shop is linked to
 that existing `shop_identity`, so the admin can display it as another
 address/branch of the same real shop while preserving source-specific scrape
 data. When omitted or `null`, the source shop stays unlinked.
+
+The scrape result is included only in the approve response:
+
+```json
+{
+  "scrape_result": {
+    "shop_id": 217,
+    "source": "2gis",
+    "source_type": "2gis",
+    "status": "success",
+    "duration_seconds": 1.42,
+    "products_seen": 64,
+    "products_saved": 64,
+    "price_snapshots_saved": 64
+  }
+}
+```
 
 ## Scrapes
 
@@ -442,29 +461,6 @@ Example response:
       "error": null
     }
   ]
-}
-```
-
-### `POST /scrapes/shops/{shop_id}/run`
-
-Runs one tracked shop/source scrape immediately from the API process. This is
-intended for explicit admin actions, for example after approving a new 2GIS
-candidate. It does not require Celery beat or a worker process to be running.
-
-Example response:
-
-```json
-{
-  "shop_id": 217,
-  "source": "2gis",
-  "source_type": "2gis",
-  "status": "success",
-  "duration_seconds": 1.42,
-  "products_seen": 64,
-  "products_saved": 64,
-  "price_snapshots_saved": 64,
-  "reason": null,
-  "error": null
 }
 ```
 

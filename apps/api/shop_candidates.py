@@ -11,6 +11,7 @@ from stroyhub.catalog.shop_candidates import (
 )
 from stroyhub.db import get_session
 from stroyhub.models import ShopSourceCandidate
+from stroyhub.scraping.runner import run_shop_scrape
 
 router = APIRouter(prefix="/shop-source-candidates", tags=["shop-source-candidates"])
 
@@ -40,6 +41,7 @@ class ShopSourceCandidateResponse(BaseModel):
     approved_shop_id: int | None
     official_strategy: dict[str, object] | None = None
     suggested_identity: dict[str, object] | None = None
+    scrape_result: dict[str, object] | None = None
 
 
 class ShopSourceCandidateApproveRequest(BaseModel):
@@ -106,9 +108,20 @@ def approve_shop_source_candidate(
         raise _http_error(exc) from exc
 
     approved_candidate_id = candidate.id
+    approved_shop_id = candidate.approved_shop_id
     session.commit()
+    scrape_result: dict[str, object] | None = None
+    if approved_shop_id is not None:
+        try:
+            scrape_result = run_shop_scrape(session, approved_shop_id)
+        except Exception as exc:
+            scrape_result = {
+                "shop_id": approved_shop_id,
+                "status": "failed",
+                "error": str(exc),
+            }
     session.expire_all()
-    return _candidate_response(approved_candidate_id, session)
+    return _candidate_response(approved_candidate_id, session, scrape_result=scrape_result)
 
 
 def _refresh_response(
@@ -129,21 +142,24 @@ def _refresh_response(
 def _candidate_response(
     candidate_id: int,
     session: Session,
+    scrape_result: dict[str, object] | None = None,
 ) -> ShopSourceCandidateResponse:
     catalog = ShopCandidateCatalog(session)
     for item in catalog.list_candidates(
         CandidateListFilters(include_approved=True)
     ):
         if item.id == candidate_id:
-            return _candidate_response_model(item, catalog)
+            return _candidate_response_model(item, catalog, scrape_result=scrape_result)
     raise HTTPException(status_code=404, detail="shop source candidate not found")
 
 
 def _candidate_response_model(
     candidate: ShopSourceCandidate,
     catalog: ShopCandidateCatalog,
+    scrape_result: dict[str, object] | None = None,
 ) -> ShopSourceCandidateResponse:
     response = ShopSourceCandidateResponse.model_validate(candidate)
+    response.scrape_result = scrape_result
     if isinstance(candidate.raw, dict):
         strategy = candidate.raw.get("official_strategy")
         if isinstance(strategy, dict):
