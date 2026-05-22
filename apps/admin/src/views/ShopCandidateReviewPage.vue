@@ -133,14 +133,19 @@ async function refreshCandidates(): Promise<void> {
   }
 }
 
-async function approveCandidate(candidate: ShopSourceCandidate): Promise<void> {
+async function approveCandidate(
+  candidate: ShopSourceCandidate,
+  shopIdentityId?: number,
+): Promise<void> {
   approvingCandidateId.value = candidate.id
   errorMessage.value = ''
   saveMessage.value = ''
 
   try {
-    await approveShopSourceCandidate(candidate.id)
-    saveMessage.value = `${candidate.display_name} добавлен в магазины`
+    await approveShopSourceCandidate(candidate.id, shopIdentityId)
+    saveMessage.value = shopIdentityId && candidate.suggested_identity
+      ? `${candidate.display_name} добавлен как филиал ${candidate.suggested_identity.display_name}`
+      : `${candidate.display_name} добавлен в магазины`
     await loadCandidates()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось утвердить кандидата'
@@ -323,17 +328,47 @@ onMounted(() => {
               Не найден с {{ formatDateTime(candidate.missing_since) }}
             </p>
           </div>
+          <div
+            v-if="candidate.suggested_identity"
+            class="rounded-md border border-amber-400/20 bg-amber-400/5 p-3"
+          >
+            <p class="text-xs uppercase tracking-wide text-amber-200/70">Похожий магазин</p>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <p class="font-medium text-amber-50">{{ candidate.suggested_identity.display_name }}</p>
+              <span class="rounded-full border border-amber-300/30 px-2 py-0.5 text-xs text-amber-100">
+                источников: {{ candidate.suggested_identity.source_count }}
+              </span>
+            </div>
+            <p class="mt-2 text-xs text-neutral-500">
+              Можно добавить этот 2GIS-адрес как филиал существующего магазина.
+            </p>
+          </div>
         </div>
 
-        <div class="mt-4 flex justify-end">
+        <div class="mt-4 flex flex-wrap justify-end gap-2">
+          <button
+            v-if="candidate.suggested_identity"
+            type="button"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-semibold text-neutral-300 transition hover:border-amber-300 hover:text-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
+            @click="approveCandidate(candidate)"
+          >
+            Создать отдельно
+          </button>
           <button
             type="button"
             class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
-            @click="approveCandidate(candidate)"
+            @click="approveCandidate(candidate, candidate.suggested_identity?.id)"
           >
             <Icon :icon="icons.check" class="size-3.5" aria-hidden="true" />
-            {{ approvingCandidateId === candidate.id ? 'Добавляем...' : 'Утвердить' }}
+            {{
+              approvingCandidateId === candidate.id
+                ? 'Добавляем...'
+                : candidate.suggested_identity
+                  ? 'Добавить филиалом'
+                  : 'Утвердить'
+            }}
           </button>
         </div>
       </article>

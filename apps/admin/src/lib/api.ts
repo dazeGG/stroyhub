@@ -174,6 +174,13 @@ export interface ShopSourceCandidate {
     label: string
     status: string
   } | null
+  suggested_identity: {
+    id: number
+    display_name: string
+    status: IdentityStatus
+    source_count: number
+    reason: string
+  } | null
 }
 
 export interface ShopSourceCandidateListResponse {
@@ -544,11 +551,15 @@ export function refreshShopSourceCandidates(
 
 export function approveShopSourceCandidate(
   candidateId: number,
+  shopIdentityId?: number,
   signal?: AbortSignal,
 ): Promise<ShopSourceCandidate> {
   return writeJson<ShopSourceCandidate>(
     `/shop-source-candidates/${candidateId}/approve`,
-    { method: 'POST' },
+    {
+      method: 'POST',
+      body: JSON.stringify({ shop_identity_id: shopIdentityId ?? null }),
+    },
     signal,
   )
 }

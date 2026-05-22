@@ -15,7 +15,7 @@ from stroyhub.catalog.shop_candidates import (
     parse_twogis_search_candidates,
 )
 from stroyhub.core.config import settings
-from stroyhub.db import ShopRepository, ShopUpsert
+from stroyhub.db import ShopIdentityCreate, ShopIdentityRepository, ShopRepository, ShopUpsert
 from stroyhub.models import Shop, ShopSourceCandidate
 
 
@@ -259,6 +259,58 @@ def test_candidate_approval_creates_unlinked_tracked_shop(
     assert shop.url == "https://approve-me.example.test/"
     assert shop.shop_identity_id is None
     assert shop.shop_identity is None
+
+
+def test_candidate_suggests_existing_identity_by_name(db_session: Session) -> None:
+    identity = ShopIdentityRepository(db_session).create(
+        ShopIdentityCreate(display_name="Металл Торг", address="Якутск")
+    )
+    catalog = ShopCandidateCatalog(db_session)
+    catalog.refresh_from_twogis(
+        seeds=[
+            CandidateDiscoverySeed(
+                source_id="metalltorg-branch",
+                display_name="Металлторг",
+                address="Проспект Михаила Николаева, 1",
+                rubrics="Стройматериалы",
+                has_prices_signal=True,
+            )
+        ],
+    )
+
+    candidate = catalog.list_candidates(CandidateListFilters())[0]
+    suggestion = catalog.suggest_identity(candidate)
+
+    assert suggestion is not None
+    assert suggestion.id == identity.id
+    assert suggestion.display_name == "Металл Торг"
+    assert suggestion.reason == "name_match"
+
+
+def test_candidate_approval_can_link_to_existing_identity(db_session: Session) -> None:
+    identity = ShopIdentityRepository(db_session).create(
+        ShopIdentityCreate(display_name="Юником", address="Якутск")
+    )
+    catalog = ShopCandidateCatalog(db_session)
+    catalog.refresh_from_twogis(
+        seeds=[
+            CandidateDiscoverySeed(
+                source_id="unicom-branch",
+                display_name="Юником",
+                address="Вилюйский тракт 3 километр, 1/4",
+                rubrics="Стройматериалы",
+                has_prices_signal=True,
+            )
+        ],
+    )
+    candidate = catalog.list_candidates(CandidateListFilters())[0]
+
+    catalog.approve(candidate.id, shop_identity_id=identity.id)
+    shop = db_session.scalar(select(Shop).where(Shop.source_id == "unicom-branch"))
+
+    assert shop is not None
+    assert shop.shop_identity_id == identity.id
+    assert shop.address == "Вилюйский тракт 3 километр, 1/4"
 
 
 def test_parse_twogis_search_candidates_extracts_real_search_cards() -> None:

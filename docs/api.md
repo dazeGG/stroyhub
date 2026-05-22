@@ -358,7 +358,15 @@ Example response:
       "last_seen_at": "2026-05-23T00:00:00Z",
       "last_checked_at": "2026-05-23T00:00:00Z",
       "missing_since": null,
-      "approved_shop_id": null
+      "approved_shop_id": null,
+      "official_strategy": null,
+      "suggested_identity": {
+        "id": 7,
+        "display_name": "Build Shop",
+        "status": "active",
+        "source_count": 1,
+        "reason": "name_match"
+      }
     }
   ]
 }
@@ -382,11 +390,22 @@ latest refresh are marked `stale` instead of being deleted. Already approved
 
 ### `POST /shop-source-candidates/{candidate_id}/approve`
 
-Approves a candidate into tracked data. The endpoint creates an unlinked `shops`
-row for the 2GIS source, resolves the website URL only when the candidate had a
-website signal, marks the candidate `approved`, and returns the updated
-candidate. A `shop_identity` is created manually later from the admin UI when an
-operator wants to group a real shop.
+Approves a candidate into tracked data. The endpoint creates a `shops` row for
+the 2GIS source, resolves the website URL only when the candidate had a website
+signal, marks the candidate `approved`, and returns the updated candidate.
+
+Optional JSON body:
+
+```json
+{
+  "shop_identity_id": 7
+}
+```
+
+When `shop_identity_id` is provided, the created 2GIS source shop is linked to
+that existing `shop_identity`, so the admin can display it as another
+address/branch of the same real shop while preserving source-specific scrape
+data. When omitted or `null`, the source shop stays unlinked.
 
 ## Scrapes
 

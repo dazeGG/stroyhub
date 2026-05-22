@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from stroyhub.catalog import shop_candidates as candidate_module
 from stroyhub.catalog.shop_candidates import CandidateDiscoverySeed, ShopCandidateCatalog
 from stroyhub.core.config import settings
+from stroyhub.db import ShopIdentityCreate, ShopIdentityRepository
+from stroyhub.models import Shop
 
 from apps.api.main import create_app
 from apps.api.products import get_session
@@ -96,6 +98,7 @@ def test_shop_source_candidate_api_lists_candidates(
             "missing_since": None,
             "approved_shop_id": None,
             "official_strategy": None,
+            "suggested_identity": None,
         }
     ]
 
@@ -181,3 +184,44 @@ def test_shop_source_candidate_api_approves_candidate(
     assert client.get("/shop-source-candidates").json() == {"items": []}
     approved = client.get("/shop-source-candidates", params={"include_approved": True}).json()
     assert approved["items"][0]["source_id"] == "candidate-api-approve"
+
+
+def test_shop_source_candidate_api_suggests_identity_and_approves_branch(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    identity = ShopIdentityRepository(db_session).create(
+        ShopIdentityCreate(display_name="Металл Торг", address="Якутск")
+    )
+    ShopCandidateCatalog(db_session).refresh_from_twogis(
+        seeds=[
+            CandidateDiscoverySeed(
+                source_id="candidate-api-branch",
+                display_name="Металлторг",
+                address="Проспект Михаила Николаева, 1",
+                rubrics="Стройматериалы",
+                has_prices_signal=True,
+            )
+        ],
+    )
+
+    candidate = client.get("/shop-source-candidates").json()["items"][0]
+
+    assert candidate["suggested_identity"] == {
+        "id": identity.id,
+        "display_name": "Металл Торг",
+        "status": "active",
+        "source_count": 0,
+        "reason": "name_match",
+    }
+
+    response = client.post(
+        f"/shop-source-candidates/{candidate['id']}/approve",
+        json={"shop_identity_id": identity.id},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "approved"
+    shop = db_session.get(Shop, response.json()["approved_shop_id"])
+    assert shop is not None
+    assert shop.shop_identity_id == identity.id
