@@ -81,6 +81,24 @@ when selecting candidates.
 files created from the live log before training. A snapshot is not created for
 every individual label.
 
+The category verifier dataset CLI exposes the current workflow:
+
+```bash
+uv run python -m apps.ml.category_verifier_dataset_cli status
+uv run python -m apps.ml.category_verifier_dataset_cli snapshot
+```
+
+`status` compares the live label log with the latest snapshot and reports total
+live labels, total live labeled products, latest snapshot counts, new labels,
+new labeled products, and `ready_for_training`. Readiness is true when at least
+50 newly labeled products exist since the latest snapshot. If no snapshot exists,
+the live labeled product count is used as the new count.
+
+`snapshot` creates the next incrementing dataset version under
+`.var/ml/category_verifier/datasets/`, for example `v001.jsonl` with
+`v001.meta.json`. Metadata records the snapshot version, creation time, source
+label file, schema version, label count, and labeled product count.
+
 Duplicate product/category pair labels are allowed as later corrections in the
 append-only log. Dataset helpers use the latest label for a product/category
 pair by default, while CLI queue helpers can skip pairs that already have any
