@@ -50,14 +50,21 @@ class CategoryLabelQueue:
         self._source = source
         self._categorizer = RuleBasedCategorizer()
 
-    def next_item(self) -> CategoryLabelQueueItem | None:
+    def next_item(
+        self,
+        *,
+        excluded_product_ids: set[int] | None = None,
+    ) -> CategoryLabelQueueItem | None:
         categories = self._leaf_categories()
         if len(categories) < self._candidate_count:
             return None
 
+        excluded_product_ids = excluded_product_ids or set()
         labeled_pairs = self._label_store.labeled_pairs()
         products = self._products()
         for product in products:
+            if product.id in excluded_product_ids:
+                continue
             candidates = self._candidates_for_product(product, categories, labeled_pairs)
             if len(candidates) == self._candidate_count:
                 return CategoryLabelQueueItem(
