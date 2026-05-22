@@ -24,6 +24,8 @@ Use the source slug that appears in parser code and persisted records:
 - `tests/fixtures/unicom/`
 - `tests/fixtures/metalltorg/`
 - `tests/fixtures/sibnord/` for the accepted SibNord parser follow-up.
+- `tests/fixtures/vostoktechtorg/` for the accepted Vostoktechtorg parser
+  follow-up.
 - `tests/fixtures/twogis/` if future 2GIS tests need captured samples.
 
 Filename pattern:
@@ -125,3 +127,14 @@ These are focused HTML fragments, not full page dumps. They preserve the Bitrix
 product-card/detail selectors, embedded `JCCatalogItem`/`JCCatalogElement`
 objects, prices, availability text, image paths, product ids, and category
 breadcrumbs needed for parser characterization.
+
+Vostoktechtorg research fixtures were captured on 2026-05-22 for the accepted
+parser follow-up:
+
+- `tests/fixtures/vostoktechtorg/category-stroitelnye-materialy-page1.html`;
+- `tests/fixtures/vostoktechtorg/product-223784.html`.
+
+These are focused HTML fragments from the Bitrix/Aspro catalog. They preserve
+product card selectors, section links, pagination metadata, schema.org offer
+metadata, stock quantities, article codes, image paths, and the
+`setViewedProduct` detail-page object.
