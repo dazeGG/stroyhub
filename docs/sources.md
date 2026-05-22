@@ -487,6 +487,15 @@ Notes:
 - No authentication requirement was observed during research.
 - No rate limit response was observed during focused sample checks, but request
   pacing should still be conservative.
+- Scheduled M13 collection uses the official API as `source=unicom` with
+  `source_type=official_api`, seeded by `scripts/seed_unicom_source.py`.
+- The seeded collection config stores explicit leaf category UUIDs in
+  `shops.raw.category_uuids`; it does not yet auto-walk the full catalog menu.
+- Worker collection processes configured categories sequentially, with no
+  concurrent requests. Default request options are `limit=50`, `sort=popular`,
+  and `max_pages=100`.
+- A category that reaches `max_pages` records a `partial` scrape run; a source
+  exception records a failed Unicom scrape run and marks the shop failed.
 - `shop=uc` did not change the sampled cement response, but the `stocks` block
   contains multiple Yakutsk stock locations. Availability semantics need parser
   research before per-shop stock is modeled.

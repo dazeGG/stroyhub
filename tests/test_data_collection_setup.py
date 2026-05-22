@@ -11,9 +11,13 @@ def test_setup_data_collection_dry_run_lists_categories_then_whitelist(capsys) -
     output = capsys.readouterr().out
     assert result == 0
     assert output.index("== Seed normalized categories ==") < output.index(
+        "== Seed official Unicom source =="
+    )
+    assert output.index("== Seed official Unicom source ==") < output.index(
         "== Seed initial 2GIS whitelist =="
     )
     assert "seed category: slug=mixes_aggregates name=Смеси и сыпучие материалы" in output
+    assert "schedule shop: source=unicom" in output
     assert "schedule shop: source=2gis" in output
     assert "scrape_interval=3600" in output
 
@@ -31,5 +35,6 @@ def test_setup_data_collection_script_runs_documented_dry_run_command() -> None:
 
     assert result.returncode == 0
     assert "== Seed normalized categories ==" in result.stdout
+    assert "== Seed official Unicom source ==" in result.stdout
     assert "== Seed initial 2GIS whitelist ==" in result.stdout
     assert result.stderr == ""
