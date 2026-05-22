@@ -92,7 +92,7 @@ def test_shop_source_candidate_api_lists_candidates(
             "product_count": 1,
             "priced_product_count": 1,
             "priority": 100,
-            "priority_reason": "есть сайт",
+            "priority_reason": "есть цены и сайт",
             "last_seen_at": response.json()["items"][0]["last_seen_at"],
             "last_checked_at": response.json()["items"][0]["last_checked_at"],
             "missing_since": None,

@@ -334,6 +334,9 @@ def parse_twogis_search_candidates(
             continue
 
         next_start = anchors[index + 1].start() if index + 1 < len(anchors) else len(page_html)
+        # Search pages append a large JSON state after the visible cards. Keep the website
+        # scan close to the card so nearby service contacts do not leak into candidates.
+        next_start = min(next_start, match.start() + 8_000)
         card_html = page_html[match.start() : next_start]
         name = _html_text(match.group("name"))
         if not name:
@@ -399,7 +402,7 @@ def _extract_website(card_html: str) -> str | None:
 
 def _priority(*, has_prices: bool, has_website: bool) -> tuple[int, str]:
     if has_prices and has_website:
-        return 100, "есть сайт"
+        return 100, "есть цены и сайт"
     if has_prices:
         return 80, "есть цены"
     if has_website:

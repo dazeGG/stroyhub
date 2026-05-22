@@ -85,7 +85,7 @@ def test_candidate_refresh_prioritizes_prices_then_website(db_session: Session) 
     assert summary.created == 4
     assert [item.source_id for item in items] == ["both", "prices", "website", "none"]
     assert [item.priority for item in items] == [100, 80, 60, 10]
-    assert items[0].priority_reason == "есть сайт"
+    assert items[0].priority_reason == "есть цены и сайт"
     assert items[2].priority_reason == "есть сайт"
     assert items[3].priority_reason == "нет цен и сайта"
 
@@ -255,6 +255,27 @@ def test_parse_twogis_search_candidates_extracts_real_search_cards() -> None:
             rubrics="Стройматериалы",
             website_url="https://metalltorg.biz",
         ),
+    ]
+
+
+def test_parse_twogis_search_candidates_ignores_app_state_contacts_after_cards() -> None:
+    page_html = (
+        '<a href="/yakutsk/firm/7037402698916908" class="_1rehek">'
+        '<span class="_lvwrwt"><span>Айта+М</span></span></a>'
+        "<div>Якутск Стройматериалы</div>"
+        + (" " * 8_500)
+        + '{"contacts":[{"text":"pochta.ru","type":"website","value":"pochta.ru/offices/677007"}]}'
+    )
+
+    seeds = parse_twogis_search_candidates(page_html, fallback_rubrics="стройматериалы")
+
+    assert seeds == [
+        CandidateDiscoverySeed(
+            source_id="7037402698916908",
+            display_name="Айта+М",
+            address="Якутск",
+            rubrics="Стройматериалы",
+        )
     ]
 
 

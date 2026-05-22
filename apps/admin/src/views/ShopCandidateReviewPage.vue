@@ -81,11 +81,11 @@ function priorityClass(candidate: ShopSourceCandidate): string {
 }
 
 function candidateSignalLabel(candidate: ShopSourceCandidate): string {
-  if (candidate.has_website) {
-    return 'есть сайт'
+  if (candidate.has_prices && candidate.has_website) {
+    return 'есть цены и сайт'
   }
   if (!candidate.has_prices) {
-    return 'нет цен и сайта'
+    return candidate.has_website ? 'есть сайт' : 'нет цен и сайта'
   }
   return 'есть цены'
 }

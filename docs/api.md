@@ -348,7 +348,7 @@ Example response:
       "product_count": 42,
       "priced_product_count": 40,
       "priority": 100,
-      "priority_reason": "есть сайт",
+      "priority_reason": "есть цены и сайт",
       "last_seen_at": "2026-05-23T00:00:00Z",
       "last_checked_at": "2026-05-23T00:00:00Z",
       "missing_since": null,
