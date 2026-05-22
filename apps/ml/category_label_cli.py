@@ -198,13 +198,13 @@ def run_label_session(
 
 def parse_label_answer(answer: str, candidate_category_ids: tuple[int, ...]) -> LabelAction:
     normalized = answer.strip().lower()
-    if normalized in {"u", "undo", "г"}:
+    if normalized in {"u", "undo", "г", "у"}:
         return LabelAction(kind="undo")
-    if normalized in {"s", "skip", "", "ы"}:
+    if normalized in {"s", "skip", "", "ы", "с"}:
         return LabelAction(kind="skip")
-    if normalized in {"x", "not_product", "ч"}:
+    if normalized in {"x", "not_product", "ч", "х"}:
         return LabelAction(kind="not_product")
-    if normalized in {"n", "none", "0", "т"}:
+    if normalized in {"n", "none", "0", "т", "н"}:
         return LabelAction(kind="save")
 
     selected_ids: list[int] = []
