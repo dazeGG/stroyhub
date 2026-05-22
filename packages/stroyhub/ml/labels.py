@@ -49,6 +49,10 @@ class CategoryLabelStore:
         base_path = root or Path.cwd()
         return cls(base_path / ".var" / "ml" / "category_verifier" / "labels.jsonl")
 
+    @classmethod
+    def from_path(cls, path: str | Path) -> CategoryLabelStore:
+        return cls(Path(path))
+
     def append(self, record: CategoryLabelRecord) -> CategoryLabelRecord:
         normalized = _normalize_record(record)
         self._path.parent.mkdir(parents=True, exist_ok=True)
