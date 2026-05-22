@@ -10,7 +10,7 @@ from stroyhub.db import SessionLocal
 from stroyhub.ml.category_queue import CategoryLabelQueue, CategoryLabelQueueItem
 from stroyhub.ml.labels import CategoryLabelRecord, CategoryLabelStore
 
-LabelActionKind = Literal["save", "skip", "quit", "not_product"]
+LabelActionKind = Literal["save", "skip", "not_product"]
 
 # ANSI colour helpers
 _RESET = "\033[0m"
@@ -50,7 +50,6 @@ class LabelSessionResult:
     saved: int
     skipped: int
     not_product: int
-    quit_requested: bool
     exhausted: bool
 
 
@@ -73,31 +72,35 @@ def main(argv: Sequence[str] | None = None) -> int:
         else CategoryLabelStore.from_path(args.labels_path)
     )
 
-    with SessionLocal() as session:
-        queue = CategoryLabelQueue(
-            session,
-            label_store,
-            source=args.source,
-            shuffle=args.shuffle,
-            category_raw=args.category_raw,
-        )
-        result = run_label_session(
-            queue,
-            label_store,
-            limit=args.limit,
-            labeled_by=args.labeled_by,
-        )
-        session.commit()
+    result = None
+    try:
+        with SessionLocal() as session:
+            queue = CategoryLabelQueue(
+                session,
+                label_store,
+                source=args.source,
+                shuffle=args.shuffle,
+                category_raw=args.category_raw,
+            )
+            result = run_label_session(
+                queue,
+                label_store,
+                limit=args.limit,
+                labeled_by=args.labeled_by,
+            )
+            session.commit()
+    except KeyboardInterrupt:
+        pass
 
-    print(
-        "labeling summary: "
-        f"saved={result.saved} "
-        f"skipped={result.skipped} "
-        f"not_product={result.not_product} "
-        f"quit={result.quit_requested} "
-        f"exhausted={result.exhausted} "
-        f"labels_path={label_store.path}"
-    )
+    if result is not None:
+        print(
+            "labeling summary: "
+            f"saved={result.saved} "
+            f"skipped={result.skipped} "
+            f"not_product={result.not_product} "
+            f"exhausted={result.exhausted} "
+            f"labels_path={label_store.path}"
+        )
     return 0
 
 
@@ -125,7 +128,6 @@ def run_label_session(
                 saved=saved,
                 skipped=skipped,
                 not_product=not_product_count,
-                quit_requested=False,
                 exhausted=True,
             )
 
@@ -136,14 +138,6 @@ def run_label_session(
             saved=saved, skipped=skipped,
         )
         action = _read_action(item, input_fn=input_fn, output=output)
-        if action.kind == "quit":
-            return LabelSessionResult(
-                saved=saved,
-                skipped=skipped,
-                not_product=not_product_count,
-                quit_requested=True,
-                exhausted=False,
-            )
         if action.kind == "skip":
             excluded_product_ids.add(item.product.id)
             skipped += 1
@@ -169,15 +163,12 @@ def run_label_session(
         saved=saved,
         skipped=skipped,
         not_product=not_product_count,
-        quit_requested=False,
         exhausted=False,
     )
 
 
 def parse_label_answer(answer: str, candidate_category_ids: tuple[int, ...]) -> LabelAction:
     normalized = answer.strip().lower()
-    if normalized in {"q", "quit", "exit"}:
-        return LabelAction(kind="quit")
     if normalized in {"s", "skip", ""}:
         return LabelAction(kind="skip")
     if normalized in {"x", "not_product"}:
@@ -192,7 +183,7 @@ def parse_label_answer(answer: str, candidate_category_ids: tuple[int, ...]) -> 
 
     for token in tokens:
         if not token.isdigit():
-            raise ValueError("Use 1-3, multiple numbers, n, s, or q.")
+            raise ValueError("Use 1-3, multiple numbers, n, or s.")
         index = int(token)
         if index < 1 or index > len(candidate_category_ids):
             raise ValueError("Candidate number is outside the shown list.")
@@ -210,12 +201,12 @@ def _read_action(
     output: Writer,
 ) -> LabelAction:
     candidate_ids = tuple(candidate.id for candidate in item.candidates)
-    prompt = "Choose numbers, n=none, s=skip, x=not_product, q=quit: "
+    prompt = "Choose numbers, n=none, s=skip, x=not_product, Ctrl+C=quit: "
     while True:
         try:
             answer = input_fn(prompt)
         except UnicodeDecodeError:
-            output.write("Could not decode input. Use 1-3, n, s, or q.\n")
+            output.write("Could not decode input. Use 1-3, n, or s.\n")
             continue
         try:
             return parse_label_answer(answer, candidate_ids)

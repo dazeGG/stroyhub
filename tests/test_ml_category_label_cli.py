@@ -23,7 +23,6 @@ from apps.ml.category_label_cli import LabelAction, parse_label_answer, run_labe
         ("", LabelAction(kind="skip")),
         ("x", LabelAction(kind="not_product")),
         ("not_product", LabelAction(kind="not_product")),
-        ("q", LabelAction(kind="quit")),
     ],
 )
 def test_parse_label_answer_supported_flows(answer: str, expected: LabelAction) -> None:
@@ -115,19 +114,6 @@ def test_run_label_session_moves_to_next_product_after_save(tmp_path) -> None:
     assert result.saved == 2
     assert [record.product_id for record in records] == [1, 2]
 
-
-def test_run_label_session_quit_does_not_write_label(tmp_path) -> None:
-    label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
-
-    result = run_label_session(
-        FakeQueue([_queue_item(product_id=1)]),  # type: ignore[arg-type]
-        label_store,
-        input_fn=FakeInput(["q"]),
-        output=FakeOutput(),
-    )
-
-    assert result.quit_requested
-    assert label_store.read_records() == []
 
 
 def test_run_label_session_marks_not_product_and_continues(tmp_path) -> None:
