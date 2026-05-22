@@ -25,8 +25,8 @@ const isFullPage = computed(() => route.meta.fullPage === true)
       <template v-else>
         <aside class="fixed inset-y-0 left-0 hidden w-64 border-r border-neutral-800 bg-neutral-950/95 px-5 py-6 lg:block">
           <RouterLink to="/" class="flex items-baseline gap-3">
-            <p class="text-xs font-semibold uppercase tracking-wide text-amber-300">StroyHub</p>
-            <h1 class="text-sm font-medium text-neutral-400">Админка</h1>
+            <p class="text-sm font-bold uppercase tracking-wide text-amber-300">StroyHub</p>
+            <h1 class="text-xs font-medium text-neutral-400">Админка</h1>
           </RouterLink>
 
           <nav class="mt-10 flex flex-col gap-1">
