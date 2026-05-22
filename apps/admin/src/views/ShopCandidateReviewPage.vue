@@ -195,7 +195,7 @@ onMounted(() => {
       <div>
         <RouterLink
           to="/shops"
-          class="mb-5 inline-flex h-9 items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 text-sm font-medium text-neutral-300 transition hover:border-amber-300/50 hover:text-white"
+          class="mb-5 mr-6 inline-flex h-9 items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 text-sm font-medium text-neutral-300 transition hover:border-amber-300/50 hover:text-white"
         >
           <Icon :icon="icons.arrowLeft" class="size-4" aria-hidden="true" />
           Магазины
