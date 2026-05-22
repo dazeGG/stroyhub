@@ -117,6 +117,21 @@ The train/evaluation split is 80/20 by product id. The random seed is derived
 from the pipeline run date in `YYYYMMDD` form and saved in snapshot/model
 metadata.
 
+The first training implementation is intentionally a small token baseline, not
+a neural network. It is trained by:
+
+```bash
+uv run python -m apps.ml.category_verifier_train_cli
+```
+
+The command checks whether at least 50 newly labeled products exist since the
+latest snapshot, unless `--force` is passed. It then creates the next snapshot,
+splits labels by product id into train/evaluation sets, trains the verifier,
+evaluates only on held-out labels, writes metrics and split metadata into
+`models/vNNN/metadata.json`, writes the model artifact to `model.joblib`, writes
+held-out mistakes or uncertain decisions to `reports/errors/vNNN.jsonl`, and
+updates `models/current` only after training and evaluation complete.
+
 ## Category Verifier
 
 The category verifier answers one question: does this product fit this category?

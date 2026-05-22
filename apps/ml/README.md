@@ -8,7 +8,7 @@ Planned commands:
 - category verifier labeling CLI: `category_label_cli`;
 - category verifier dataset status: `category_verifier_dataset_cli status`;
 - category verifier snapshot/export: `category_verifier_dataset_cli snapshot`;
-- category verifier train with required evaluation;
+- category verifier train with required evaluation: `category_verifier_train_cli`;
 - model artifact inspection and current-version management.
 
 Reusable code belongs in `packages/stroyhub/ml`. Runtime artifacts belong in
@@ -42,3 +42,15 @@ uv run python -m apps.ml.category_verifier_dataset_cli snapshot
 
 Snapshots are stored under `.var/ml/category_verifier/datasets/` as
 `v001.jsonl`, `v002.jsonl`, and matching `*.meta.json` files.
+
+Train the verifier on the current live labels with:
+
+```bash
+uv run python -m apps.ml.category_verifier_train_cli
+```
+
+Training refuses to run until there are at least 50 newly labeled products since
+the latest snapshot. Use `--force` only for smoke checks or early experiments.
+The command creates the next dataset snapshot, trains a small token baseline,
+runs held-out evaluation, saves `.var/ml/category_verifier/models/vNNN/`, writes
+`reports/errors/vNNN.jsonl`, and updates `models/current` after success.
