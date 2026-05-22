@@ -20,6 +20,42 @@ CandidateDiscoverer = Callable[[], Iterable["CandidateDiscoverySeed"]]
 TWOGIS_SEARCH_BASE_URL = "https://2gis.ru/yakutsk/search"
 TWOGIS_DISCOVERY_QUERY = "стройматериалы"
 TWOGIS_DISCOVERY_MAX_PAGES = 50
+OFFICIAL_STRATEGY_PRIORITY_BONUS = 1_000
+
+
+@dataclass(frozen=True, kw_only=True)
+class OfficialSourceStrategy:
+    source: str
+    source_type: str
+    label: str
+    match_names: tuple[str, ...]
+    twogis_source_ids: tuple[str, ...] = ()
+
+
+IMPLEMENTED_OFFICIAL_STRATEGIES = (
+    OfficialSourceStrategy(
+        source="unicom",
+        source_type="official_api",
+        label="Юником API",
+        match_names=("юником",),
+        twogis_source_ids=(
+            "7037402698746785",
+            "70000001058951900",
+            "70000001019786573",
+        ),
+    ),
+    OfficialSourceStrategy(
+        source="metalltorg",
+        source_type="official_html",
+        label="Металл Торг HTML",
+        match_names=("металл торг", "металлторг"),
+        twogis_source_ids=(
+            "7037402698889811",
+            "7037402698767155",
+            "70000001033120495",
+        ),
+    ),
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -106,6 +142,9 @@ class ShopCandidateCatalog:
                 has_prices=seed.has_prices_signal,
                 has_website=seed.has_website_signal,
             )
+            official_strategy = _official_strategy_for_seed(seed)
+            if official_strategy is not None:
+                priority += OFFICIAL_STRATEGY_PRIORITY_BONUS
 
             candidate.display_name = seed.display_name
             candidate.address = seed.address
@@ -132,6 +171,13 @@ class ShopCandidateCatalog:
                     "has_website": seed.has_website_signal,
                 },
             }
+            if official_strategy is not None:
+                candidate.raw["official_strategy"] = {
+                    "source": official_strategy.source,
+                    "source_type": official_strategy.source_type,
+                    "label": official_strategy.label,
+                    "status": "implemented",
+                }
             self._session.flush()
             if was_new:
                 created += 1
@@ -458,6 +504,21 @@ def _priority(*, has_prices: bool, has_website: bool) -> tuple[int, str]:
     if has_website:
         return 60, "есть сайт"
     return 10, "нет цен и сайта"
+
+
+def _official_strategy_for_seed(seed: CandidateDiscoverySeed) -> OfficialSourceStrategy | None:
+    normalized_name = _normalize_match_text(seed.display_name)
+    for strategy in IMPLEMENTED_OFFICIAL_STRATEGIES:
+        if seed.source_id in strategy.twogis_source_ids:
+            return strategy
+        if any(name in normalized_name for name in strategy.match_names):
+            return strategy
+
+    return None
+
+
+def _normalize_match_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value.casefold().replace("ё", "е")).strip()
 
 
 def _approved_shop(session: Session, source_id: str) -> Shop | None:

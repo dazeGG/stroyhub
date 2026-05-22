@@ -93,6 +93,43 @@ def test_candidate_refresh_prioritizes_prices_then_website(db_session: Session) 
     assert [item.product_count for item in items] == [0, 0, 0, 0]
 
 
+def test_candidate_refresh_prioritizes_implemented_official_strategy(
+    db_session: Session,
+) -> None:
+    catalog = ShopCandidateCatalog(db_session)
+
+    catalog.refresh_from_twogis(
+        seeds=[
+            CandidateDiscoverySeed(
+                source_id="ordinary",
+                display_name="Ordinary Prices Website",
+                address="Yakutsk",
+                rubrics="Стройматериалы",
+                has_prices_signal=True,
+                has_website_signal=True,
+            ),
+            CandidateDiscoverySeed(
+                source_id="7037402698746785",
+                display_name="Юником",
+                address="Вилюйский тракт 3 километр, 1/4",
+                rubrics="Стройматериалы",
+                has_website_signal=True,
+            ),
+        ],
+    )
+
+    items = catalog.list_candidates(CandidateListFilters())
+
+    assert [item.source_id for item in items] == ["7037402698746785", "ordinary"]
+    assert items[0].priority == 1060
+    assert items[0].raw["official_strategy"] == {
+        "source": "unicom",
+        "source_type": "official_api",
+        "label": "Юником API",
+        "status": "implemented",
+    }
+
+
 def test_candidate_refresh_skips_approved_shops_and_marks_missing_stale(
     db_session: Session,
 ) -> None:

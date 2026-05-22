@@ -168,6 +168,12 @@ export interface ShopSourceCandidate {
   last_checked_at: string | null
   missing_since: string | null
   approved_shop_id: number | null
+  official_strategy: {
+    source: string
+    source_type: SourceType
+    label: string
+    status: string
+  } | null
 }
 
 export interface ShopSourceCandidateListResponse {

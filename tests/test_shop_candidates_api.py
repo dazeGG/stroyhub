@@ -95,8 +95,37 @@ def test_shop_source_candidate_api_lists_candidates(
             "last_checked_at": response.json()["items"][0]["last_checked_at"],
             "missing_since": None,
             "approved_shop_id": None,
+            "official_strategy": None,
         }
     ]
+
+
+def test_shop_source_candidate_api_exposes_official_strategy(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    ShopCandidateCatalog(db_session).refresh_from_twogis(
+        seeds=[
+            CandidateDiscoverySeed(
+                source_id="7037402698889811",
+                display_name="Металл Торг",
+                address="Проспект Михаила Николаева, 1",
+                rubrics="Стройматериалы",
+                has_prices_signal=True,
+                has_website_signal=True,
+            )
+        ],
+    )
+
+    response = client.get("/shop-source-candidates")
+
+    assert response.status_code == 200
+    assert response.json()["items"][0]["official_strategy"] == {
+        "source": "metalltorg",
+        "source_type": "official_html",
+        "label": "Металл Торг HTML",
+        "status": "implemented",
+    }
 
 
 def test_shop_source_candidate_api_refresh_uses_twogis_discovery(
