@@ -1,7 +1,11 @@
+import html
+import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from urllib.parse import quote
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -16,6 +20,17 @@ from stroyhub.scraping import TwogisScrapeResult, scrape_twogis_branch
 
 TWOGIS_SOURCE = "2gis"
 CandidateScraper = Callable[[str], TwogisScrapeResult]
+CandidateDiscoverer = Callable[[], Iterable["CandidateDiscoverySeed"]]
+TWOGIS_SEARCH_BASE_URL = "https://2gis.ru/yakutsk/search"
+TWOGIS_DISCOVERY_QUERIES = (
+    "стройматериалы",
+    "строительные материалы",
+    "пиломатериалы",
+    "крепеж",
+    "сантехника",
+    "электрика",
+)
+TWOGIS_DISCOVERY_MAX_PAGES = 5
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -44,81 +59,6 @@ class CandidateRefreshSummary:
 
 SHOP_CANDIDATE_STATUSES = frozenset({"pending", "stale", "hidden", "archived", "approved"})
 
-DEFAULT_DISCOVERY_SEEDS = (
-    CandidateDiscoverySeed(
-        source_id="7037402698889811",
-        display_name="Металл Торг",
-        address="Проспект Михаила Николаева, 1",
-        rubrics="Стройматериалы; доставка",
-        website_url="https://metalltorg.biz/catalog/",
-    ),
-    CandidateDiscoverySeed(
-        source_id="70000001007229923",
-        display_name="Евролайн",
-        address="Улица Курнатовского, 86",
-        rubrics="Стройматериалы; доставка",
-    ),
-    CandidateDiscoverySeed(
-        source_id="7037402698746785",
-        display_name="Юником",
-        address="Вилюйский тракт 3 километр, 1/4",
-        rubrics="Стройматериалы; доставка",
-        website_url="https://unicom-ykt.ru/",
-    ),
-    CandidateDiscoverySeed(
-        source_id="7037402698836780",
-        display_name="Пирамида",
-        address="Переулок Космачёва, 2",
-        rubrics="Стройматериалы",
-    ),
-    CandidateDiscoverySeed(
-        source_id="7037402698755240",
-        display_name="Космос",
-        address="Улица Космонавтов, 23",
-        rubrics="Стройматериалы; доставка",
-        website_url="https://kosmos-ykt.ru/catalog",
-    ),
-    CandidateDiscoverySeed(
-        source_id="70000001038286835",
-        display_name="ЛидерСтрой",
-        address="Улица Жорницкого, 50а",
-        rubrics="Стройматериалы; доставка",
-    ),
-    CandidateDiscoverySeed(
-        source_id="70000001065271367",
-        display_name="СибНорд",
-        address="Улица Челюскина, 37/7в",
-        rubrics="Стройматериалы; доставка",
-        website_url="https://sibnord.ru/",
-    ),
-    CandidateDiscoverySeed(
-        source_id="7037402698774152",
-        display_name="Ондулин",
-        address="Улица Чернышевского, 48",
-        rubrics="Стройматериалы; доставка",
-    ),
-    CandidateDiscoverySeed(
-        source_id="7037402698745664",
-        display_name="Интехстрой",
-        address="Улица Леваневского, 3",
-        rubrics="Стройматериалы; доставка",
-        website_url="https://its96.ru/",
-    ),
-    CandidateDiscoverySeed(
-        source_id="70000001062470950",
-        display_name="Востоктехторг",
-        address="Проспект Михаила Николаева, 25/5",
-        rubrics="Стройматериалы; доставка",
-        website_url="https://vtt14.ru/catalog/",
-    ),
-    CandidateDiscoverySeed(
-        source_id="70000001021201334",
-        display_name="Строительный мир",
-        address="Улица Чернышевского, 105",
-        rubrics="Стройматериалы; доставка",
-        website_url="https://orion-expressiya.ru/",
-    ),
-)
 
 
 class ShopCandidateCatalog:
@@ -145,7 +85,8 @@ class ShopCandidateCatalog:
     def refresh_from_twogis(
         self,
         *,
-        seeds: Iterable[CandidateDiscoverySeed] = DEFAULT_DISCOVERY_SEEDS,
+        seeds: Iterable[CandidateDiscoverySeed] | None = None,
+        discoverer: CandidateDiscoverer | None = None,
         scraper: CandidateScraper | None = None,
         refreshed_at: datetime | None = None,
     ) -> CandidateRefreshSummary:
@@ -156,8 +97,10 @@ class ShopCandidateCatalog:
         skipped_approved = 0
         seen_source_ids: set[str] = set()
         scrape = scraper or _default_scraper
+        discovery = discoverer or discover_twogis_candidates
+        discovery_seeds = seeds if seeds is not None else discovery()
 
-        for seed in seeds:
+        for seed in discovery_seeds:
             checked += 1
             seen_source_ids.add(seed.source_id)
             approved_shop = _approved_shop(self._session, seed.source_id)
@@ -342,14 +285,126 @@ def _default_scraper(source_id: str) -> TwogisScrapeResult:
     return scrape_twogis_branch(branch_id=source_id, page_size=50, max_pages=3)
 
 
+def discover_twogis_candidates(
+    *,
+    queries: Iterable[str] = TWOGIS_DISCOVERY_QUERIES,
+    max_pages: int = TWOGIS_DISCOVERY_MAX_PAGES,
+    base_url: str = TWOGIS_SEARCH_BASE_URL,
+) -> list[CandidateDiscoverySeed]:
+    seeds_by_source_id: dict[str, CandidateDiscoverySeed] = {}
+    with httpx.Client(
+        timeout=20.0,
+        follow_redirects=True,
+        headers={"User-Agent": "Mozilla/5.0"},
+    ) as client:
+        for query in queries:
+            for page in range(1, max_pages + 1):
+                response = client.get(_search_page_url(base_url=base_url, query=query, page=page))
+                response.raise_for_status()
+                page_seeds = parse_twogis_search_candidates(
+                    response.text,
+                    fallback_rubrics=query,
+                )
+                if not page_seeds:
+                    break
+                for seed in page_seeds:
+                    seeds_by_source_id.setdefault(seed.source_id, seed)
+
+    return list(seeds_by_source_id.values())
+
+
+def parse_twogis_search_candidates(
+    page_html: str,
+    *,
+    fallback_rubrics: str,
+) -> list[CandidateDiscoverySeed]:
+    anchors = list(
+        re.finditer(
+            r'<a href="/yakutsk/firm/(?P<source_id>\d+)" class="_1rehek">'
+            r'\s*<span class="_lvwrwt">\s*<span>(?P<name>.*?)</span>',
+            page_html,
+            flags=re.DOTALL,
+        )
+    )
+    seeds_by_source_id: dict[str, CandidateDiscoverySeed] = {}
+
+    for index, match in enumerate(anchors):
+        source_id = match.group("source_id")
+        if source_id in seeds_by_source_id:
+            continue
+
+        next_start = anchors[index + 1].start() if index + 1 < len(anchors) else len(page_html)
+        card_html = page_html[match.start() : next_start]
+        name = _html_text(match.group("name"))
+        if not name:
+            continue
+
+        card_text = _html_text(card_html)
+        seeds_by_source_id[source_id] = CandidateDiscoverySeed(
+            source_id=source_id,
+            display_name=name,
+            address=_extract_address(card_text),
+            rubrics=_extract_rubrics(card_text, fallback=fallback_rubrics),
+            website_url=_extract_website(card_html),
+        )
+
+    return list(seeds_by_source_id.values())
+
+
+def _search_page_url(*, base_url: str, query: str, page: int) -> str:
+    url = f"{base_url.rstrip('/')}/{quote(query)}"
+    if page > 1:
+        url = f"{url}/page/{page}"
+    return url
+
+
+def _html_text(value: str) -> str:
+    without_tags = re.sub(r"<[^>]+>", " ", value)
+    return html.unescape(re.sub(r"\s+", " ", without_tags)).strip()
+
+
+def _extract_address(text: str) -> str:
+    match = re.search(
+        r"((?:Улица|Проспект|Переулок|Вилюйский тракт|Покровское шоссе|"
+        r"Окружное шоссе|Сергеляхское шоссе)[^.;]{2,80}?,\s*\d[^.;]{0,40}?),\s*Якутск",
+        text,
+    )
+    if match is None:
+        return "Якутск"
+    return match.group(1).strip()
+
+
+def _extract_rubrics(text: str, *, fallback: str) -> str:
+    if "Стройматериалы" in text and "Доставка" in text:
+        return "Стройматериалы; доставка"
+    if "Стройматериалы" in text:
+        return "Стройматериалы"
+    return fallback
+
+
+def _extract_website(card_html: str) -> str | None:
+    match = re.search(r'"type":"website","value":"(?P<value>[^"]+)"', card_html)
+    if match is None:
+        return None
+
+    value = html.unescape(match.group("value"))
+    if value.startswith("http://link.2gis.ru") and "?" in value:
+        value = value.rsplit("?", maxsplit=1)[-1]
+    if not value.startswith(("http://", "https://")):
+        value = f"https://{value}"
+    if any(host in value for host in ("2gis.ru", "dgis.ru")):
+        return None
+    return value
+
+
 def _priority(*, has_prices: bool, has_website: bool) -> tuple[int, str]:
     if has_prices and has_website:
-        return 100, "есть цены и сайт"
+        return 100, "есть сайт"
     if has_prices:
         return 80, "есть цены"
     if has_website:
-        return 60, "есть сайт, цен не найдено"
-    return 10, "цен не найдено"
+        return 60, "есть сайт"
+    return 10, "нет цен и сайта"
 
 
 def _approved_shop(session: Session, source_id: str) -> Shop | None:

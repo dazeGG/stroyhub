@@ -348,7 +348,7 @@ Example response:
       "product_count": 42,
       "priced_product_count": 40,
       "priority": 100,
-      "priority_reason": "есть цены и сайт",
+      "priority_reason": "есть сайт",
       "last_seen_at": "2026-05-23T00:00:00Z",
       "last_checked_at": "2026-05-23T00:00:00Z",
       "missing_since": null,
@@ -367,7 +367,7 @@ Priority order:
 
 ### `POST /shop-source-candidates/refresh`
 
-Refreshes the candidate queue from the 2GIS discovery source. New candidates are
+Refreshes the candidate queue from 2GIS search discovery pages. New candidates are
 added, existing unapproved candidates are updated, and unapproved candidates
 missing from the latest refresh are marked `stale` instead of being deleted.
 Already approved `shops` are skipped and stay out of the pending queue.

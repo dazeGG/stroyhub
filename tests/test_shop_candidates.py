@@ -4,13 +4,14 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.catalog.shop_candidates import (
     CandidateDiscoverySeed,
     CandidateListFilters,
     ShopCandidateCatalog,
+    parse_twogis_search_candidates,
 )
 from stroyhub.core.config import settings
 from stroyhub.db import ShopRepository, ShopUpsert
@@ -29,6 +30,9 @@ def db_session() -> Iterator[Session]:
 
     transaction = connection.begin()
     session = Session(bind=connection, autoflush=False, expire_on_commit=False)
+    session.execute(
+        text("TRUNCATE shop_source_candidates, shops, shop_identities RESTART IDENTITY CASCADE")
+    )
 
     try:
         yield session
@@ -81,9 +85,9 @@ def test_candidate_refresh_prioritizes_prices_then_website(db_session: Session) 
     assert summary.created == 4
     assert [item.source_id for item in items] == ["both", "prices", "website", "none"]
     assert [item.priority for item in items] == [100, 80, 60, 10]
-    assert items[0].priority_reason == "есть цены и сайт"
-    assert items[2].priority_reason == "есть сайт, цен не найдено"
-    assert items[3].priority_reason == "цен не найдено"
+    assert items[0].priority_reason == "есть сайт"
+    assert items[2].priority_reason == "есть сайт"
+    assert items[3].priority_reason == "нет цен и сайта"
 
 
 def test_candidate_refresh_skips_approved_shops_and_marks_missing_stale(
@@ -213,6 +217,45 @@ def test_candidate_approval_creates_identity_and_tracked_shop(db_session: Sessio
     assert shop.shop_identity is not None
     assert shop.shop_identity.display_name == "Approve Me"
     assert shop.shop_identity.preferred_source == "2gis"
+
+
+def test_parse_twogis_search_candidates_extracts_real_search_cards() -> None:
+    page_html = """
+    <div>
+      <a href="/yakutsk/firm/70000001007229923" class="_1rehek">
+        <span class="_lvwrwt"><span>Евролайн</span></span>
+      </a>
+      <div>
+        Магазин строительных материалов Улица Курнатовского, 86,
+        Якутск Стройматериалы · Доставка
+      </div>
+      <a href="/yakutsk/firm/7037402698889811" class="_1rehek">
+        <span class="_lvwrwt"><span>Металл Торг</span></span>
+      </a>
+      <div>Проспект Михаила Николаева, 1, Якутск Стройматериалы</div>
+      <script>
+        {"type":"website","value":"http://link.2gis.ru/1.2/demo?https://metalltorg.biz"}
+      </script>
+    </div>
+    """
+
+    seeds = parse_twogis_search_candidates(page_html, fallback_rubrics="стройматериалы")
+
+    assert seeds == [
+        CandidateDiscoverySeed(
+            source_id="70000001007229923",
+            display_name="Евролайн",
+            address="Улица Курнатовского, 86",
+            rubrics="Стройматериалы; доставка",
+        ),
+        CandidateDiscoverySeed(
+            source_id="7037402698889811",
+            display_name="Металл Торг",
+            address="Проспект Михаила Николаева, 1",
+            rubrics="Стройматериалы",
+            website_url="https://metalltorg.biz",
+        ),
+    ]
 
 
 def _fake_scraper(price_counts: dict[str, int]):  # type: ignore[no-untyped-def]

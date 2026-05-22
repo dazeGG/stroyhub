@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.catalog import shop_candidates as candidate_module
@@ -27,6 +27,9 @@ def db_session() -> Iterator[Session]:
 
     transaction = connection.begin()
     session = Session(bind=connection, autoflush=False, expire_on_commit=False)
+    session.execute(
+        text("TRUNCATE shop_source_candidates, shops, shop_identities RESTART IDENTITY CASCADE")
+    )
 
     try:
         yield session
@@ -89,7 +92,7 @@ def test_shop_source_candidate_api_lists_candidates(
             "product_count": 1,
             "priced_product_count": 1,
             "priority": 100,
-            "priority_reason": "есть цены и сайт",
+            "priority_reason": "есть сайт",
             "last_seen_at": response.json()["items"][0]["last_seen_at"],
             "last_checked_at": response.json()["items"][0]["last_checked_at"],
             "missing_since": None,
@@ -103,13 +106,23 @@ def test_shop_source_candidate_api_refresh_uses_twogis_discovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(candidate_module, "_default_scraper", _fake_scraper)
+    discovered = [
+        CandidateDiscoverySeed(
+            source_id="discovered-api",
+            display_name="Discovered API",
+            address="Yakutsk",
+            rubrics="Стройматериалы",
+            website_url="https://discovered.example.test/",
+        )
+    ]
 
+    monkeypatch.setattr(candidate_module, "discover_twogis_candidates", lambda: discovered)
     response = client.post("/shop-source-candidates/refresh")
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["checked"] == len(candidate_module.DEFAULT_DISCOVERY_SEEDS)
-    assert payload["created"] == len(candidate_module.DEFAULT_DISCOVERY_SEEDS)
+    assert payload["checked"] == len(discovered)
+    assert payload["created"] == len(discovered)
     assert payload["skipped_approved"] == 0
     assert payload["items"][0]["priority"] == 100
     assert payload["items"][0]["has_prices"] is True

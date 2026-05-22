@@ -80,6 +80,16 @@ function priorityClass(candidate: ShopSourceCandidate): string {
   return 'border-neutral-700 bg-neutral-900 text-neutral-400'
 }
 
+function candidateSignalLabel(candidate: ShopSourceCandidate): string {
+  if (candidate.has_website) {
+    return 'есть сайт'
+  }
+  if (!candidate.has_prices) {
+    return 'нет цен и сайта'
+  }
+  return 'есть цены'
+}
+
 function priceSignal(candidate: ShopSourceCandidate): string {
   if (candidate.has_prices) {
     return `${candidate.priced_product_count} с ценой из ${candidate.product_count}`
@@ -181,16 +191,16 @@ onMounted(() => {
 
 <template>
   <section class="space-y-6">
-    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
       <div>
         <RouterLink
           to="/shops"
-          class="inline-flex items-center gap-2 text-sm font-medium text-neutral-400 transition hover:text-white"
+          class="mb-5 inline-flex h-9 items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 text-sm font-medium text-neutral-300 transition hover:border-amber-300/50 hover:text-white"
         >
           <Icon :icon="icons.arrowLeft" class="size-4" aria-hidden="true" />
           Магазины
         </RouterLink>
-        <p class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
           <Icon :icon="icons.databaseImport" class="size-4" aria-hidden="true" />
           Кандидаты источников
         </p>
@@ -300,7 +310,7 @@ onMounted(() => {
                 {{ statusLabel(candidate.status) }}
               </span>
               <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="priorityClass(candidate)">
-                {{ candidate.priority_reason }}
+                {{ candidateSignalLabel(candidate) }}
               </span>
             </div>
             <p class="mt-2 text-sm text-neutral-500">{{ candidate.address || 'Адрес не указан' }}</p>
