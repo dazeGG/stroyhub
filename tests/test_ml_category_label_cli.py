@@ -36,6 +36,7 @@ def test_parse_label_answer_rejects_unknown_input() -> None:
 def test_run_label_session_saves_single_selection(tmp_path) -> None:
     label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
     queue = FakeQueue([_queue_item(product_id=1)])
+    output = FakeOutput()
 
     result = run_label_session(
         queue,  # type: ignore[arg-type]
@@ -43,7 +44,7 @@ def test_run_label_session_saves_single_selection(tmp_path) -> None:
         limit=1,
         labeled_by="tester",
         input_fn=FakeInput(["2"]),
-        output=FakeOutput(),
+        output=output,
     )
 
     records = label_store.read_records()
@@ -53,6 +54,7 @@ def test_run_label_session_saves_single_selection(tmp_path) -> None:
     assert records[0].candidate_category_ids == (10, 20, 30)
     assert records[0].selected_category_ids == (20,)
     assert records[0].labeled_by == "tester"
+    assert "------------------------------------------------------------------------" in output.text
 
 
 def test_run_label_session_saves_none_as_no_positive_target(tmp_path) -> None:
@@ -126,6 +128,23 @@ def test_run_label_session_quit_does_not_write_label(tmp_path) -> None:
     assert label_store.read_records() == []
 
 
+def test_run_label_session_recovers_from_undecodable_input(tmp_path) -> None:
+    label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
+    output = FakeOutput()
+
+    result = run_label_session(
+        FakeQueue([_queue_item(product_id=1)]),  # type: ignore[arg-type]
+        label_store,
+        limit=1,
+        input_fn=UndecodableThenValidInput("1"),
+        output=output,
+    )
+
+    assert result.saved == 1
+    assert label_store.read_records()[0].selected_category_ids == (10,)
+    assert "Could not decode input" in output.text
+
+
 class FakeQueue:
     def __init__(self, items: Iterable[CategoryLabelQueueItem]) -> None:
         self._items = tuple(items)
@@ -157,6 +176,18 @@ class FakeOutput:
     def write(self, text: str) -> object:
         self.text += text
         return len(text)
+
+
+class UndecodableThenValidInput:
+    def __init__(self, answer: str) -> None:
+        self._answer = answer
+        self._raised = False
+
+    def __call__(self, _prompt: str) -> str:
+        if not self._raised:
+            self._raised = True
+            raise UnicodeDecodeError("utf-8", b"\xd1", 0, 1, "invalid continuation byte")
+        return self._answer
 
 
 def _queue_item(*, product_id: int) -> CategoryLabelQueueItem:

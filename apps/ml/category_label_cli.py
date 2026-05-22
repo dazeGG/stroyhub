@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
@@ -32,6 +33,7 @@ class LabelSessionResult:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    _configure_stdin()
     parser = argparse.ArgumentParser(
         description="Label product/category matches for the category verifier dataset."
     )
@@ -158,7 +160,11 @@ def _read_action(
 ) -> LabelAction:
     candidate_ids = tuple(candidate.id for candidate in item.candidates)
     while True:
-        answer = input_fn("Choose category numbers, n=none, s=skip, q=quit: ")
+        try:
+            answer = input_fn("Choose category numbers, n=none, s=skip, q=quit: ")
+        except UnicodeDecodeError:
+            output.write("Could not decode input. Use 1-3, n, s, or q.\n")
+            continue
         try:
             return parse_label_answer(answer, candidate_ids)
         except ValueError as error:
@@ -167,6 +173,8 @@ def _read_action(
 
 def _print_item(item: CategoryLabelQueueItem, output: Writer) -> None:
     output.write("\n")
+    output.write("-" * 72)
+    output.write("\n")
     output.write(f"Product #{item.product.id}: {item.product.title}\n")
     output.write(f"Source: {item.product.source}\n")
     if item.product.category_raw:
@@ -174,6 +182,12 @@ def _print_item(item: CategoryLabelQueueItem, output: Writer) -> None:
     output.write("Candidates:\n")
     for index, candidate in enumerate(item.candidates, start=1):
         output.write(f"  {index}. {candidate.name} [{candidate.reason}]\n")
+
+
+def _configure_stdin() -> None:
+    reconfigure = getattr(sys.stdin, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(encoding="utf-8", errors="replace")
 
 
 class _Stdout:
