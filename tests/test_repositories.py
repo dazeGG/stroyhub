@@ -174,6 +174,38 @@ def test_shop_identity_update_respects_locked_fields(db_session: Session) -> Non
     assert updated.preferred_source == "2gis"
 
 
+def test_shop_identity_delete_detaches_sources_without_deleting_source_data(
+    db_session: Session,
+) -> None:
+    identity_repository = ShopIdentityRepository(db_session)
+    shop_repository = ShopRepository(db_session)
+    identity = identity_repository.create(ShopIdentityCreate(display_name="Delete Me"))
+    shop = shop_repository.upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="delete-identity-source",
+            name="Source",
+            shop_identity_id=identity.id,
+        )
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="delete-identity-product",
+            title="Delete identity product",
+            normalized_title="delete identity product",
+        )
+    )
+
+    identity_repository.delete(identity.id)
+    db_session.expire_all()
+
+    assert db_session.get(ShopIdentity, identity.id) is None
+    assert db_session.get(Shop, shop.id).shop_identity_id is None
+    assert db_session.get(SourceProduct, product.id).shop_id == shop.id
+
+
 def test_shop_repository_rejects_manual_source_type(db_session: Session) -> None:
     repository = ShopRepository(db_session)
 

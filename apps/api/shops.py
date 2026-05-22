@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from stroyhub.catalog.shops import (
@@ -179,6 +179,21 @@ def update_shop_identity(
     session.commit()
     session.expire_all()
     return _identity_response(identity.id, session)
+
+
+@identity_router.delete("/{identity_id}", status_code=204)
+def delete_shop_identity(
+    identity_id: int,
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    repository = ShopIdentityRepository(session)
+    try:
+        repository.delete(identity_id)
+    except ValueError as exc:
+        raise _http_error(exc) from exc
+
+    session.commit()
+    return Response(status_code=204)
 
 
 @identity_router.post(

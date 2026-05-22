@@ -471,6 +471,21 @@ export function updateShopIdentity(
   )
 }
 
+export async function deleteShopIdentity(
+  identityId: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await fetch(apiPath(`/shop-identities/${identityId}`), {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(`API request failed with ${response.status}`)
+  }
+}
+
 export function linkShopSource(
   identityId: number,
   shopId: number,
