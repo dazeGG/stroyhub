@@ -10,7 +10,7 @@ from stroyhub.db import SessionLocal
 from stroyhub.ml.category_queue import CategoryLabelQueue, CategoryLabelQueueItem
 from stroyhub.ml.labels import CategoryLabelRecord, CategoryLabelStore
 
-LabelActionKind = Literal["save", "skip", "not_product"]
+LabelActionKind = Literal["save", "skip", "not_product", "undo"]
 
 # ANSI colour helpers
 _RESET = "\033[0m"
@@ -51,6 +51,12 @@ class LabelSessionResult:
     skipped: int
     not_product: int
     exhausted: bool
+
+
+@dataclass(frozen=True, kw_only=True)
+class _UndoEntry:
+    kind: Literal["save", "skip", "not_product"]
+    product_id: int
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -112,6 +118,7 @@ def run_label_session(
     skipped = 0
     not_product_count = 0
     excluded_product_ids: set[int] = set()
+    undo_stack: list[_UndoEntry] = []
     output = output or _Stdout()
     labeled_total = queue.labeled_count()
     unlabeled_total = queue.unlabeled_count()
@@ -142,14 +149,31 @@ def run_label_session(
                 not_product=not_product_count,
                 exhausted=False,
             )
+        if action.kind == "undo":
+            if not undo_stack:
+                output.write("Nothing to undo.\n")
+                continue
+            entry = undo_stack.pop()
+            excluded_product_ids.discard(entry.product_id)
+            if entry.kind == "save":
+                label_store.pop_last()
+                saved -= 1
+            elif entry.kind == "skip":
+                skipped -= 1
+            elif entry.kind == "not_product":
+                queue.unmark_not_product(entry.product_id)
+                not_product_count -= 1
+            continue
         if action.kind == "skip":
             excluded_product_ids.add(item.product.id)
             skipped += 1
+            undo_stack.append(_UndoEntry(kind="skip", product_id=item.product.id))
             continue
         if action.kind == "not_product":
             queue.mark_not_product(item.product.id)
             excluded_product_ids.add(item.product.id)
             not_product_count += 1
+            undo_stack.append(_UndoEntry(kind="not_product", product_id=item.product.id))
             continue
 
         label_store.append(
@@ -162,6 +186,7 @@ def run_label_session(
         )
         excluded_product_ids.add(item.product.id)
         saved += 1
+        undo_stack.append(_UndoEntry(kind="save", product_id=item.product.id))
 
     return LabelSessionResult(
         saved=saved,
@@ -173,11 +198,13 @@ def run_label_session(
 
 def parse_label_answer(answer: str, candidate_category_ids: tuple[int, ...]) -> LabelAction:
     normalized = answer.strip().lower()
-    if normalized in {"s", "skip", ""}:
+    if normalized in {"u", "undo", "г"}:
+        return LabelAction(kind="undo")
+    if normalized in {"s", "skip", "", "ы"}:
         return LabelAction(kind="skip")
-    if normalized in {"x", "not_product"}:
+    if normalized in {"x", "not_product", "ч"}:
         return LabelAction(kind="not_product")
-    if normalized in {"n", "none", "0"}:
+    if normalized in {"n", "none", "0", "т"}:
         return LabelAction(kind="save")
 
     selected_ids: list[int] = []
@@ -205,7 +232,7 @@ def _read_action(
     output: Writer,
 ) -> LabelAction:
     candidate_ids = tuple(candidate.id for candidate in item.candidates)
-    prompt = "Choose numbers, n=none, s=skip, x=not_product: "
+    prompt = "Choose numbers, n=none, s=skip, x=not_product, u=undo: "
     while True:
         try:
             answer = input_fn(prompt)
