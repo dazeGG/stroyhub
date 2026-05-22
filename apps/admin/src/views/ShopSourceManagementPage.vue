@@ -394,21 +394,33 @@ onMounted(() => {
 
     <div class="grid gap-4 md:grid-cols-4">
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Магазины</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.buildingStore" class="size-4" aria-hidden="true" />
+          Магазины
+        </p>
         <p class="mt-3 text-3xl font-semibold text-white">{{ identities.length }}</p>
       </div>
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Связанные источники</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.link" class="size-4" aria-hidden="true" />
+          Связанные источники
+        </p>
         <p class="mt-3 text-3xl font-semibold text-white">{{ groupedSourceCount }}</p>
       </div>
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Без магазина</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.linkOff" class="size-4" aria-hidden="true" />
+          Без магазина
+        </p>
         <p class="mt-3 text-3xl font-semibold" :class="ungroupedSourceCount > 0 ? 'text-amber-200' : 'text-white'">
           {{ ungroupedSourceCount }}
         </p>
       </div>
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="text-sm text-neutral-500">Требуют внимания</p>
+        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+          <Icon :icon="icons.alertTriangle" class="size-4" aria-hidden="true" />
+          Требуют внимания
+        </p>
         <p class="mt-3 text-3xl font-semibold" :class="failingSourceCount + heldIdentityCount > 0 ? 'text-red-200' : 'text-white'">
           {{ failingSourceCount + heldIdentityCount }}
         </p>

@@ -1,6 +1,7 @@
 import activityIcon from '@iconify-icons/tabler/activity'
 import alertTriangleIcon from '@iconify-icons/tabler/alert-triangle'
 import arrowLeftIcon from '@iconify-icons/tabler/arrow-left'
+import buildingIcon from '@iconify-icons/tabler/building'
 import buildingStoreIcon from '@iconify-icons/tabler/building-store'
 import calendarDueIcon from '@iconify-icons/tabler/calendar-due'
 import categoryIcon from '@iconify-icons/tabler/category'
@@ -17,6 +18,7 @@ import gitCompareIcon from '@iconify-icons/tabler/git-compare'
 import helpCircleIcon from '@iconify-icons/tabler/help-circle'
 import historyIcon from '@iconify-icons/tabler/history'
 import linkIcon from '@iconify-icons/tabler/link'
+import linkOffIcon from '@iconify-icons/tabler/link-off'
 import listCheckIcon from '@iconify-icons/tabler/list-check'
 import packageIcon from '@iconify-icons/tabler/package'
 import pencilIcon from '@iconify-icons/tabler/pencil'
@@ -34,6 +36,7 @@ export const icons = {
   activity: activityIcon,
   alertTriangle: alertTriangleIcon,
   arrowLeft: arrowLeftIcon,
+  building: buildingIcon,
   buildingStore: buildingStoreIcon,
   calendarDue: calendarDueIcon,
   category: categoryIcon,
@@ -50,6 +53,7 @@ export const icons = {
   helpCircle: helpCircleIcon,
   history: historyIcon,
   link: linkIcon,
+  linkOff: linkOffIcon,
   listCheck: listCheckIcon,
   package: packageIcon,
   pencil: pencilIcon,
