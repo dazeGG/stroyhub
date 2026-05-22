@@ -267,13 +267,13 @@ onMounted(() => {
       <p class="mt-2 text-sm text-neutral-500">Обновите список из 2GIS, чтобы загрузить магазины на подтверждение.</p>
     </div>
 
-    <div v-else class="grid gap-3">
+    <div v-else class="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
       <article
         v-for="candidate in candidates"
         :key="candidate.id"
-        class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
+        class="flex min-h-[260px] flex-col rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
       >
-        <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div class="min-h-[92px]">
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
               <h3 class="text-base font-semibold text-white">{{ candidate.display_name }}</h3>
@@ -284,19 +284,9 @@ onMounted(() => {
             <p class="mt-2 text-sm text-neutral-500">{{ candidate.address || 'Адрес не указан' }}</p>
             <p class="mt-1 font-mono text-xs text-neutral-600">2GIS · {{ candidate.source_id }}</p>
           </div>
-
-          <button
-            type="button"
-            class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50 sm:w-fit"
-            :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
-            @click="approveCandidate(candidate)"
-          >
-            <Icon :icon="icons.check" class="size-4" aria-hidden="true" />
-            {{ approvingCandidateId === candidate.id ? 'Добавляем...' : 'Утвердить' }}
-          </button>
         </div>
 
-        <div class="mt-4 grid gap-4 border-t border-neutral-800 pt-4 text-sm text-neutral-400 md:grid-cols-[1fr_auto]">
+        <div class="mt-4 grid flex-1 gap-4 border-t border-neutral-800 pt-4 text-sm text-neutral-400">
           <div>
             <p class="text-xs uppercase tracking-wide text-neutral-600">Сигналы 2GIS</p>
             <div class="mt-2 flex flex-wrap gap-2">
@@ -327,6 +317,16 @@ onMounted(() => {
             </p>
           </div>
         </div>
+
+        <button
+          type="button"
+          class="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
+          @click="approveCandidate(candidate)"
+        >
+          <Icon :icon="icons.check" class="size-4" aria-hidden="true" />
+          {{ approvingCandidateId === candidate.id ? 'Добавляем...' : 'Утвердить' }}
+        </button>
       </article>
     </div>
   </section>
