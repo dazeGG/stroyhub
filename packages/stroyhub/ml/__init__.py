@@ -6,6 +6,12 @@ from stroyhub.ml.category_queue import (
     CategoryLabelQueue,
     CategoryLabelQueueItem,
 )
+from stroyhub.ml.datasets import (
+    CategoryVerifierDatasetStatus,
+    CategoryVerifierDatasetStore,
+    CategoryVerifierSnapshot,
+    CategoryVerifierSnapshotMetadata,
+)
 from stroyhub.ml.labels import (
     CategoryLabelRecord,
     CategoryLabelStore,
@@ -30,6 +36,10 @@ __all__ = [
     "CategoryLabelQueue",
     "CategoryLabelQueueItem",
     "CategoryLabelStore",
+    "CategoryVerifierDatasetStatus",
+    "CategoryVerifierDatasetStore",
+    "CategoryVerifierSnapshot",
+    "CategoryVerifierSnapshotMetadata",
     "PredictorTarget",
     "SourceProductLike",
     "VerifierPairLabel",
