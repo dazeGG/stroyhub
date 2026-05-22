@@ -187,6 +187,119 @@ def test_category_label_queue_only_excludes_labeled_products(
     assert item.product.id == unlabeled_product.id
 
 
+def test_category_label_queue_excludes_not_product(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    categories = _seed_categories(db_session, prefix="queue-not-product")
+    source = "queue-not-product-source"
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source=source, source_id="queue-not-product-shop", name="Queue Shop")
+    )
+    not_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source=source,
+            source_product_id="queue-not-product-bad",
+            title="Сиппанели",
+            normalized_title="сиппанели",
+            category_id=categories["cement"],
+            category_raw="Сиппанели",
+            is_not_product=True,
+        )
+    )
+    real_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source=source,
+            source_product_id="queue-not-product-good",
+            title="Цемент М500",
+            normalized_title="цемент м500",
+            category_id=categories["cement"],
+            category_raw="Цемент",
+        )
+    )
+
+    item = CategoryLabelQueue(
+        db_session,
+        CategoryLabelStore(tmp_path / "labels.jsonl"),
+        source=source,
+    ).next_item()
+
+    assert item is not None
+    assert item.product.id == real_product.id
+    assert item.product.id != not_product.id
+
+
+def test_category_label_queue_mark_not_product(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    categories = _seed_categories(db_session, prefix="queue-mark-not-product")
+    source = "queue-mark-not-product-source"
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source=source, source_id="queue-mark-not-product-shop", name="Queue Shop")
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source=source,
+            source_product_id="queue-mark-not-product-product",
+            title="Сиппанели",
+            normalized_title="сиппанели",
+            category_id=categories["cement"],
+            category_raw="Сиппанели",
+        )
+    )
+
+    queue = CategoryLabelQueue(
+        db_session,
+        CategoryLabelStore(tmp_path / "labels.jsonl"),
+        source=source,
+    )
+    queue.mark_not_product(product.id)
+    db_session.expire(product)
+
+    assert product.is_not_product is True
+
+
+def test_category_label_queue_upsert_preserves_not_product_flag(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    categories = _seed_categories(db_session, prefix="queue-preserve-flag")
+    source = "queue-preserve-flag-source"
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source=source, source_id="queue-preserve-flag-shop", name="Queue Shop")
+    )
+    repo = SourceProductRepository(db_session)
+    repo.upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source=source,
+            source_product_id="queue-preserve-flag-product",
+            title="Сиппанели",
+            normalized_title="сиппанели",
+            category_id=categories["cement"],
+            category_raw="Сиппанели",
+            is_not_product=True,
+        )
+    )
+    product = repo.upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source=source,
+            source_product_id="queue-preserve-flag-product",
+            title="Сиппанели",
+            normalized_title="сиппанели",
+            category_id=categories["cement"],
+            category_raw="Сиппанели",
+        )
+    )
+
+    assert product.is_not_product is True
+
+
 def test_category_label_queue_category_raw_filter(
     db_session: Session,
     tmp_path,

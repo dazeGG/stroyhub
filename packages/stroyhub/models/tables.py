@@ -136,6 +136,9 @@ class SourceProduct(TimestampMixin, Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    is_not_product: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
 
     shop: Mapped[Shop] = relationship(back_populates="source_products")
     category: Mapped[Category | None] = relationship(back_populates="source_products")

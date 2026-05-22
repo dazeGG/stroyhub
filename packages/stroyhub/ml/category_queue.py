@@ -103,10 +103,17 @@ class CategoryLabelQueue:
             if p.id not in self._labeled_product_ids
         )
 
+    def mark_not_product(self, product_id: int) -> None:
+        product = self._session.get(SourceProduct, product_id)
+        if product is not None:
+            product.is_not_product = True
+            self._session.flush()
+
     def _products(self) -> list[SourceProduct]:
         statement = (
             select(SourceProduct)
             .where(SourceProduct.is_active.is_(True))
+            .where(SourceProduct.is_not_product.is_(False))
             .order_by(SourceProduct.id.asc())
         )
         if self._source is not None:

@@ -21,6 +21,8 @@ from apps.ml.category_label_cli import LabelAction, parse_label_answer, run_labe
         ("none", LabelAction(kind="save", selected_category_ids=())),
         ("s", LabelAction(kind="skip")),
         ("", LabelAction(kind="skip")),
+        ("x", LabelAction(kind="not_product")),
+        ("not_product", LabelAction(kind="not_product")),
         ("q", LabelAction(kind="quit")),
     ],
 )
@@ -128,6 +130,26 @@ def test_run_label_session_quit_does_not_write_label(tmp_path) -> None:
     assert label_store.read_records() == []
 
 
+def test_run_label_session_marks_not_product_and_continues(tmp_path) -> None:
+    label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
+    marked: list[int] = []
+    queue = FakeQueue([_queue_item(product_id=1), _queue_item(product_id=2)])
+    queue.mark_not_product = lambda pid: marked.append(pid)  # type: ignore[method-assign]
+
+    result = run_label_session(
+        queue,  # type: ignore[arg-type]
+        label_store,
+        limit=1,
+        input_fn=FakeInput(["x", "1"]),
+        output=FakeOutput(),
+    )
+
+    assert result.not_product == 1
+    assert result.saved == 1
+    assert 1 in marked
+    assert label_store.read_records()[0].product_id == 2
+
+
 def test_run_label_session_shows_progress_counter(tmp_path) -> None:
     label_store = CategoryLabelStore(tmp_path / "labels.jsonl")
     output = FakeOutput()
@@ -215,6 +237,9 @@ class FakeQueue:
 
     def unlabeled_count(self) -> int:
         return len(self._items)
+
+    def mark_not_product(self, product_id: int) -> None:
+        pass
 
 
 class FakeInput:

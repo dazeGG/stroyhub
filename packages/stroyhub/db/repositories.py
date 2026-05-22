@@ -75,6 +75,7 @@ class SourceProductUpsert:
     raw: JsonObject | None = None
     observed_at: datetime | None = None
     is_active: bool = True
+    is_not_product: bool | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -340,6 +341,8 @@ class SourceProductRepository:
         product.source_updated_at = data.source_updated_at
         product.raw = data.raw
         product.is_active = data.is_active
+        if data.is_not_product is not None:
+            product.is_not_product = data.is_not_product
 
         if observed_at is not None:
             product.last_seen_at = observed_at
