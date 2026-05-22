@@ -8,9 +8,15 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
+from stroyhub.db import ShopRepository, ShopUpsert
 from stroyhub.models import Category, PriceSnapshot, ScrapeRun, Shop, SourceProduct
 from stroyhub.parsers.unicom import UnicomClient
-from stroyhub.scraping import persist_unicom_scrape_result, scrape_unicom_category
+from stroyhub.scraping import (
+    persist_unicom_scrape_failure,
+    persist_unicom_scrape_result,
+    scrape_unicom_category,
+    scrape_unicom_shop,
+)
 
 
 @pytest.fixture
@@ -107,6 +113,7 @@ def test_persist_unicom_scrape_result_upserts_products_and_appends_price_snapsho
 
     assert shop is not None
     assert shop.name == "Юником Test"
+    assert shop.source_type == "official_api"
     assert shop.url == "https://unicom-ykt.ru/"
     assert shop.scrape_status == "success"
     assert first_persist.shop_id == second_persist.shop_id == shop.id
@@ -156,6 +163,78 @@ def test_persist_unicom_scrape_result_marks_partial_run_but_failed_shop_status(
     assert shop.scrape_status == "failed"
     assert scrape_run is not None
     assert scrape_run.status == "partial"
+
+
+def test_scrape_unicom_shop_uses_seeded_category_config(db_session: Session) -> None:
+    client = UnicomClient(client=httpx.Client(transport=httpx.MockTransport(_unicom_handler)))
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="uc",
+            source_type="official_api",
+            name="Юником Config Test",
+            url="https://unicom-ykt.ru/",
+            raw={"category_uuids": ["category-a", "category-b"], "limit": 2, "max_pages": 2},
+        )
+    )
+
+    result = scrape_unicom_shop(
+        db_session,
+        shop,
+        client=client,
+        finished_at=datetime(2026, 5, 17, 12, 0, tzinfo=UTC),
+    )
+
+    scrape_run_count = db_session.scalar(
+        select(func.count()).select_from(ScrapeRun).where(ScrapeRun.shop_id == shop.id)
+    )
+    snapshot_count = db_session.scalar(
+        select(func.count())
+        .select_from(PriceSnapshot)
+        .join(SourceProduct)
+        .where(SourceProduct.shop_id == shop.id)
+    )
+
+    assert result.shop_id == shop.id
+    assert result.categories_seen == 2
+    assert result.categories_partial == 0
+    assert result.products_seen == 6
+    assert result.source_products_saved == 6
+    assert result.price_snapshots_saved == 6
+    assert result.scrape_status == "success"
+    assert scrape_run_count == 2
+    assert snapshot_count == 6
+    assert shop.raw["category_uuids"] == ["category-a", "category-b"]
+    assert shop.raw["limit"] == 2
+    assert shop.raw["max_pages"] == 2
+
+
+def test_persist_unicom_scrape_failure_records_failed_run(db_session: Session) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="uc",
+            source_type="official_api",
+            name="Юником Failure Test",
+            raw={"category_uuids": ["category-a"], "limit": 2, "max_pages": 2},
+        )
+    )
+
+    scrape_run_id = persist_unicom_scrape_failure(
+        db_session,
+        shop,
+        error="timeout",
+        failed_at=datetime(2026, 5, 17, 12, 0, tzinfo=UTC),
+    )
+
+    scrape_run = db_session.get(ScrapeRun, scrape_run_id)
+
+    assert scrape_run is not None
+    assert scrape_run.status == "failed"
+    assert scrape_run.error == "timeout"
+    assert scrape_run.items_seen == 0
+    assert scrape_run.items_saved == 0
+    assert scrape_run.raw["config"]["category_uuids"] == ["category-a"]
 
 
 def _unicom_handler(request: httpx.Request) -> httpx.Response:

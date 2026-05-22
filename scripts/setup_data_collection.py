@@ -10,6 +10,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 seed_categories = importlib.import_module("seed_categories").main
+seed_unicom_source = importlib.import_module("seed_unicom_source").main
 seed_twogis_whitelist = importlib.import_module("seed_twogis_whitelist").main
 
 
@@ -17,7 +18,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Run the repeatable local data collection setup: normalized categories first, "
-            "then the initial 2GIS scrape whitelist."
+            "then official shop sources and the initial 2GIS scrape whitelist."
         )
     )
     parser.add_argument("--scrape-interval", type=int, default=86400)
@@ -26,13 +27,20 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     category_args = ["--dry-run"] if args.dry_run else []
     whitelist_args = ["--scrape-interval", str(args.scrape_interval)]
+    unicom_args = ["--scrape-interval", str(args.scrape_interval)]
     if args.dry_run:
         whitelist_args.append("--dry-run")
+        unicom_args.append("--dry-run")
 
     print("== Seed normalized categories ==")
     category_result = seed_categories(category_args)
     if category_result != 0:
         return category_result
+
+    print("== Seed official Unicom source ==")
+    unicom_result = seed_unicom_source(unicom_args)
+    if unicom_result != 0:
+        return unicom_result
 
     print("== Seed initial 2GIS whitelist ==")
     return seed_twogis_whitelist(whitelist_args)

@@ -45,7 +45,8 @@ uv run alembic upgrade head
 
 ## 3. Seed Local Collection Inputs
 
-Seed normalized categories and the initial 2GIS shop whitelist:
+Seed normalized categories, official shop sources, and the initial 2GIS shop
+whitelist:
 
 ```bash
 uv run python scripts/setup_data_collection.py
@@ -60,9 +61,20 @@ uv run python scripts/setup_data_collection.py --dry-run
 The setup flow runs:
 
 1. `scripts/seed_categories.py`
-2. `scripts/seed_twogis_whitelist.py`
+2. `scripts/seed_unicom_source.py`
+3. `scripts/seed_twogis_whitelist.py`
 
-Both flows are idempotent and can be repeated.
+These seed flows are idempotent and can be repeated.
+
+To configure only the official Unicom source:
+
+```bash
+uv run python scripts/seed_unicom_source.py
+```
+
+The Unicom seed writes one `shops` row with `source=unicom` and
+`source_type=official_api`. Its `raw` config stores the category UUID list,
+`limit`, `max_pages`, and sort order used by scheduled collection.
 
 ## 4. Run an Explicit Live Smoke Check
 
@@ -126,6 +138,11 @@ uv run celery -A apps.worker.celery_app:celery_app beat --loglevel=info
 
 Beat dispatches due shops every day at `00:00 Asia/Yakutsk`.
 
+The due-shop dispatcher currently supports:
+
+- `2gis` branch scrapes;
+- `unicom` official API scrapes from the seeded category UUID config.
+
 For a one-off worker dispatch from Python/Celery internals, use the existing
 `stroyhub.scrape_due_shops` task rather than adding live network calls to tests.
 
@@ -135,12 +152,14 @@ Recent scrape runs:
 
 ```bash
 uv run python scripts/report_scrape_runs.py --source 2gis --days 7
+uv run python scripts/report_scrape_runs.py --source unicom --days 7
 ```
 
 Uncategorized product coverage:
 
 ```bash
 uv run python scripts/report_category_coverage.py --source 2gis
+uv run python scripts/report_category_coverage.py --source unicom
 ```
 
 Product API smoke:
@@ -186,20 +205,22 @@ Fix:
 uv run alembic upgrade head
 ```
 
-### 2GIS live source fails or returns partial data
+### 2GIS or Unicom live source fails or returns partial data
 
 Symptoms:
 
 - `scrape_status=partial`
 - `stop_reason=max_pages_reached`
-- request exceptions from the unofficial 2GIS endpoint
+- request exceptions from a source endpoint
 
 Guidance:
 
 - Keep live checks explicit.
 - Do not add live calls to default tests.
-- Keep very large catalogs such as Юником and Востоктехторг out of the normal
-  whitelist until a dedicated large-catalog mode exists. See
+- Unicom official API collection is sequential by configured category UUID. Do
+  not add concurrent category scraping until rate-limit behavior is known.
+- Keep very large unknown catalogs such as Востоктехторг out of normal
+  scheduled collection until source-specific pacing is documented. See
   `docs/sources.md`.
 
 ### Repeated scrapes add many price snapshots
