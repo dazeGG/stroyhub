@@ -13,7 +13,7 @@ from stroyhub.db.repositories import (
     ShopRepository,
     ShopUpsert,
 )
-from stroyhub.models import Shop, ShopSourceCandidate
+from stroyhub.models import Shop, ShopIdentity, ShopSourceCandidate
 
 TWOGIS_SOURCE = "2gis"
 CandidateDiscoverer = Callable[[], Iterable["CandidateDiscoverySeed"]]
@@ -84,12 +84,22 @@ class CandidateRefreshSummary:
     skipped_approved: int
 
 
+@dataclass(frozen=True, kw_only=True)
+class CandidateIdentitySuggestion:
+    id: int
+    display_name: str
+    status: str
+    source_count: int
+    reason: str
+
+
 SHOP_CANDIDATE_STATUSES = frozenset({"pending", "stale", "hidden", "archived", "approved"})
 
 
 class ShopCandidateCatalog:
     def __init__(self, session: Session) -> None:
         self._session = session
+        self._identity_suggestion_sources: list[ShopIdentity] | None = None
 
     def list_candidates(self, filters: CandidateListFilters) -> list[ShopSourceCandidate]:
         statement = select(ShopSourceCandidate)
@@ -194,7 +204,48 @@ class ShopCandidateCatalog:
             skipped_approved=skipped_approved,
         )
 
-    def approve(self, candidate_id: int) -> ShopSourceCandidate:
+    def suggest_identity(
+        self,
+        candidate: ShopSourceCandidate,
+    ) -> CandidateIdentitySuggestion | None:
+        candidate_key = _normalize_identity_key(candidate.display_name)
+        if not candidate_key:
+            return None
+
+        for identity in self._identity_sources_for_suggestions():
+            identity_keys = [_normalize_identity_key(identity.display_name)]
+            identity_keys.extend(
+                _normalize_identity_key(shop.name) for shop in identity.source_shops
+            )
+            if any(_strong_identity_match(candidate_key, key) for key in identity_keys):
+                return CandidateIdentitySuggestion(
+                    id=identity.id,
+                    display_name=identity.display_name,
+                    status=identity.status,
+                    source_count=len(identity.source_shops),
+                    reason="name_match",
+                )
+
+        return None
+
+    def _identity_sources_for_suggestions(self) -> list[ShopIdentity]:
+        if self._identity_suggestion_sources is None:
+            self._identity_suggestion_sources = list(
+                self._session.scalars(
+                    select(ShopIdentity).order_by(
+                        ShopIdentity.display_name.asc(),
+                        ShopIdentity.id.asc(),
+                    )
+                )
+            )
+        return self._identity_suggestion_sources
+
+    def approve(
+        self,
+        candidate_id: int,
+        *,
+        shop_identity_id: int | None = None,
+    ) -> ShopSourceCandidate:
         candidate = self._session.get(ShopSourceCandidate, candidate_id)
         if candidate is None:
             raise ValueError("shop source candidate not found")
@@ -214,6 +265,7 @@ class ShopCandidateCatalog:
                 source_id=candidate.source_id,
                 source_type="2gis",
                 name=candidate.display_name,
+                shop_identity_id=shop_identity_id,
                 address=candidate.address,
                 url=website_url,
                 scrape_status="scheduled",
@@ -519,6 +571,21 @@ def _official_strategy_for_seed(seed: CandidateDiscoverySeed) -> OfficialSourceS
 
 def _normalize_match_text(value: str) -> str:
     return re.sub(r"\s+", " ", value.casefold().replace("ё", "е")).strip()
+
+
+def _normalize_identity_key(value: str | None) -> str:
+    if value is None:
+        return ""
+    normalized = value.casefold().replace("ё", "е")
+    return re.sub(r"[^0-9a-zа-я]+", "", normalized)
+
+
+def _strong_identity_match(left: str, right: str) -> bool:
+    if not left or not right:
+        return False
+    if left == right:
+        return True
+    return min(len(left), len(right)) >= 5 and (left in right or right in left)
 
 
 def _approved_shop(session: Session, source_id: str) -> Shop | None:

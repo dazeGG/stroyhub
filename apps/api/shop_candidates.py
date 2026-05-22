@@ -39,6 +39,11 @@ class ShopSourceCandidateResponse(BaseModel):
     missing_since: datetime | None
     approved_shop_id: int | None
     official_strategy: dict[str, object] | None = None
+    suggested_identity: dict[str, object] | None = None
+
+
+class ShopSourceCandidateApproveRequest(BaseModel):
+    shop_identity_id: int | None = None
 
 
 class ShopSourceCandidateListResponse(BaseModel):
@@ -60,15 +65,16 @@ def list_shop_source_candidates(
     status: str | None = None,
     include_approved: bool = False,
 ) -> ShopSourceCandidateListResponse:
+    catalog = ShopCandidateCatalog(session)
     try:
-        items = ShopCandidateCatalog(session).list_candidates(
+        items = catalog.list_candidates(
             CandidateListFilters(status=status, include_approved=include_approved)
         )
     except ValueError as exc:
         raise _http_error(exc) from exc
 
     return ShopSourceCandidateListResponse(
-        items=[_candidate_response_model(item) for item in items]
+        items=[_candidate_response_model(item, catalog) for item in items]
     )
 
 
@@ -81,17 +87,21 @@ def refresh_shop_source_candidates(
     session.commit()
     session.expire_all()
     items = catalog.list_candidates(CandidateListFilters())
-    return _refresh_response(summary, items)
+    return _refresh_response(summary, items, catalog)
 
 
 @router.post("/{candidate_id}/approve", response_model=ShopSourceCandidateResponse)
 def approve_shop_source_candidate(
     candidate_id: int,
     session: Annotated[Session, Depends(get_session)],
+    payload: ShopSourceCandidateApproveRequest | None = None,
 ) -> ShopSourceCandidateResponse:
     catalog = ShopCandidateCatalog(session)
     try:
-        candidate = catalog.approve(candidate_id)
+        candidate = catalog.approve(
+            candidate_id,
+            shop_identity_id=payload.shop_identity_id if payload is not None else None,
+        )
     except ValueError as exc:
         raise _http_error(exc) from exc
 
@@ -104,6 +114,7 @@ def approve_shop_source_candidate(
 def _refresh_response(
     summary: CandidateRefreshSummary,
     items: list[ShopSourceCandidate],
+    catalog: ShopCandidateCatalog,
 ) -> ShopSourceCandidateRefreshResponse:
     return ShopSourceCandidateRefreshResponse(
         checked=summary.checked,
@@ -111,7 +122,7 @@ def _refresh_response(
         updated=summary.updated,
         stale=summary.stale,
         skipped_approved=summary.skipped_approved,
-        items=[_candidate_response_model(item) for item in items],
+        items=[_candidate_response_model(item, catalog) for item in items],
     )
 
 
@@ -119,20 +130,33 @@ def _candidate_response(
     candidate_id: int,
     session: Session,
 ) -> ShopSourceCandidateResponse:
-    for item in ShopCandidateCatalog(session).list_candidates(
+    catalog = ShopCandidateCatalog(session)
+    for item in catalog.list_candidates(
         CandidateListFilters(include_approved=True)
     ):
         if item.id == candidate_id:
-            return _candidate_response_model(item)
+            return _candidate_response_model(item, catalog)
     raise HTTPException(status_code=404, detail="shop source candidate not found")
 
 
-def _candidate_response_model(candidate: ShopSourceCandidate) -> ShopSourceCandidateResponse:
+def _candidate_response_model(
+    candidate: ShopSourceCandidate,
+    catalog: ShopCandidateCatalog,
+) -> ShopSourceCandidateResponse:
     response = ShopSourceCandidateResponse.model_validate(candidate)
     if isinstance(candidate.raw, dict):
         strategy = candidate.raw.get("official_strategy")
         if isinstance(strategy, dict):
             response.official_strategy = strategy
+    suggestion = catalog.suggest_identity(candidate)
+    if suggestion is not None:
+        response.suggested_identity = {
+            "id": suggestion.id,
+            "display_name": suggestion.display_name,
+            "status": suggestion.status,
+            "source_count": suggestion.source_count,
+            "reason": suggestion.reason,
+        }
     return response
 
 
