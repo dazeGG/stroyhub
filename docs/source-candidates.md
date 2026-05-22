@@ -12,6 +12,9 @@ implemented source support:
 M13 uses this inventory to decide which official shop catalogs should supersede
 or complement 2GIS before the public product site is built.
 
+The M13 end-of-milestone shop/source readiness checklist lives in
+`docs/shop-readiness.md`.
+
 The lists are implementation planning input only. Before adding a parser, inspect
 the source contract, capture focused fixtures, and update `docs/sources.md` with
 source-specific details.

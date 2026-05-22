@@ -1,0 +1,86 @@
+# M13 Shop Readiness Checklist
+
+This checklist captures the shop/source readiness state at the end of M13 before
+public MVP site work starts.
+
+Snapshot date: 2026-05-22.
+
+Data basis:
+
+- current local database source records and scrape runs;
+- `docs/sources.md` 2GIS validation and official-source notes;
+- `docs/source-candidates.md` M13 official source audit;
+- `docs/category-quality.md` category quality notes.
+
+## Readiness Policy
+
+Use these statuses for public-MVP planning:
+
+- `primary_official`: official shop source should be preferred once it has a
+  recent successful scrape with prices.
+- `fallback_2gis`: usable 2GIS source record; keep as fallback/comparison data,
+  not authoritative when an official source is healthy.
+- `hold_disabled`: do not include in normal scheduled collection or public MVP
+  display until a listed gap is resolved.
+- `out_of_mvp_scope`: useful later, but not required for the construction
+  materials MVP.
+
+The MVP must not add a generic `manual` scrape source. Admin work may manage
+shop identities, source links, source status, notes, and locked metadata, but
+products, prices, and price snapshots should come from external source records:
+`2gis`, `official_api`, or `official_html`.
+
+## Source Summary
+
+| Shop/source | MVP readiness | Primary source | Fallback source | Current data snapshot | Known risks / notes | Next action |
+| --- | --- | --- | --- | --- | --- | --- |
+| Юником | `primary_official` candidate | `unicom`, `official_api`; seeded config has 6 leaf category UUIDs | 2GIS should stay held for normal schedule because it reports about 18k products and only partial slices were validated | No official scrape rows in the current local DB snapshot; 2GIS large-catalog checks were non-persisted research | Official API coverage is configured but must be smoke-run before public display; image URL semantics and stock semantics are still limited | Before M15, seed/run `unicom`, link identity, confirm last successful scrape and category quality |
+| Металл Торг | `primary_official` candidate | `metalltorg`, `official_html`; default configured category is the conservative brick page | 2GIS fallback is persisted: 18 source products, latest successful scrape 2026-05-17 | Local DB has 2GIS fallback only in this snapshot; official parser/seed flow exists | HTML selectors are brittle; default official scope is intentionally small until parser health expands | Before M15, seed/run official HTML source and keep 2GIS as fallback |
+| Евролайн | `fallback_2gis` | None confirmed for MVP | 2GIS branch `70000001007229923` | 106 source products; latest successful scrape 2026-05-17 | Category quality notes include SIP panels and insulation false negatives | Keep enabled as fallback source; review category gaps in M14 |
+| Пирамида | `fallback_2gis` | None confirmed for MVP | 2GIS branch `7037402698836780` | 48 source products; latest successful scrape 2026-05-17 | Contains likely out-of-scope `Мебель` products; dry-mix coverage looks useful | Keep enabled, but filter/review noisy categories before public launch |
+| Ондулин | `fallback_2gis` | None confirmed for MVP | 2GIS branch `7037402698774152` | 183 source products; latest successful scrape 2026-05-17 | Insulation raw category needs better mapping; some products mapped to greenhouse-related categories | Keep enabled; category review needed in M14 |
+| Интехстрой | `fallback_2gis` | Official site exists, but no usable product/catalog signals were confirmed in M13 audit | 2GIS branch `7037402698745664` | 213 source products; latest successful scrape 2026-05-17 | Raw categories include межвенцовый утеплитель, штакетник, and likely out-of-scope household items | Keep 2GIS enabled; official source remains hold |
+| Строительный мир / Орион-Экспрессия | `fallback_2gis` with official-source hold | Official site responded, but breadth still needs validation | 2GIS branch `70000001021201334` | 81 persisted source products in the current local DB; 2GIS validation saw 83 items; latest successful scrape 2026-05-17 | Generic `Материалы`, `Работа`, and special-purpose categories need review; official catalog may be narrower than core sources | Keep 2GIS enabled; create parser research only if M15 needs this shop as official |
+| СибНорд | `hold_disabled` until parser implementation | Candidate official HTML source; follow-up #203 | 2GIS validation returned no priced products | No persisted local source rows in current snapshot | Bitrix pagination uses `PAGEN_1`, but robots policy disallows that pattern; broad pagination needs policy before schedule | Keep out of public MVP unless #203 is implemented and smoke-run |
+| Востоктехторг | `hold_disabled` until parser implementation | Candidate official HTML source; follow-up #205 | 2GIS should stay held because it reports about 18.5k products and validated only partial slices | No persisted local source rows in current snapshot | Large catalog; prefer sitemap/configured pages until pagination and pacing policy are accepted | Keep out of public MVP unless #205 is implemented and smoke-run |
+| Космос, ЛидерСтрой | `hold_disabled` | Official/source quality not accepted for MVP | 2GIS validation returned no prices | No persisted local source rows in current snapshot | No priced source data observed from 2GIS baseline | Keep out of scheduled collection |
+| Decorative/plumbing/engineering shops from the M13 audit | `out_of_mvp_scope` | Later parser backlog only | None for MVP | Not part of current persisted baseline | Assortment is mostly decorative, plumbing, flooring, or engineering-adjacent | Revisit after core construction-material MVP |
+
+## Release-Blocking Gaps
+
+Move these into M14/M15 planning before public-site implementation depends on
+shop/source data:
+
+1. M14: run official-source readiness smoke for Юником and Металл Торг
+   ([#211](https://github.com/dazeGG/stroyhub/issues/211)).
+   Required evidence: seeded source records, latest successful scrape, item
+   counts, error count, and category quality notes in the admin.
+2. M14: link real shop identities to official and 2GIS source records, then set
+   `preferred_source` to the healthy official source where available.
+3. M14: review category-quality gaps for the currently fallback-ready 2GIS
+   sources: insulation, SIP panels, generic `Материалы`, `Работа`, `Мебель`, and
+   other obvious non-product cards
+   ([#212](https://github.com/dazeGG/stroyhub/issues/212)).
+4. M15: public MVP catalog must read from source-specific products and respect
+   source priority; it should not merge cross-shop products until matching is
+   intentionally reintroduced
+   ([#210](https://github.com/dazeGG/stroyhub/issues/210)).
+5. Ongoing parsers: #203 and #205 are not required for the first M15 cut unless
+   СибНорд or Востоктехторг are chosen as launch-critical shops. If they become
+   launch-critical, they block public MVP data readiness until parser, fixtures,
+   scrape smoke, and robots/pacing policy are accepted.
+
+## Pre-M15 Checklist
+
+- [ ] `unicom` official source is seeded, linked to a Юником identity, and has a
+  recent successful or intentionally scoped partial scrape.
+- [ ] `metalltorg` official source is seeded, linked to a Металл Торг identity,
+  and has a recent successful scrape for the configured category set.
+- [ ] Large 2GIS catalogs for Юником and Востоктехторг remain disabled/held for
+  scheduled collection unless a large-catalog mode is implemented.
+- [ ] Every public MVP source record has a clear status in admin:
+  active/preferred, fallback, disabled/hold, or out of MVP scope.
+- [ ] Category quality notes for fallback 2GIS shops are reviewed and either
+  fixed, documented as acceptable, or moved into M14/M15 issues.
+- [ ] Public MVP product pages show source-specific shop attribution and do not
+  imply cross-shop canonical matching.
