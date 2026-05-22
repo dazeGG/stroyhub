@@ -90,17 +90,6 @@ function candidateSignalLabel(candidate: ShopSourceCandidate): string {
   return 'есть цены'
 }
 
-function priceSignal(candidate: ShopSourceCandidate): string {
-  if (candidate.has_prices) {
-    return `${candidate.priced_product_count} с ценой из ${candidate.product_count}`
-  }
-  if (candidate.has_products) {
-    return `Товары есть, цен не найдено (${candidate.product_count})`
-  }
-
-  return 'Цен не найдено'
-}
-
 function canApprove(candidate: ShopSourceCandidate): boolean {
   return candidate.status === 'pending' || candidate.status === 'stale'
 }
@@ -328,24 +317,28 @@ onMounted(() => {
           </button>
         </div>
 
-        <div class="mt-4 grid gap-4 border-t border-neutral-800 pt-4 text-sm text-neutral-400 md:grid-cols-3">
+        <div class="mt-4 grid gap-4 border-t border-neutral-800 pt-4 text-sm text-neutral-400 md:grid-cols-[1fr_auto]">
           <div>
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Цены</p>
-            <p class="mt-2 text-neutral-200">{{ priceSignal(candidate) }}</p>
-          </div>
-          <div>
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Сайт</p>
-            <a
-              v-if="candidate.website_url"
-              :href="candidate.website_url"
-              target="_blank"
-              rel="noreferrer"
-              class="mt-2 inline-flex max-w-full items-center gap-1 truncate text-amber-200 hover:text-amber-100"
-            >
-              <span class="truncate">{{ candidate.website_url }}</span>
-              <Icon :icon="icons.externalLink" class="size-3.5 shrink-0" aria-hidden="true" />
-            </a>
-            <p v-else class="mt-2 text-neutral-500">Сайт не найден</p>
+            <p class="text-xs uppercase tracking-wide text-neutral-600">Сигналы 2GIS</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <span
+                v-if="candidate.has_prices"
+                class="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-200"
+              >
+                <Icon :icon="icons.currencyRubel" class="size-3.5" aria-hidden="true" />
+                Есть товары и цены
+              </span>
+              <span
+                v-if="candidate.has_website"
+                class="inline-flex items-center gap-1 rounded-full border border-sky-400/30 bg-sky-400/10 px-2.5 py-1 text-xs font-medium text-sky-200"
+              >
+                <Icon :icon="icons.externalLink" class="size-3.5" aria-hidden="true" />
+                Есть сайт
+              </span>
+            </div>
+            <p class="mt-2 text-xs text-neutral-500">
+              Ссылка на сайт и товары подтягиваются после утверждения источника.
+            </p>
           </div>
           <div>
             <p class="text-xs uppercase tracking-wide text-neutral-600">Последняя проверка</p>
