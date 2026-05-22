@@ -490,6 +490,121 @@ Implementation follow-up:
 - [#203](https://github.com/dazeGG/stroyhub/issues/203): implement SibNord
   official HTML parser.
 
+## Vostoktechtorg
+
+Accepted official HTML source candidate. Parser implementation is not yet
+scheduled for collection.
+
+Research date: 2026-05-22.
+
+Base URL:
+
+```text
+https://vtt14.ru
+```
+
+Observed strategy:
+
+- Bitrix-powered server-rendered HTML catalog using the Aspro Max storefront.
+- No stable public JSON catalog API was identified during focused research.
+- Product listing pages contain schema.org product/offer metadata, product card
+  HTML, article blocks, stock quantities, and price/unit text.
+- Product detail pages contain schema.org offer metadata and a
+  `setViewedProduct(...)` JavaScript object with product id, name, URL, measure,
+  price, currency, quantity ratio, and buyability signals.
+- `sitemap-iblock-15.xml` exposed 19,493 catalog URLs during research, with
+  per-URL `lastmod` timestamps.
+
+Representative pages:
+
+| Page | URL | Observed notes |
+| --- | --- | --- |
+| Catalog root | `https://vtt14.ru/catalog/` | Top-level category navigation page. |
+| Construction materials category | `https://vtt14.ru/catalog/stroitelnye_materialy/` | 20 product cards on page 1, `data-all_count="537"`, pagination to `?PAGEN_1=27`. |
+| Construction materials page 2 | `https://vtt14.ru/catalog/stroitelnye_materialy/?PAGEN_1=2` | Returned 20 product cards during research. |
+| Bitumen lacquer product | `https://vtt14.ru/catalog/stroitelnye_materialy/lakokrasochnaya_produktsiya/lak_bt_577_bitumnyy_kuzbasslak_17_kg_imperiya/` | Product detail page for source product id `223784`, article `00044084`, price `175` RUB per kg. |
+
+Observed category tree signals:
+
+- Top-level categories visible from catalog navigation include `Вентиляция`,
+  `Генераторы, ИБП, Солнечные системы`, `Инструмент`, `Климатическое
+  оборудование`, `Крепёж`, `Металлопродукция`, `Насосное оборудование`,
+  `Оборудование и средства пожаротушения`, `Спецодежда и средства защиты`,
+  `Инженерные системы`, `Резина.Асбест`, `Строительные материалы`,
+  `Смазочные материалы`, `Теплоизоляция`, `Хозяйственные принадлежности`, and
+  `Электротовары`.
+- The construction-material section displayed 16 direct child sections during
+  research, including `Гидро-ветро- изоляция`, `Гипсокартон`, `Двери`,
+  `Кирпич, глина, мертель, известь`, `Лакокрасочная продукция`,
+  `Пена монтажная, герметики, клеи`, and `Продукция деревопереработки`.
+
+Observed listing selectors and signals:
+
+| Field | Selector or extraction hint |
+| --- | --- |
+| Product card | `div.catalog-block-view__item.item_block[data-id]` |
+| Source product id | `data-id` on the product card, add-to-cart button, or stock block |
+| Product detail URL | `.item-title a[href]`, `.thumb[href]`, or `link[itemprop="url"]` |
+| Title | `.item-title a span`, or `meta[itemprop="name"]` |
+| Price | `meta[itemprop="price"]`, `.price_value`, or add-to-cart `data-value` |
+| Currency | `meta[itemprop="priceCurrency"]`, observed as `RUB` |
+| Unit | `.price_measure`, observed examples include `/кг`, `/шт`, `/м2`, `/рулон` |
+| Availability | `link[itemprop="availability"]`, plus visible `.item-stock` text |
+| Stock quantity | `.item-stock` text such as `В наличии: 2242`, or button `data-max` |
+| Article/code | `.article_block[data-value]`, observed as `00044084` |
+| Image | `meta[itemprop="image"]`, `img[data-src]`, or `img[src]` |
+| Category path | Breadcrumbs and section URL path |
+
+Observed detail selectors and signals:
+
+| Field | Selector or extraction hint |
+| --- | --- |
+| Title | `h1#pagetitle` |
+| Source product id | `setViewedProduct(PRODUCT_ID, ...)`, button `data-item`, or detail URL mapping from sitemap |
+| Source article/code | `.article__value[itemprop="value"]`, observed as `00044084` |
+| Price | `meta[itemprop="price"]`, `.price_value`, or `setViewedProduct.MIN_PRICE.PRICE` |
+| Currency | `meta[itemprop="priceCurrency"]`, or `setViewedProduct.MIN_PRICE.CURRENCY` |
+| Unit | `.price_measure`, or `setViewedProduct.CATALOG_MEASURE_NAME` |
+| Availability | `link[itemprop="availability"]` and `.item-stock` |
+| Stock quantity | `.item-stock` text such as `В наличии: 2242 в 2 филиалах` |
+| Image | `link[itemprop="image"]`, gallery image, or sitemap/detail metadata |
+| Source timestamp | sitemap `lastmod`; no product-detail updated-at field was observed in HTML |
+
+Pagination and pacing notes:
+
+- `Строительные материалы` reported 537 products, 20 product cards per page,
+  and 27 pages during research.
+- Bitrix pagination loads the same category URL with `?PAGEN_1=N`.
+- `https://vtt14.ru/robots.txt` disallows `/*?PAGEN` for generic user agents,
+  so scheduled broad pagination must not be enabled without an explicit policy
+  decision.
+- Sitemap-driven product URL discovery is more promising than pagination for
+  this source because `sitemap-iblock-15.xml` contains catalog URLs and
+  `lastmod` timestamps.
+- Full-site official catalog size is large: 19,493 catalog URLs were exposed in
+  the sitemap. The construction-material section is much smaller at 537 listed
+  products and is a better first parser scope.
+
+Source precedence:
+
+- Vostoktechtorg official catalog should supersede 2GIS for this shop once
+  parser health is accepted.
+- The official source is likely a better answer than the 2GIS large-catalog
+  partial scrape: it has official prices, stock quantities, article codes,
+  category paths, product detail URLs, and sitemap timestamps.
+- Keep 2GIS as fallback/comparison data until the official parser has successful
+  repeated runs.
+
+Focused fixtures:
+
+- `tests/fixtures/vostoktechtorg/category-stroitelnye-materialy-page1.html`;
+- `tests/fixtures/vostoktechtorg/product-223784.html`.
+
+Implementation follow-up:
+
+- [#205](https://github.com/dazeGG/stroyhub/issues/205): implement
+  Vostoktechtorg official HTML parser.
+
 ## Unicom Yakutsk
 
 Secondary JSON source.
