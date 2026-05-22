@@ -62,7 +62,8 @@ The setup flow runs:
 
 1. `scripts/seed_categories.py`
 2. `scripts/seed_unicom_source.py`
-3. `scripts/seed_twogis_whitelist.py`
+3. `scripts/seed_metalltorg_source.py`
+4. `scripts/seed_twogis_whitelist.py`
 
 These seed flows are idempotent and can be repeated.
 
@@ -75,6 +76,18 @@ uv run python scripts/seed_unicom_source.py
 The Unicom seed writes one `shops` row with `source=unicom` and
 `source_type=official_api`. Its `raw` config stores the category UUID list,
 `limit`, `max_pages`, and sort order used by scheduled collection.
+
+To configure only the official Metalltorg HTML source:
+
+```bash
+uv run python scripts/seed_metalltorg_source.py
+```
+
+The Metalltorg seed writes one `shops` row with `source=metalltorg` and
+`source_type=official_html`. Its default config is intentionally conservative:
+one known construction-material category URL, sequential requests only, and
+`max_pages=3`. Add more category URLs only after selector health is checked
+against fixtures.
 
 ## 4. Run an Explicit Live Smoke Check
 
@@ -142,6 +155,7 @@ The due-shop dispatcher currently supports:
 
 - `2gis` branch scrapes;
 - `unicom` official API scrapes from the seeded category UUID config.
+- `metalltorg` official HTML scrapes from the seeded category URL config.
 
 For a one-off worker dispatch from Python/Celery internals, use the existing
 `stroyhub.scrape_due_shops` task rather than adding live network calls to tests.
@@ -153,6 +167,7 @@ Recent scrape runs:
 ```bash
 uv run python scripts/report_scrape_runs.py --source 2gis --days 7
 uv run python scripts/report_scrape_runs.py --source unicom --days 7
+uv run python scripts/report_scrape_runs.py --source metalltorg --days 7
 ```
 
 Uncategorized product coverage:
@@ -160,6 +175,7 @@ Uncategorized product coverage:
 ```bash
 uv run python scripts/report_category_coverage.py --source 2gis
 uv run python scripts/report_category_coverage.py --source unicom
+uv run python scripts/report_category_coverage.py --source metalltorg
 ```
 
 Product API smoke:
@@ -217,8 +233,10 @@ Guidance:
 
 - Keep live checks explicit.
 - Do not add live calls to default tests.
-- Unicom official API collection is sequential by configured category UUID. Do
-  not add concurrent category scraping until rate-limit behavior is known.
+- Unicom official API collection is sequential by configured category UUID.
+- Metalltorg official HTML collection is sequential by configured category URL
+  and should be treated as selector-brittle.
+- Do not add concurrent source scraping until rate-limit behavior is known.
 - Keep very large unknown catalogs such as Востоктехторг out of normal
   scheduled collection until source-specific pacing is documented. See
   `docs/sources.md`.

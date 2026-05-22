@@ -533,6 +533,22 @@ Sample pages:
 | Brick category | `https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/` | Product listing page with 1 product card and no multi-page pagination. |
 | Brick product | `https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/120420/` | Product detail page for article `24407`. |
 
+Scheduled M13 collection:
+
+- Source identity: `source=metalltorg`, `source_type=official_html`,
+  `source_id=metalltorg-yakutsk`.
+- Seed command: `uv run python scripts/seed_metalltorg_source.py`.
+- Default category URL config is intentionally small:
+  `https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/`.
+- Default pacing is sequential pages/categories, no concurrent requests,
+  `timeout=20.0`, and `max_pages=3`.
+- A scrape reaching `max_pages` or page-level fetch failures records a
+  `partial` scrape run; an orchestration exception records a failed scrape run
+  and marks the shop failed.
+- Treat selectors as brittle HTML contracts. Parser fixtures under
+  `tests/fixtures/metalltorg/` are the characterization baseline and should be
+  updated deliberately when source markup changes.
+
 Observed listing selectors:
 
 | Field | Selector or extraction hint |

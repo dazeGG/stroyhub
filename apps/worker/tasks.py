@@ -5,10 +5,13 @@ from typing import Any
 
 from stroyhub.db import SessionLocal
 from stroyhub.models import Shop
+from stroyhub.parsers.metalltorg import METALLTORG_SOURCE
 from stroyhub.parsers.unicom import UNICOM_SOURCE
 from stroyhub.scraping import (
+    persist_metalltorg_scrape_failure,
     persist_twogis_scrape_result,
     persist_unicom_scrape_failure,
+    scrape_metalltorg_shop,
     scrape_twogis_branch,
     scrape_unicom_shop,
 )
@@ -21,7 +24,7 @@ from stroyhub.scraping.scheduler import (
 from apps.worker.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
-SUPPORTED_SCHEDULED_SOURCES = frozenset({"2gis", UNICOM_SOURCE})
+SUPPORTED_SCHEDULED_SOURCES = frozenset({"2gis", METALLTORG_SOURCE, UNICOM_SOURCE})
 
 
 @celery_app.task(name="stroyhub.scrape_due_shops")  # type: ignore[untyped-decorator]
@@ -76,7 +79,7 @@ def scrape_shop(shop_id: int) -> dict[str, Any]:
                 products_seen = result.items_seen
                 products_saved = persisted_twogis.source_products_saved
                 price_snapshots_saved = persisted_twogis.price_snapshots_saved
-            else:
+            elif shop.source == UNICOM_SOURCE:
                 persisted_unicom = scrape_unicom_shop(
                     session,
                     shop,
@@ -86,6 +89,16 @@ def scrape_shop(shop_id: int) -> dict[str, Any]:
                 products_seen = persisted_unicom.products_seen
                 products_saved = persisted_unicom.source_products_saved
                 price_snapshots_saved = persisted_unicom.price_snapshots_saved
+            else:
+                persisted_metalltorg = scrape_metalltorg_shop(
+                    session,
+                    shop,
+                    finished_at=completed_at,
+                )
+                scrape_status = persisted_metalltorg.scrape_status
+                products_seen = persisted_metalltorg.products_seen
+                products_saved = persisted_metalltorg.source_products_saved
+                price_snapshots_saved = persisted_metalltorg.price_snapshots_saved
 
             mark_shop_scrape_completion(
                 shop,
@@ -102,6 +115,13 @@ def scrape_shop(shop_id: int) -> dict[str, Any]:
             if failed_shop is not None:
                 if source == UNICOM_SOURCE:
                     persist_unicom_scrape_failure(
+                        session,
+                        failed_shop,
+                        error=error,
+                        failed_at=failed_at,
+                    )
+                if source == METALLTORG_SOURCE:
+                    persist_metalltorg_scrape_failure(
                         session,
                         failed_shop,
                         error=error,

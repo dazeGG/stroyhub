@@ -56,6 +56,15 @@ def test_scrape_due_shops_schedules_supported_sources(
             next_scrape_at=now - timedelta(minutes=1),
         )
     )
+    metalltorg_shop = repository.upsert(
+        ShopUpsert(
+            source="metalltorg",
+            source_id="worker-due-metalltorg",
+            source_type="official_html",
+            name="Metalltorg Due",
+            next_scrape_at=now - timedelta(minutes=1),
+        )
+    )
     unsupported_shop = repository.upsert(
         ShopUpsert(
             source="unsupported-worker",
@@ -70,14 +79,14 @@ def test_scrape_due_shops_schedules_supported_sources(
     monkeypatch.setattr(
         worker_tasks,
         "list_due_shops",
-        lambda *args, **kwargs: [twogis_shop, unicom_shop, unsupported_shop],
+        lambda *args, **kwargs: [twogis_shop, unicom_shop, metalltorg_shop, unsupported_shop],
     )
 
     try:
         result = worker_tasks.scrape_due_shops.run(limit=10)
 
-        assert result["scheduled"] == 2
-        assert scheduled_shop_ids == [twogis_shop.id, unicom_shop.id]
+        assert result["scheduled"] == 3
+        assert scheduled_shop_ids == [twogis_shop.id, unicom_shop.id, metalltorg_shop.id]
     finally:
         _delete_worker_test_shops(db_session)
 
@@ -160,6 +169,84 @@ def test_scrape_shop_records_unicom_failure_run(
         _delete_worker_test_shops(db_session)
 
 
+def test_scrape_shop_runs_metalltorg_source_without_live_network(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="metalltorg",
+            source_id="worker-metalltorg-shop",
+            source_type="official_html",
+            name="Metalltorg Worker",
+            next_scrape_at=datetime.now(UTC) - timedelta(minutes=1),
+            raw={"category_urls": ["https://example.test/catalog/"]},
+        )
+    )
+    db_session.commit()
+
+    def fake_scrape_metalltorg_shop(*args: object, **kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            scrape_status="success",
+            products_seen=1,
+            source_products_saved=1,
+            price_snapshots_saved=1,
+        )
+
+    monkeypatch.setattr(worker_tasks, "scrape_metalltorg_shop", fake_scrape_metalltorg_shop)
+
+    try:
+        result = worker_tasks.scrape_shop.run(shop.id)
+        db_session.expire_all()
+        refreshed_shop = db_session.get(Shop, shop.id)
+
+        assert result["source"] == "metalltorg"
+        assert result["status"] == "success"
+        assert result["products_seen"] == 1
+        assert refreshed_shop is not None
+        assert refreshed_shop.scrape_status == "success"
+    finally:
+        _delete_worker_test_shops(db_session)
+
+
+def test_scrape_shop_records_metalltorg_failure_run(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="metalltorg",
+            source_id="worker-metalltorg-failure",
+            source_type="official_html",
+            name="Metalltorg Failure",
+            raw={"category_urls": ["https://example.test/catalog/"]},
+        )
+    )
+    db_session.commit()
+
+    def fake_scrape_metalltorg_shop(*args: object, **kwargs: object) -> SimpleNamespace:
+        raise RuntimeError("selector changed")
+
+    monkeypatch.setattr(worker_tasks, "scrape_metalltorg_shop", fake_scrape_metalltorg_shop)
+
+    try:
+        with pytest.raises(RuntimeError, match="selector changed"):
+            worker_tasks.scrape_shop.run(shop.id)
+
+        db_session.expire_all()
+        refreshed_shop = db_session.get(Shop, shop.id)
+        failure_run = db_session.scalar(
+            select(ScrapeRun).where(ScrapeRun.shop_id == shop.id, ScrapeRun.status == "failed")
+        )
+        assert refreshed_shop is not None
+        assert refreshed_shop.scrape_status == "failed"
+        assert failure_run is not None
+        assert failure_run.source == "metalltorg"
+        assert failure_run.error == "selector changed"
+    finally:
+        _delete_worker_test_shops(db_session)
+
+
 def _delete_worker_test_shops(session: Session) -> None:
     shop_ids = list(
         session.scalars(
@@ -168,9 +255,12 @@ def _delete_worker_test_shops(session: Session) -> None:
                     [
                         "worker-due-2gis",
                         "worker-due-unicom",
+                        "worker-due-metalltorg",
                         "worker-due-unsupported",
                         "worker-unicom-shop",
                         "worker-unicom-failure",
+                        "worker-metalltorg-shop",
+                        "worker-metalltorg-failure",
                     ]
                 )
             )
