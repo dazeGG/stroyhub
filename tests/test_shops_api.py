@@ -349,3 +349,38 @@ def test_retry_shop_scrape_rejects_running_source(
 
     assert response.status_code == 409
     assert response.json()["detail"] == "shop scrape is already running"
+
+
+def test_retry_shop_scrape_returns_503_when_enqueue_fails(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="metalltorg",
+            source_id="shops-api-enqueue-fail",
+            source_type="official_html",
+            name="Enqueue Fail Shop",
+            scrape_status="failed",
+        )
+    )
+    monkeypatch.setattr(
+        "apps.admin_api.shops.enqueue_shop_scrape",
+        lambda shop_id: {
+            "shop_id": shop_id,
+            "status": "enqueue_failed",
+            "reason": "redis unavailable",
+        },
+    )
+
+    response = client.post(f"/shops/{shop.id}/scrape/retry")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "redis unavailable"
+    db_session.expire(shop)
+    assert isinstance(shop.raw, dict)
+    enqueue_failed = shop.raw.get("enqueue_failed")
+    assert isinstance(enqueue_failed, dict)
+    assert enqueue_failed["operation"] == "shop_retry"
+    assert enqueue_failed["reason"] == "redis unavailable"
