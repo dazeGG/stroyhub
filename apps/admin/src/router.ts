@@ -13,6 +13,17 @@ import ShopSourceManagementPage from './views/ShopSourceManagementPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    }
+
+    if (to.path === '/products' && from.path === '/products') {
+      return false
+    }
+
+    return { top: 0 }
+  },
   routes: [
     { path: '/', name: 'dashboard', component: DashboardPage },
     { path: '/products', name: 'source-products', component: CatalogPage },
