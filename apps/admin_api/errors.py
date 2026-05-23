@@ -75,11 +75,26 @@ def install_error_handlers(app: FastAPI) -> None:
         )
 
 
-def api_error_responses(*status_codes: int) -> dict[int, dict[str, Any]]:
-    return {
-        status_code: {
+def api_error_responses(*status_codes: int) -> dict[int | str, dict[str, Any]]:
+    responses: dict[int | str, dict[str, Any]] = {}
+    for status_code in status_codes:
+        if status_code == 422:
+            responses[status_code] = {
+                "description": "Validation error or typed API error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "oneOf": [
+                                {"$ref": "#/components/schemas/HTTPValidationError"},
+                                {"$ref": "#/components/schemas/ApiErrorResponse"},
+                            ]
+                        }
+                    }
+                },
+            }
+            continue
+        responses[status_code] = {
             "model": ApiErrorResponse,
             "description": f"Error {status_code}",
         }
-        for status_code in status_codes
-    }
+    return responses

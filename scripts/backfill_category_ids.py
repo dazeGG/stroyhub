@@ -124,7 +124,13 @@ def backfill_products(
 
 
 def _has_active_category_override(product: Any) -> bool:
-    overrides = getattr(product, "category_overrides", None)
+    product_values = getattr(product, "__dict__", None)
+    if isinstance(product_values, dict):
+        if "category_overrides" not in product_values:
+            return False
+        overrides = product_values["category_overrides"]
+    else:
+        overrides = getattr(product, "category_overrides", None)
     if not isinstance(overrides, (list, tuple)):
         return False
     return any(getattr(override, "status", None) == "active" for override in overrides)

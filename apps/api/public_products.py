@@ -95,7 +95,7 @@ def search_products(
         limit=limit,
         offset=offset,
     )
-    catalog = ProductCatalog(session)
+    catalog = ProductCatalog(session, public_visibility=True)
     items = [
         PublicProductSearchItemResponse.model_validate(item)
         for item in catalog.search_products(filters)
@@ -113,7 +113,7 @@ def get_product(
     product_id: int,
     session: Annotated[Session, Depends(get_session)],
 ) -> PublicProductSearchItemResponse:
-    item = ProductCatalog(session).get_product(product_id)
+    item = ProductCatalog(session, public_visibility=True).get_product(product_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Source product not found")
     return PublicProductSearchItemResponse.model_validate(item)
@@ -124,7 +124,7 @@ def list_product_prices(
     product_id: int,
     session: Annotated[Session, Depends(get_session)],
 ) -> PublicProductPriceHistoryResponse:
-    catalog = ProductCatalog(session)
+    catalog = ProductCatalog(session, public_visibility=True)
     if not catalog.source_product_exists(product_id):
         raise HTTPException(status_code=404, detail="Source product not found")
 

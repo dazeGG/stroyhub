@@ -21,7 +21,9 @@ from stroyhub.db import (
 from stroyhub.models import Category, CategoryOverride
 
 from apps.admin_api.main import create_app
-from apps.admin_api.products import get_session
+from apps.admin_api.products import get_session as get_admin_session
+from apps.api.main import create_app as create_public_app
+from apps.api.public_products import get_session as get_public_session
 
 
 @pytest.fixture
@@ -53,7 +55,22 @@ def client(db_session: Session) -> Iterator[TestClient]:
     def override_get_session() -> Iterator[Session]:
         yield db_session
 
-    app.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[get_admin_session] = override_get_session
+
+    with TestClient(app) as test_client:
+        yield test_client
+
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def public_client(db_session: Session) -> Iterator[TestClient]:
+    app = create_public_app()
+
+    def override_get_session() -> Iterator[Session]:
+        yield db_session
+
+    app.dependency_overrides[get_public_session] = override_get_session
 
     with TestClient(app) as test_client:
         yield test_client
@@ -623,6 +640,16 @@ def test_product_category_override_endpoint_rejects_root_category(
     }
 
 
+def test_product_category_override_openapi_documents_business_and_validation_422() -> None:
+    schema = create_app().openapi()
+    response_schema = schema["paths"]["/products/{product_id}/category-override"]["put"][
+        "responses"
+    ]["422"]["content"]["application/json"]["schema"]
+
+    assert {"$ref": "#/components/schemas/ApiErrorResponse"} in response_schema["oneOf"]
+    assert {"$ref": "#/components/schemas/HTTPValidationError"} in response_schema["oneOf"]
+
+
 def test_product_category_override_revert_returns_404_without_active_override(
     client: TestClient, db_session: Session
 ) -> None:
@@ -780,7 +807,7 @@ def test_product_price_history_endpoint_returns_404_for_missing_product(
 
 
 def test_public_products_prefer_healthy_identity_preferred_source(
-    client: TestClient,
+    public_client: TestClient,
     db_session: Session,
 ) -> None:
     identity = ShopIdentityRepository(db_session).create(
@@ -823,7 +850,7 @@ def test_public_products_prefer_healthy_identity_preferred_source(
         )
     )
 
-    response = client.get("/products", params={"q": "Priority Cement M500"})
+    response = public_client.get("/products", params={"q": "Priority Cement M500"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -831,12 +858,69 @@ def test_public_products_prefer_healthy_identity_preferred_source(
     assert [item["id"] for item in payload["items"]] == [preferred_product.id]
     assert payload["items"][0]["shop"]["source"] == "unicom"
 
-    assert client.get(f"/products/{fallback_product.id}").status_code == 404
-    assert client.get(f"/products/{fallback_product.id}/prices").status_code == 404
+    assert public_client.get(f"/products/{fallback_product.id}").status_code == 404
+    assert public_client.get(f"/products/{fallback_product.id}/prices").status_code == 404
+
+
+def test_admin_products_keep_fallback_source_products_visible(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    identity = ShopIdentityRepository(db_session).create(
+        ShopIdentityCreate(display_name="Admin Preferred Shop", preferred_source="unicom")
+    )
+    fallback_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="admin-priority-fallback",
+            name="Admin Fallback Shop",
+            shop_identity_id=identity.id,
+            scrape_status="success",
+        )
+    )
+    preferred_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="admin-priority-preferred",
+            name="Admin Preferred Shop",
+            shop_identity_id=identity.id,
+            scrape_status="success",
+        )
+    )
+    fallback_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=fallback_shop.id,
+            source="2gis",
+            source_product_id="admin-priority-fallback-product",
+            title="Admin Priority Cement M500",
+            normalized_title="admin priority cement m500",
+        )
+    )
+    preferred_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=preferred_shop.id,
+            source="unicom",
+            source_product_id="admin-priority-preferred-product",
+            title="Admin Priority Cement M500",
+            normalized_title="admin priority cement m500",
+        )
+    )
+
+    response = client.get("/products", params={"q": "Admin Priority Cement M500"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 2
+    assert {item["id"] for item in payload["items"]} == {
+        fallback_product.id,
+        preferred_product.id,
+    }
+    assert client.get(f"/products/{fallback_product.id}").status_code == 200
+    assert client.get(f"/products/{fallback_product.id}/prices").status_code == 200
 
 
 def test_public_products_fall_back_when_preferred_source_is_unhealthy(
-    client: TestClient,
+    public_client: TestClient,
     db_session: Session,
 ) -> None:
     identity = ShopIdentityRepository(db_session).create(
@@ -879,7 +963,7 @@ def test_public_products_fall_back_when_preferred_source_is_unhealthy(
         )
     )
 
-    response = client.get("/products", params={"q": "Fallback Cement M400"})
+    response = public_client.get("/products", params={"q": "Fallback Cement M400"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -890,7 +974,7 @@ def test_public_products_fall_back_when_preferred_source_is_unhealthy(
 
 @pytest.mark.parametrize("identity_status", ["hold", "disabled", "out_of_scope"])
 def test_public_products_hide_non_active_shop_identity_statuses(
-    client: TestClient,
+    public_client: TestClient,
     db_session: Session,
     identity_status: str,
 ) -> None:
@@ -916,8 +1000,8 @@ def test_public_products_hide_non_active_shop_identity_statuses(
         )
     )
 
-    response = client.get("/products", params={"q": f"Hidden Product {identity_status}"})
+    response = public_client.get("/products", params={"q": f"Hidden Product {identity_status}"})
 
     assert response.status_code == 200
     assert response.json()["total"] == 0
-    assert client.get(f"/products/{product.id}").status_code == 404
+    assert public_client.get(f"/products/{product.id}").status_code == 404
