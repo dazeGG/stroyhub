@@ -280,6 +280,19 @@ Use GitHub Issues for task status, backlog, acceptance criteria, and implementat
 
 If an issue discussion creates a lasting architectural or data-model decision, update the appropriate `docs/*.md` file as part of the work.
 
+## Agent Memory
+
+When `agentmemory` is available, use it proactively to save durable working context that should carry across sessions.
+
+Save concise notes for:
+
+- user preferences about workflow, communication style, and tool usage;
+- recurring implementation patterns and repository conventions discovered while working;
+- lasting architecture, data-model, or source-integration decisions;
+- non-obvious bugs, fixes, and verification lessons that may help future work.
+
+Do not save secrets, credentials, `.env` values, temporary scratch details, or short-lived task status. Keep GitHub Issues and the StroyHub MVP GitHub Project as the source of truth for backlog and task status. Keep repo docs as the source of truth for long-lived project decisions, and use memory as a cross-session reminder to consult or update those docs.
+
 ## GitHub Tracker
 
 Tasks are tracked in GitHub Issues and the StroyHub MVP GitHub Project.
