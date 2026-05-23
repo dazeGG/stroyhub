@@ -117,6 +117,9 @@ def scrape_metalltorg_category(
         products.extend(page.products)
         priced_products += sum(1 for product in page.products if product.price is not None)
         total_count = page.total_count if page.total_count is not None else total_count
+        if _has_seen_reported_total(products_seen=len(products), total_count=total_count):
+            pending_urls.clear()
+            break
 
         for next_url in page.next_page_urls:
             if next_url not in seen_urls and next_url not in pending_urls:
@@ -490,6 +493,10 @@ def _shop_raw(result: MetalltorgScrapeResult) -> JsonObject:
         "stop_reason": result.stop_reason,
         "failures": result.failures,
     }
+
+
+def _has_seen_reported_total(*, products_seen: int, total_count: int | None) -> bool:
+    return total_count is not None and products_seen >= total_count
 
 
 def _scrape_run_raw(result: MetalltorgScrapeResult) -> JsonObject:

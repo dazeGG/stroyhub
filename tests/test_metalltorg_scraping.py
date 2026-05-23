@@ -1,15 +1,18 @@
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import httpx
 import pytest
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
 from stroyhub.db import ShopRepository, ShopUpsert
 from stroyhub.models import PriceSnapshot, ScrapeRun, Shop, SourceProduct
+from stroyhub.parsers.common import ParsedProduct
+from stroyhub.parsers.metalltorg.parser import MetalltorgListingPage
 from stroyhub.scraping import (
     persist_metalltorg_scrape_failure,
     persist_metalltorg_scrape_result,
@@ -32,6 +35,12 @@ def db_session() -> Iterator[Session]:
 
     transaction = connection.begin()
     session = Session(bind=connection, autoflush=False, expire_on_commit=False)
+    session.execute(
+        text(
+            "TRUNCATE price_snapshots, source_products, scrape_runs, shops, "
+            "shop_identities, categories RESTART IDENTITY CASCADE"
+        )
+    )
 
     try:
         yield session
@@ -55,6 +64,50 @@ def test_scrape_metalltorg_category_collects_fixture_products() -> None:
     assert result.products_seen == 1
     assert result.priced_products == 1
     assert result.products[0].source == "metalltorg"
+
+
+def test_scrape_metalltorg_category_completes_when_reported_total_is_seen(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed_at = datetime(2026, 5, 18, 10, 0, tzinfo=UTC)
+
+    def fake_parse_listing_page(
+        html: str,
+        *,
+        page_url: str,
+        parsed_at: datetime,
+    ) -> MetalltorgListingPage:
+        return MetalltorgListingPage(
+            products=[
+                _parsed_product("one", parsed_at=parsed_at),
+                _parsed_product("two", parsed_at=parsed_at),
+            ],
+            next_page_urls=[
+                "https://metalltorg.biz/catalog/stroitelnye_materialy_1/?PAGEN_1=2",
+                "https://metalltorg.biz/catalog/stroitelnye_materialy_1/?PAGEN_1=3",
+            ],
+            total_count=2,
+            raw={"page_url": page_url, "html": html},
+        )
+
+    monkeypatch.setattr(
+        "stroyhub.scraping.metalltorg.parse_listing_page",
+        fake_parse_listing_page,
+    )
+
+    result = scrape_metalltorg_category(
+        start_url="https://metalltorg.biz/catalog/stroitelnye_materialy_1/",
+        max_pages=1,
+        fetch=lambda url, timeout: "<html></html>",
+        parsed_at=observed_at,
+    )
+
+    assert result.completeness == "complete"
+    assert result.stop_reason == "complete"
+    assert result.pages_seen == 1
+    assert result.products_seen == 2
+    assert result.total_count == 2
+    assert result.next_pages_seen == 0
 
 
 def test_persist_metalltorg_scrape_result_saves_products_and_snapshots(
@@ -180,6 +233,26 @@ def test_persist_metalltorg_scrape_failure_records_failed_run(db_session: Sessio
     assert scrape_run.status == "failed"
     assert scrape_run.source == "metalltorg"
     assert scrape_run.error == "selector changed"
+
+
+def _parsed_product(source_product_id: str, *, parsed_at: datetime) -> ParsedProduct:
+    return ParsedProduct(
+        source="metalltorg",
+        shop_source_id="metalltorg-yakutsk",
+        source_product_id=source_product_id,
+        title=f"Product {source_product_id}",
+        normalized_title=f"product {source_product_id}",
+        fingerprint=f"fingerprint-{source_product_id}",
+        description=None,
+        category_raw="Строительные материалы",
+        unit_raw="шт",
+        price=Decimal("100.00"),
+        currency="RUB",
+        image_url=None,
+        source_updated_at=None,
+        raw={"product_url": f"https://example.test/{source_product_id}"},
+        parsed_at=parsed_at,
+    )
 
 
 def _fixture_fetch(url: str, timeout: float) -> str:
