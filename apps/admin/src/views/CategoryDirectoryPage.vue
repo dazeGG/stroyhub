@@ -259,7 +259,6 @@ onMounted(() => {
               </span>
               <div class="min-w-0">
                 <p class="truncate text-base font-semibold text-white" :title="category.name">{{ category.name }}</p>
-                <p class="mt-1 truncate font-mono text-xs text-neutral-500" :title="category.slug">{{ category.slug }}</p>
               </div>
             </div>
             <div class="min-w-0 md:text-right">
@@ -292,7 +291,6 @@ onMounted(() => {
             >
               <div class="min-w-0 pl-10 md:pl-12">
                 <p class="truncate font-medium text-neutral-200" :title="child.name">{{ child.name }}</p>
-                <p class="mt-1 truncate font-mono text-xs text-neutral-500" :title="child.slug">{{ child.slug }}</p>
               </div>
               <p class="min-w-0 truncate font-mono text-xs text-neutral-400 md:text-right" :title="child.slug">
                 {{ child.slug }}
