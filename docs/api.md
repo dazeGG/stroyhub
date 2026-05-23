@@ -832,5 +832,3 @@ Example response:
   ]
 }
 ```
-Query param `status` is optional; allowed:
-`pending`, `stale`, `hidden`, `archived`, `approved`.
