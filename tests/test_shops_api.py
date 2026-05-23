@@ -110,6 +110,7 @@ def test_shops_endpoint_lists_shops_without_raw_payload(
         "error_count": 3,
         "is_preferred_source": True,
         "twogis_large_catalog": None,
+        "enqueue_failed": None,
     }
     assert "raw" not in item
 
@@ -326,6 +327,41 @@ def test_retry_shop_scrape_marks_source_scheduled_and_enqueues_task(
     assert shop.next_scrape_at is not None
 
 
+def test_retry_shop_scrape_retries_scheduled_shop_with_enqueue_failure(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="metalltorg",
+            source_id="shops-api-retry-enqueue-failed",
+            source_type="official_html",
+            name="Retry Enqueue Failed",
+            scrape_status="scheduled",
+            raw={
+                "enqueue_failed": {
+                    "operation": "shop_retry",
+                    "failed_at": "2026-05-23T10:00:00+00:00",
+                    "reason": "redis unavailable",
+                }
+            },
+        )
+    )
+
+    monkeypatch.setattr(
+        "apps.admin_api.shops.enqueue_shop_scrape",
+        lambda shop_id: {"shop_id": shop_id, "status": "queued", "task_id": "retry-task"},
+    )
+
+    response = client.post(f"/shops/{shop.id}/scrape/retry")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"
+    db_session.expire(shop)
+    assert shop.raw is None or "enqueue_failed" not in shop.raw
+
+
 def test_retry_shop_scrape_rejects_running_source(
     client: TestClient,
     db_session: Session,
@@ -384,3 +420,7 @@ def test_retry_shop_scrape_returns_503_when_enqueue_fails(
     assert isinstance(enqueue_failed, dict)
     assert enqueue_failed["operation"] == "shop_retry"
     assert enqueue_failed["reason"] == "redis unavailable"
+    shops = client.get("/shops", params={"source": "metalltorg"}).json()["items"]
+    item = next(item for item in shops if item["id"] == shop.id)
+    assert item["enqueue_failed"]["operation"] == "shop_retry"
+    assert item["enqueue_failed"]["reason"] == "redis unavailable"

@@ -1,5 +1,11 @@
 """Scraping orchestration services."""
 
+from stroyhub.scraping.enqueue import (
+    EnqueueFailure,
+    clear_enqueue_failed,
+    enqueue_failure_state,
+    mark_enqueue_failed,
+)
 from stroyhub.scraping.metalltorg import (
     MetalltorgPersistResult,
     MetalltorgScrapeResult,
@@ -43,6 +49,9 @@ __all__ = [
     "UnicomCategoryBatchState",
     "UnicomPersistResult",
     "UnicomScrapeResult",
+    "EnqueueFailure",
+    "clear_enqueue_failed",
+    "enqueue_failure_state",
     "metalltorg_shop_scrape_config",
     "persist_metalltorg_scrape_failure",
     "persist_metalltorg_scrape_result",
@@ -58,4 +67,3 @@ __all__ = [
     "unicom_category_batch_state",
     "unicom_shop_scrape_config",
 ]
-from stroyhub.scraping.enqueue import mark_enqueue_failed

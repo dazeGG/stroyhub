@@ -181,18 +181,17 @@ Create an issue when:
 ### Enqueue Failure Repair
 
 When an admin action commits shop state but enqueue fails, API endpoints return
-`503` and save diagnostic metadata in `shops.raw.enqueue_failed`.
+`503` and expose diagnostic metadata as `enqueue_failed` on `GET /shops`.
 
 Repair flow:
 
-1. Open `/shops` and identify the affected source shop.
+1. Open `/shops` and identify the affected source shop with `enqueue_failed`.
 2. Verify `scrape_status` and `next_scrape_at` reflect the intended state
    transition from the original action.
 3. Retry the same action (shop retry, candidate approve, or strategy
    materialize) after Redis/Celery connectivity is restored.
 4. Confirm a new response contains `status = queued` and `task_id`.
-5. Clear or overwrite stale `enqueue_failed` metadata during normal subsequent
-   successful operator actions.
+5. Confirm `GET /shops` no longer shows `enqueue_failed` for that source shop.
 
 Use a quick fix when:
 

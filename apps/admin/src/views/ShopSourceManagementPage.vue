@@ -159,7 +159,15 @@ function sourceTypeClass(sourceType: string): string {
 }
 
 function canRetryShop(shop: ShopListItem): boolean {
-  return ['failed', 'partial'].includes(shop.scrape_status)
+  return ['failed', 'partial'].includes(shop.scrape_status) || shop.enqueue_failed !== null
+}
+
+function enqueueFailureTitle(shop: ShopListItem): string {
+  if (!shop.enqueue_failed) {
+    return ''
+  }
+
+  return `${shop.enqueue_failed.operation}: ${shop.enqueue_failed.reason}`
 }
 
 function formatDateTime(value: string | null): string {
@@ -763,6 +771,13 @@ onMounted(() => {
                   {{ statusLabel(shop.scrape_status) }}
                 </span>
                 <p class="mt-2 text-xs text-neutral-500">ошибок: {{ shop.error_count }}</p>
+                <p
+                  v-if="shop.enqueue_failed"
+                  class="mt-2 max-w-[220px] truncate text-xs text-red-300"
+                  :title="enqueueFailureTitle(shop)"
+                >
+                  enqueue: {{ shop.enqueue_failed.reason }}
+                </p>
                 <button
                   v-if="canRetryShop(shop)"
                   type="button"
