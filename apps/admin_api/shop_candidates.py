@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends, Path, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,6 +18,12 @@ from stroyhub.parsers.metalltorg import METALLTORG_SHOP_SOURCE_ID, METALLTORG_SO
 from stroyhub.parsers.unicom import UNICOM_DEFAULT_SHOP_SOURCE_ID, UNICOM_SOURCE
 from stroyhub.scraping.enqueue import clear_enqueue_failed, mark_enqueue_failed
 
+from apps.admin_api.errors import (
+    ApiError,
+    ValueErrorRule,
+    api_error_responses,
+    value_error_mapper,
+)
 from apps.admin_api.scrape_queue import enqueue_shop_scrape
 from apps.admin_api.validation import ShopCandidateStatus
 
@@ -171,7 +177,7 @@ def refresh_shop_source_candidates(
     try:
         task = refresh_shop_source_candidates_task.delay()
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise ApiError(status_code=503, code="enqueue_failed", message=str(exc)) from exc
     return AsyncOperationAcceptedResponse(
         operation="refresh_shop_source_candidates",
         status="queued",
@@ -179,7 +185,11 @@ def refresh_shop_source_candidates(
     )
 
 
-@router.post("/{candidate_id}/approve", response_model=ShopSourceCandidateResponse)
+@router.post(
+    "/{candidate_id}/approve",
+    response_model=ShopSourceCandidateResponse,
+    responses=api_error_responses(400, 404, 503),
+)
 def approve_shop_source_candidate(
     candidate_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
@@ -209,9 +219,10 @@ def approve_shop_source_candidate(
                     reason=str(scrape_result.get("reason") or "enqueue failed"),
                 )
                 session.commit()
-            raise HTTPException(
+            raise ApiError(
                 status_code=503,
-                detail=str(scrape_result.get("reason") or "enqueue failed"),
+                code="enqueue_failed",
+                message=str(scrape_result.get("reason") or "enqueue failed"),
             )
         if shop is not None:
             clear_enqueue_failed(shop)
@@ -224,6 +235,7 @@ def approve_shop_source_candidate(
     "/{candidate_id}/verify-twogis-data",
     response_model=AsyncOperationAcceptedResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    responses=api_error_responses(503),
 )
 def verify_shop_source_candidate_twogis_data(
     candidate_id: Annotated[int, Path(gt=0)],
@@ -235,7 +247,7 @@ def verify_shop_source_candidate_twogis_data(
     try:
         task = verify_shop_source_candidate_twogis_data_task.delay(candidate_id)
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise ApiError(status_code=503, code="enqueue_failed", message=str(exc)) from exc
     return AsyncOperationAcceptedResponse(
         operation="verify_shop_source_candidate_twogis_data",
         status="queued",
@@ -247,6 +259,7 @@ def verify_shop_source_candidate_twogis_data(
 @router.post(
     "/official-strategies/{source}/materialize",
     response_model=OfficialStrategyMaterializeResponse,
+    responses=api_error_responses(400, 404, 503),
 )
 def materialize_official_strategy(
     source: str,
@@ -272,9 +285,10 @@ def materialize_official_strategy(
                     reason=str(scrape_result.get("reason") or "enqueue failed"),
                 )
                 session.commit()
-            raise HTTPException(
+            raise ApiError(
                 status_code=503,
-                detail=str(scrape_result.get("reason") or "enqueue failed"),
+                code="enqueue_failed",
+                message=str(scrape_result.get("reason") or "enqueue failed"),
             )
         if shop is not None:
             clear_enqueue_failed(shop)
@@ -284,7 +298,11 @@ def materialize_official_strategy(
     shop = session.get(Shop, shop_id)
     identity = session.get(ShopIdentity, materialized.identity.id)
     if shop is None or identity is None:
-        raise HTTPException(status_code=404, detail="official source was not found")
+        raise ApiError(
+            status_code=404,
+            code="official_source_not_found",
+            message="official source was not found",
+        )
     return OfficialStrategyMaterializeResponse(
         source=source,
         shop=OfficialSourceShopResponse.model_validate(shop),
@@ -330,7 +348,11 @@ def _candidate_response(
                 scrape_result=scrape_result,
                 session=session,
             )
-    raise HTTPException(status_code=404, detail="shop source candidate not found")
+    raise ApiError(
+        status_code=404,
+        code="shop_source_candidate_not_found",
+        message="shop source candidate not found",
+    )
 
 
 def _verification_response(
@@ -454,8 +476,14 @@ def _official_shop_for_strategy(session: Session, strategy: dict[str, object]) -
     return None
 
 
-def _http_error(error: ValueError) -> HTTPException:
-    detail = str(error)
-    if "not found" in detail:
-        return HTTPException(status_code=404, detail=detail)
-    return HTTPException(status_code=400, detail=detail)
+_http_error = value_error_mapper(
+    (
+        ValueErrorRule("shop source candidate not found", 404, "shop_source_candidate_not_found"),
+        ValueErrorRule("approved candidate cannot be verified", 400, "candidate_already_approved"),
+        ValueErrorRule(
+            "hidden or archived candidate cannot be approved",
+            400,
+            "candidate_status_not_approvable",
+        ),
+    )
+)

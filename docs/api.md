@@ -18,6 +18,18 @@ Validation notes:
   positive integers.
 - Admin-facing actor/reason text fields are trimmed and length-constrained.
 
+Error response contract for typed admin/API errors:
+
+```json
+{
+  "code": "source_product_not_found",
+  "message": "Source product not found",
+  "details": {}
+}
+```
+
+`422` validation errors keep the default FastAPI shape.
+
 ## System
 
 ### `GET /health`

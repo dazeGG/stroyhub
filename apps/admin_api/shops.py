@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Response, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from stroyhub.catalog.shops import (
@@ -23,6 +23,12 @@ from stroyhub.scraping.enqueue import (
 )
 from stroyhub.scraping.twogis import build_twogis_large_catalog_raw, twogis_large_catalog_state
 
+from apps.admin_api.errors import (
+    ApiError,
+    ValueErrorRule,
+    api_error_responses,
+    value_error_mapper,
+)
 from apps.admin_api.scrape_queue import enqueue_shop_scrape
 from apps.admin_api.validation import ShopIdentityStatus, ShopScrapeStatus
 
@@ -281,25 +287,38 @@ def unlink_shop_source(
     return _shop_response(shop.id, session)
 
 
-@router.post("/{shop_id}/scrape/retry", response_model=ShopScrapeRetryResponse)
+@router.post(
+    "/{shop_id}/scrape/retry",
+    response_model=ShopScrapeRetryResponse,
+    responses=api_error_responses(400, 404, 409, 503),
+)
 def retry_shop_scrape(
     shop_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ShopScrapeRetryResponse:
     shop = session.get(Shop, shop_id)
     if shop is None:
-        raise HTTPException(status_code=404, detail="shop not found")
+        raise ApiError(status_code=404, code="shop_not_found", message="shop not found")
     if shop.scrape_status == "disabled":
-        raise HTTPException(status_code=400, detail="disabled shop source cannot be retried")
+        raise ApiError(
+            status_code=400,
+            code="shop_retry_disabled_source",
+            message="disabled shop source cannot be retried",
+        )
     if shop.scrape_status == "running":
-        raise HTTPException(status_code=409, detail="shop scrape is already running")
+        raise ApiError(
+            status_code=409,
+            code="shop_scrape_already_running",
+            message="shop scrape is already running",
+        )
     has_failed_enqueue = enqueue_failure_state(shop.raw) is not None
     if shop.scrape_status not in {"failed", "partial"} and not (
         shop.scrape_status == "scheduled" and has_failed_enqueue
     ):
-        raise HTTPException(
+        raise ApiError(
             status_code=400,
-            detail="only failed, partial, or enqueue-failed scheduled scrapes can be retried",
+            code="shop_retry_status_not_allowed",
+            message="only failed, partial, or enqueue-failed scheduled scrapes can be retried",
         )
 
     shop.scrape_status = "scheduled"
@@ -314,7 +333,11 @@ def retry_shop_scrape(
             reason=str(result.get("reason") or "enqueue failed"),
         )
         session.commit()
-        raise HTTPException(status_code=503, detail=str(result.get("reason") or "enqueue failed"))
+        raise ApiError(
+            status_code=503,
+            code="enqueue_failed",
+            message=str(result.get("reason") or "enqueue failed"),
+        )
     clear_enqueue_failed(shop)
     session.commit()
     task_id = result.get("task_id")
@@ -333,6 +356,7 @@ def retry_shop_scrape(
     "/{shop_id}/twogis-large-catalog/enable",
     response_model=AsyncOperationAcceptedResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    responses=api_error_responses(400, 404, 503),
 )
 def enable_twogis_large_catalog(
     shop_id: Annotated[int, Path(gt=0)],
@@ -344,7 +368,7 @@ def enable_twogis_large_catalog(
     try:
         task = enable_twogis_large_catalog_task.delay(shop.id)
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise ApiError(status_code=503, code="enqueue_failed", message=str(exc)) from exc
     return AsyncOperationAcceptedResponse(
         operation="enable_twogis_large_catalog",
         status="queued",
@@ -353,7 +377,11 @@ def enable_twogis_large_catalog(
     )
 
 
-@router.post("/{shop_id}/twogis-large-catalog/disable", response_model=ShopListItemResponse)
+@router.post(
+    "/{shop_id}/twogis-large-catalog/disable",
+    response_model=ShopListItemResponse,
+    responses=api_error_responses(400, 404),
+)
 def disable_twogis_large_catalog(
     shop_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
@@ -381,7 +409,11 @@ def _identity_response(identity_id: int, session: Session) -> ShopIdentityRespon
     for item in items:
         if item.id == identity_id:
             return ShopIdentityResponse.model_validate(item)
-    raise HTTPException(status_code=404, detail="shop identity not found")
+    raise ApiError(
+        status_code=404,
+        code="shop_identity_not_found",
+        message="shop identity not found",
+    )
 
 
 def _shop_response(shop_id: int, session: Session) -> ShopListItemResponse:
@@ -389,20 +421,27 @@ def _shop_response(shop_id: int, session: Session) -> ShopListItemResponse:
     for item in items:
         if item.id == shop_id:
             return ShopListItemResponse.model_validate(item)
-    raise HTTPException(status_code=404, detail="shop not found")
+    raise ApiError(status_code=404, code="shop_not_found", message="shop not found")
 
 
 def _get_twogis_shop(shop_id: int, session: Session) -> Shop:
     shop = session.get(Shop, shop_id)
     if shop is None:
-        raise HTTPException(status_code=404, detail="shop not found")
+        raise ApiError(status_code=404, code="shop_not_found", message="shop not found")
     if shop.source != "2gis":
-        raise HTTPException(status_code=400, detail="large catalog mode is only for 2GIS shops")
+        raise ApiError(
+            status_code=400,
+            code="large_catalog_requires_twogis",
+            message="large catalog mode is only for 2GIS shops",
+        )
     return shop
 
 
-def _http_error(error: ValueError) -> HTTPException:
-    detail = str(error)
-    if "not found" in detail:
-        return HTTPException(status_code=404, detail=detail)
-    return HTTPException(status_code=400, detail=detail)
+_http_error = value_error_mapper(
+    (
+        ValueErrorRule("shop identity not found", 404, "shop_identity_not_found"),
+        ValueErrorRule("shop not found", 404, "shop_not_found"),
+        ValueErrorRule("display_name must not be empty", 400, "display_name_empty"),
+        ValueErrorRule("manual is not an accepted shop source", 400, "invalid_shop_source"),
+    )
+)

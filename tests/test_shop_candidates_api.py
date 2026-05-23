@@ -255,7 +255,8 @@ def test_shop_source_candidate_api_approve_returns_503_when_enqueue_fails(
     response = client.post(f"/shop-source-candidates/{candidate_id}/approve")
 
     assert response.status_code == 503
-    assert response.json()["detail"] == "broker down"
+    assert response.json()["code"] == "enqueue_failed"
+    assert response.json()["message"] == "broker down"
     approved = client.get("/shop-source-candidates", params={"include_approved": True}).json()
     shop_id = approved["items"][0]["approved_shop_id"]
     shop = db_session.get(Shop, shop_id)
@@ -455,7 +456,8 @@ def test_shop_source_candidate_api_materialize_returns_503_when_enqueue_fails(
     )
 
     assert response.status_code == 503
-    assert response.json()["detail"] == "redis timeout"
+    assert response.json()["code"] == "enqueue_failed"
+    assert response.json()["message"] == "redis timeout"
     shop = db_session.scalar(select(Shop).where(Shop.source == "unicom"))
     assert shop is not None
     assert isinstance(shop.raw, dict)
