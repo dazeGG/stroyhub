@@ -35,6 +35,7 @@ let productRequest: AbortController | null = null
 let searchTimer: number | undefined
 let syncingShopQuery = false
 let syncingCategoryQuery = false
+let syncingPageQuery = false
 
 const categoryOptions = computed(() => {
   const options: { id: number; label: string }[] = []
@@ -126,6 +127,20 @@ function resetPaginationAndLoad(): void {
   resetPagination()
 }
 
+function replaceCatalogQuery(values: Record<string, string | undefined>): void {
+  const nextQuery = { ...route.query }
+
+  for (const [key, value] of Object.entries(values)) {
+    if (value) {
+      nextQuery[key] = value
+    } else {
+      delete nextQuery[key]
+    }
+  }
+
+  void router.replace({ query: nextQuery })
+}
+
 function syncSelectedShopFromRoute(): void {
   const routeShop = route.query.shop
   const nextShopId = typeof routeShop === 'string' ? routeShop : ''
@@ -146,6 +161,19 @@ function syncSelectedCategoryFromRoute(): void {
 
   syncingCategoryQuery = true
   selectedCategoryId.value = nextCategoryId
+}
+
+function syncPageFromRoute(): void {
+  const routePage = route.query.page
+  const page = typeof routePage === 'string' ? Number.parseInt(routePage, 10) : 1
+  const nextPage = Number.isFinite(page) && page > 1 ? page : 1
+  const nextOffset = (nextPage - 1) * pageSize
+  if (offset.value === nextOffset) {
+    return
+  }
+
+  syncingPageQuery = true
+  offset.value = nextOffset
 }
 
 function shopOptionLabel(shop: ShopListItem): string {
@@ -214,13 +242,7 @@ watch(selectedShopId, (shopId) => {
     return
   }
 
-  const nextQuery = { ...route.query }
-  if (shopId) {
-    nextQuery.shop = shopId
-  } else {
-    delete nextQuery.shop
-  }
-  void router.replace({ query: nextQuery })
+  replaceCatalogQuery({ shop: shopId || undefined, page: undefined })
 })
 
 watch(selectedCategoryId, (categoryId) => {
@@ -229,19 +251,22 @@ watch(selectedCategoryId, (categoryId) => {
     return
   }
 
-  const nextQuery = { ...route.query }
-  if (categoryId) {
-    nextQuery.category = categoryId
-  } else {
-    delete nextQuery.category
-  }
-  void router.replace({ query: nextQuery })
+  replaceCatalogQuery({ category: categoryId || undefined, page: undefined })
 })
 
 watch(() => route.query.shop, syncSelectedShopFromRoute)
 watch(() => route.query.category, syncSelectedCategoryFromRoute)
+watch(() => route.query.page, syncPageFromRoute)
 
 watch(offset, () => {
+  if (syncingPageQuery) {
+    syncingPageQuery = false
+  } else {
+    replaceCatalogQuery({
+      page: currentPage.value > 1 ? String(currentPage.value) : undefined,
+    })
+  }
+
   void loadProducts()
 })
 
@@ -255,6 +280,7 @@ watch(searchQuery, () => {
 onMounted(() => {
   syncSelectedShopFromRoute()
   syncSelectedCategoryFromRoute()
+  syncPageFromRoute()
   void loadFilters()
   void loadProducts()
 })
