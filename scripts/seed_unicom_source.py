@@ -12,14 +12,16 @@ from stroyhub.db import (
     ShopUpsert,
 )
 from stroyhub.models import ShopIdentity
-from stroyhub.parsers.unicom import UNICOM_DEFAULT_SHOP_SOURCE_ID, UNICOM_SOURCE
+from stroyhub.parsers.unicom import UNICOM_DEFAULT_SHOP_SOURCE_ID, UNICOM_SOURCE, UnicomClient
 from stroyhub.scraping.unicom import (
+    UNICOM_DEFAULT_CATEGORIES_PER_RUN,
     UNICOM_DEFAULT_CATEGORY_UUIDS,
     UNICOM_DEFAULT_LIMIT,
     UNICOM_DEFAULT_MAX_PAGES,
     UNICOM_DEFAULT_SHOP_NAME,
     UNICOM_DEFAULT_SHOP_URL,
     UNICOM_DEFAULT_SORT,
+    build_unicom_category_batch_raw,
 )
 
 
@@ -27,13 +29,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Seed the official Unicom catalog source.")
     parser.add_argument("--scrape-interval", type=int, default=86400)
     parser.add_argument("--category-uuid", action="append", dest="category_uuids")
+    parser.add_argument(
+        "--discover-categories",
+        action="store_true",
+        help="Fetch Unicom catalog menu and seed all leaf category UUIDs.",
+    )
+    parser.add_argument("--categories-per-run", type=int, default=UNICOM_DEFAULT_CATEGORIES_PER_RUN)
     parser.add_argument("--limit", type=int, default=UNICOM_DEFAULT_LIMIT)
     parser.add_argument("--max-pages", type=int, default=UNICOM_DEFAULT_MAX_PAGES)
     parser.add_argument("--sort", default=UNICOM_DEFAULT_SORT)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
-    category_uuids = tuple(args.category_uuids or UNICOM_DEFAULT_CATEGORY_UUIDS)
+    category_uuids = _category_uuids(
+        explicit=args.category_uuids,
+        discover=args.discover_categories,
+    )
     next_scrape_at = datetime.now(UTC)
     print(
         "schedule shop: "
@@ -42,6 +53,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"shop_source_id={UNICOM_DEFAULT_SHOP_SOURCE_ID} "
         f"name={UNICOM_DEFAULT_SHOP_NAME} "
         f"category_uuids={len(category_uuids)} "
+        f"categories_per_run={args.categories_per_run} "
         f"limit={args.limit} "
         f"max_pages={args.max_pages} "
         f"sort={args.sort} "
@@ -65,10 +77,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "source": UNICOM_SOURCE,
                 "source_type": "official_api",
                 "category_uuids": list(category_uuids),
+                "category_discovery": (
+                    "catalog_menu_leaf_categories"
+                    if args.discover_categories
+                    else "explicit_or_default"
+                ),
+                "categories_per_run": args.categories_per_run,
                 "limit": args.limit,
                 "max_pages": args.max_pages,
                 "sort": args.sort,
                 "pacing": "sequential categories; no concurrent requests",
+                "unicom_category_batch": build_unicom_category_batch_raw(
+                    enabled=len(category_uuids) > args.categories_per_run,
+                    total=len(category_uuids),
+                    categories_per_run=args.categories_per_run,
+                ),
             }
         )
 
@@ -95,6 +118,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         session.commit()
 
     return 0
+
+
+def _category_uuids(
+    *,
+    explicit: list[str] | None,
+    discover: bool,
+) -> tuple[str, ...]:
+    if explicit:
+        return tuple(explicit)
+    if discover:
+        discovered = UnicomClient().fetch_leaf_category_uuids()
+        return discovered or UNICOM_DEFAULT_CATEGORY_UUIDS
+    return UNICOM_DEFAULT_CATEGORY_UUIDS
 
 
 def _get_or_create_unicom_identity(session) -> ShopIdentity:  # type: ignore[no-untyped-def]

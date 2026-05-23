@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import httpx
 import pytest
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
@@ -31,6 +31,12 @@ def db_session() -> Iterator[Session]:
 
     transaction = connection.begin()
     session = Session(bind=connection, autoflush=False, expire_on_commit=False)
+    session.execute(
+        text(
+            "TRUNCATE shops, categories, source_products, price_snapshots, scrape_runs "
+            "RESTART IDENTITY CASCADE"
+        )
+    )
 
     try:
         yield session
@@ -197,16 +203,102 @@ def test_scrape_unicom_shop_uses_seeded_category_config(db_session: Session) -> 
 
     assert result.shop_id == shop.id
     assert result.categories_seen == 2
+    assert result.categories_total == 2
     assert result.categories_partial == 0
     assert result.products_seen == 6
     assert result.source_products_saved == 6
     assert result.price_snapshots_saved == 6
     assert result.scrape_status == "success"
+    assert result.batch_progress is False
     assert scrape_run_count == 2
     assert snapshot_count == 6
     assert shop.raw["category_uuids"] == ["category-a", "category-b"]
     assert shop.raw["limit"] == 2
     assert shop.raw["max_pages"] == 2
+
+
+def test_scrape_unicom_shop_batches_large_category_config(db_session: Session) -> None:
+    seen_category_uuids: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_category_uuids.append(request.url.path.rsplit("/", 1)[-1])
+        category_uuid = request.url.path.rsplit("/", 1)[-1]
+        return httpx.Response(
+            200,
+            json={
+                "products": [
+                    _product(
+                        product_id=f"product-{category_uuid}",
+                        name="Цемент М500",
+                        category="Цемент",
+                        price=100,
+                    )
+                ],
+                "pages": 1,
+                "productsCount": 1,
+                "stocks": [],
+                "filters": [],
+            },
+        )
+
+    client = UnicomClient(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="uc",
+            source_type="official_api",
+            name="Юником Batch Test",
+            url="https://unicom-ykt.ru/",
+            raw={
+                "category_uuids": ["category-a", "category-b", "category-c"],
+                "categories_per_run": 2,
+                "limit": 2,
+                "max_pages": 2,
+            },
+        )
+    )
+
+    first = scrape_unicom_shop(
+        db_session,
+        shop,
+        client=client,
+        finished_at=datetime(2026, 5, 17, 12, 0, tzinfo=UTC),
+    )
+
+    assert first.categories_seen == 2
+    assert first.categories_total == 3
+    assert first.scrape_status == "partial"
+    assert first.batch_progress is True
+    assert seen_category_uuids == ["category-a", "category-b"]
+    assert shop.raw["unicom_category_batch"]["next_index"] == 2
+    assert shop.raw["unicom_category_batch"]["categories_seen"] == 2
+    assert shop.raw["unicom_category_batch"]["completed"] is False
+    assert shop.raw["unicom_category_batch"]["category_product_counts"] == {
+        "category-a": 1,
+        "category-b": 1,
+    }
+    assert shop.raw["unicom_category_batch"]["total_products"] == 2
+
+    second = scrape_unicom_shop(
+        db_session,
+        shop,
+        client=client,
+        finished_at=datetime(2026, 5, 17, 13, 0, tzinfo=UTC),
+    )
+
+    assert second.categories_seen == 1
+    assert second.categories_total == 3
+    assert second.scrape_status == "success"
+    assert seen_category_uuids == ["category-a", "category-b", "category-c"]
+    assert shop.raw["unicom_category_batch"]["next_index"] == 0
+    assert shop.raw["unicom_category_batch"]["categories_seen"] == 3
+    assert shop.raw["unicom_category_batch"]["completed"] is True
+    assert shop.raw["unicom_category_batch"]["category_product_counts"] == {
+        "category-a": 1,
+        "category-b": 1,
+        "category-c": 1,
+    }
+    assert shop.raw["unicom_category_batch"]["total_products"] == 3
 
 
 def test_persist_unicom_scrape_failure_records_failed_run(db_session: Session) -> None:

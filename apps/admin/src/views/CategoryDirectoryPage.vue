@@ -81,23 +81,6 @@ const filteredCategoryGroups = computed(() => {
     })
 })
 
-function visibleChildCount(category: CategoryTreeItem): number {
-  return category.children.length
-}
-
-function emptyChildCount(category: CategoryTreeItem): number {
-  return category.children.filter((child) => child.product_count === 0).length
-}
-
-function childSummary(category: CategoryTreeItem): string {
-  const count = visibleChildCount(category)
-  if (count === 0) {
-    return 'Нет дочерних категорий'
-  }
-
-  return `${count} дочерних категорий`
-}
-
 function isCategoryExpanded(category: CategoryTreeItem): boolean {
   if (searchQuery.value.trim()) {
     return true
@@ -238,14 +221,16 @@ onMounted(() => {
           class="bg-neutral-950/10"
           data-testid="category-directory-row"
         >
-          <button
-            type="button"
-            class="grid w-full gap-3 px-4 py-4 text-left text-sm transition hover:bg-neutral-900/60 md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_160px]"
-            :aria-expanded="isCategoryExpanded(category)"
-            :aria-controls="`category-children-${category.id}`"
-            @click="toggleCategory(category)"
+          <div
+            class="grid w-full gap-3 px-4 py-4 text-left text-sm transition hover:bg-neutral-900/60 md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_150px] md:gap-x-6"
           >
-            <div class="flex min-w-0 items-start gap-3">
+            <button
+              type="button"
+              class="flex min-w-0 items-start gap-3 text-left"
+              :aria-expanded="isCategoryExpanded(category)"
+              :aria-controls="`category-children-${category.id}`"
+              @click="toggleCategory(category)"
+            >
               <span
                 class="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md border text-neutral-300"
                 :class="category.children.length > 0 ? 'border-neutral-700 bg-neutral-900' : 'border-neutral-800 bg-neutral-950 text-neutral-600'"
@@ -259,9 +244,8 @@ onMounted(() => {
               </span>
               <div class="min-w-0">
                 <p class="truncate text-base font-semibold text-white" :title="category.name">{{ category.name }}</p>
-                <p class="mt-1 truncate font-mono text-xs text-neutral-500" :title="category.slug">{{ category.slug }}</p>
               </div>
-            </div>
+            </button>
             <div class="min-w-0 md:text-right">
               <p class="text-xs uppercase tracking-wide text-neutral-600">Slug</p>
               <p class="mt-1 truncate font-mono text-xs text-neutral-300" :title="category.slug">{{ category.slug }}</p>
@@ -270,14 +254,19 @@ onMounted(() => {
               <p class="text-xs uppercase tracking-wide text-neutral-600">Товары</p>
               <p class="mt-1 font-semibold text-neutral-100">{{ category.product_count }}</p>
             </div>
-            <div class="md:text-right">
-              <p class="text-xs uppercase tracking-wide text-neutral-600">Дочерние</p>
-              <p class="mt-1 text-neutral-300">{{ childSummary(category) }}</p>
-              <p v-if="emptyChildCount(category) > 0" class="mt-1 text-xs text-amber-200">
-                пустых: {{ emptyChildCount(category) }}
-              </p>
+            <div class="flex items-start justify-start md:justify-end">
+              <RouterLink
+                :to="{ path: '/products', query: { category: category.id } }"
+                class="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
+                aria-label="Открыть исходные товары категории"
+                title="Исходные товары"
+                @click.stop
+              >
+                <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
+                Исходные товары
+              </RouterLink>
             </div>
-          </button>
+          </div>
 
           <div
             v-if="category.children.length > 0 && isCategoryExpanded(category)"
@@ -287,19 +276,26 @@ onMounted(() => {
             <div
               v-for="child in category.children"
               :key="child.id"
-              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_160px]"
+              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_150px] md:gap-x-6"
               data-testid="category-directory-row"
             >
               <div class="min-w-0 pl-10 md:pl-12">
                 <p class="truncate font-medium text-neutral-200" :title="child.name">{{ child.name }}</p>
-                <p class="mt-1 truncate font-mono text-xs text-neutral-500" :title="child.slug">{{ child.slug }}</p>
               </div>
               <p class="min-w-0 truncate font-mono text-xs text-neutral-400 md:text-right" :title="child.slug">
                 {{ child.slug }}
               </p>
               <p class="font-medium text-neutral-200 md:text-right">{{ child.product_count }}</p>
-              <div class="text-neutral-500 md:text-right">
-                {{ child.children.length }}
+              <div class="flex justify-start md:justify-end">
+                <RouterLink
+                  :to="{ path: '/products', query: { category: child.id } }"
+                  class="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
+                  aria-label="Открыть исходные товары категории"
+                  title="Исходные товары"
+                >
+                  <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
+                  Исходные товары
+                </RouterLink>
               </div>
             </div>
           </div>

@@ -31,6 +31,8 @@ UNICOM_DEFAULT_SHOP_URL = "https://unicom-ykt.ru/"
 UNICOM_DEFAULT_LIMIT = 50
 UNICOM_DEFAULT_MAX_PAGES = 100
 UNICOM_DEFAULT_SORT = "popular"
+UNICOM_DEFAULT_CATEGORIES_PER_RUN = 50
+UNICOM_CATEGORY_BATCH_RAW_KEY = "unicom_category_batch"
 UNICOM_DEFAULT_CATEGORY_UUIDS = (
     "fac247f1ae6111eca255000c29d1f857",
     "d68e4fb83d4d11e8af077062b8b53ba3",
@@ -71,17 +73,32 @@ class UnicomShopScrapeConfig:
     limit: int = UNICOM_DEFAULT_LIMIT
     sort: str = UNICOM_DEFAULT_SORT
     max_pages: int = UNICOM_DEFAULT_MAX_PAGES
+    categories_per_run: int = UNICOM_DEFAULT_CATEGORIES_PER_RUN
+
+
+@dataclass(frozen=True, kw_only=True)
+class UnicomCategoryBatchState:
+    enabled: bool
+    total: int
+    next_index: int
+    categories_seen: int
+    categories_per_run: int
+    completed: bool
+    total_products: int | None = None
+    last_stop_reason: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
 class UnicomShopScrapeResult:
     shop_id: int
     categories_seen: int
+    categories_total: int
     categories_partial: int
     products_seen: int
     source_products_saved: int
     price_snapshots_saved: int
     scrape_status: str
+    batch_progress: bool
 
 
 def scrape_unicom_category(
@@ -133,12 +150,17 @@ def scrape_unicom_shop(
 ) -> UnicomShopScrapeResult:
     completed_at = finished_at or datetime.now(UTC)
     config = unicom_shop_scrape_config(shop.raw)
+    category_uuids, start_index, batch_enabled = _category_batch_window(
+        config=config,
+        raw=shop.raw,
+    )
     categories_partial = 0
     products_seen = 0
     source_products_saved = 0
     price_snapshots_saved = 0
+    category_product_counts = _category_product_counts(shop.raw)
 
-    for category_uuid in config.category_uuids:
+    for category_uuid in category_uuids:
         result = scrape_unicom_category(
             category_uuid=category_uuid,
             client=client,
@@ -158,18 +180,39 @@ def scrape_unicom_shop(
         products_seen += result.products_seen
         source_products_saved += persisted.source_products_saved
         price_snapshots_saved += persisted.price_snapshots_saved
+        if result.products_count is not None:
+            category_product_counts[category_uuid] = result.products_count
         if persisted.scrape_status != "success":
             categories_partial += 1
 
-    scrape_status = "partial" if categories_partial else "success"
+    next_index = start_index + len(category_uuids)
+    completed = next_index >= len(config.category_uuids)
+    scrape_status = "partial" if categories_partial or not completed else "success"
+    refreshed_shop = session.get(Shop, shop.id)
+    if refreshed_shop is not None:
+        raw = dict(refreshed_shop.raw or {})
+        raw[UNICOM_CATEGORY_BATCH_RAW_KEY] = build_unicom_category_batch_raw(
+            enabled=batch_enabled,
+            total=len(config.category_uuids),
+            next_index=0 if completed else next_index,
+            categories_seen=next_index,
+            categories_per_run=config.categories_per_run,
+            completed=completed,
+            category_product_counts=category_product_counts,
+            last_stop_reason="all_categories_seen" if completed else "category_batch_limit",
+        )
+        refreshed_shop.raw = raw
+
     return UnicomShopScrapeResult(
         shop_id=shop.id,
-        categories_seen=len(config.category_uuids),
+        categories_seen=len(category_uuids),
+        categories_total=len(config.category_uuids),
         categories_partial=categories_partial,
         products_seen=products_seen,
         source_products_saved=source_products_saved,
         price_snapshots_saved=price_snapshots_saved,
         scrape_status=scrape_status,
+        batch_progress=batch_enabled and not categories_partial,
     )
 
 
@@ -326,7 +369,96 @@ def unicom_shop_scrape_config(raw: JsonObject | None) -> UnicomShopScrapeConfig:
         limit=_positive_int(config.get("limit"), default=UNICOM_DEFAULT_LIMIT),
         sort=str(config.get("sort") or UNICOM_DEFAULT_SORT),
         max_pages=_positive_int(config.get("max_pages"), default=UNICOM_DEFAULT_MAX_PAGES),
+        categories_per_run=_positive_int(
+            config.get("categories_per_run"),
+            default=UNICOM_DEFAULT_CATEGORIES_PER_RUN,
+        ),
     )
+
+
+def unicom_category_batch_state(raw: JsonObject | None) -> UnicomCategoryBatchState | None:
+    if not isinstance(raw, dict):
+        return None
+    value = raw.get(UNICOM_CATEGORY_BATCH_RAW_KEY)
+    if not isinstance(value, dict):
+        return None
+    total = max(_positive_int(value.get("total"), default=0), 0)
+    categories_per_run = _positive_int(
+        value.get("categories_per_run"),
+        default=UNICOM_DEFAULT_CATEGORIES_PER_RUN,
+    )
+    return UnicomCategoryBatchState(
+        enabled=bool(value.get("enabled")),
+        total=total,
+        next_index=max(_positive_int(value.get("next_index"), default=0), 0),
+        categories_seen=max(_positive_int(value.get("categories_seen"), default=0), 0),
+        categories_per_run=categories_per_run,
+        completed=bool(value.get("completed")),
+        total_products=_optional_int(value.get("total_products")),
+        last_stop_reason=value.get("last_stop_reason")
+        if isinstance(value.get("last_stop_reason"), str)
+        else None,
+    )
+
+
+def build_unicom_category_batch_raw(
+    *,
+    enabled: bool,
+    total: int,
+    next_index: int = 0,
+    categories_seen: int = 0,
+    categories_per_run: int = UNICOM_DEFAULT_CATEGORIES_PER_RUN,
+    completed: bool = False,
+    category_product_counts: dict[str, int] | None = None,
+    last_stop_reason: str | None = None,
+) -> JsonObject:
+    counts = dict(category_product_counts or {})
+    return {
+        "enabled": enabled,
+        "total": total,
+        "next_index": next_index,
+        "categories_seen": categories_seen,
+        "categories_per_run": categories_per_run,
+        "completed": completed,
+        "category_product_counts": counts,
+        "total_products": sum(counts.values()) if counts else None,
+        "last_stop_reason": last_stop_reason,
+    }
+
+
+def _category_batch_window(
+    *,
+    config: UnicomShopScrapeConfig,
+    raw: JsonObject | None,
+) -> tuple[tuple[str, ...], int, bool]:
+    total = len(config.category_uuids)
+    if total <= config.categories_per_run:
+        return config.category_uuids, 0, False
+
+    state = unicom_category_batch_state(raw)
+    start_index = state.next_index if state is not None and state.enabled else 0
+    if state is not None and state.completed:
+        start_index = 0
+    start_index = min(max(start_index, 0), total)
+    if start_index >= total:
+        start_index = 0
+
+    end_index = min(start_index + config.categories_per_run, total)
+    return config.category_uuids[start_index:end_index], start_index, True
+
+
+def _category_product_counts(raw: JsonObject | None) -> dict[str, int]:
+    state = raw.get(UNICOM_CATEGORY_BATCH_RAW_KEY) if isinstance(raw, dict) else None
+    if not isinstance(state, dict):
+        return {}
+    counts = state.get("category_product_counts")
+    if not isinstance(counts, dict):
+        return {}
+    return {
+        key: value
+        for key, value in counts.items()
+        if isinstance(key, str) and isinstance(value, int) and value >= 0
+    }
 
 
 def _category_id(
@@ -410,3 +542,9 @@ def _positive_int(value: object, *, default: int) -> int:
     if value < 1:
         return default
     return value
+
+
+def _optional_int(value: object) -> int | None:
+    if isinstance(value, int) and value >= 0:
+        return value
+    return None

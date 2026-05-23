@@ -76,6 +76,7 @@ class ProductSearchResponse(BaseModel):
     items: list[ProductSearchItemResponse]
     limit: int
     offset: int
+    total: int
 
 
 class ProductPriceSnapshotResponse(BaseModel):
@@ -107,6 +108,7 @@ def search_products(
     category: int | None = None,
     category_id: int | None = None,
     category_slug: str | None = None,
+    uncategorized: bool = False,
     shop: int | None = None,
     sort: ProductSort = "-last_seen_at",
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -116,16 +118,23 @@ def search_products(
         q=q,
         category_id=category_id if category_id is not None else category,
         category_slug=category_slug,
+        uncategorized=uncategorized,
         shop_id=shop,
         sort=sort,
         limit=limit,
         offset=offset,
     )
+    catalog = ProductCatalog(session)
     items = [
         ProductSearchItemResponse.model_validate(item)
-        for item in ProductCatalog(session).search_products(filters)
+        for item in catalog.search_products(filters)
     ]
-    return ProductSearchResponse(items=items, limit=limit, offset=offset)
+    return ProductSearchResponse(
+        items=items,
+        limit=limit,
+        offset=offset,
+        total=catalog.count_products(filters),
+    )
 
 
 @router.get("/{product_id}", response_model=ProductSearchItemResponse)

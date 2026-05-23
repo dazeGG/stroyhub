@@ -18,6 +18,7 @@ from stroyhub.scraping.twogis import (
     scrape_twogis_branch,
 )
 from stroyhub.scraping.unicom import (
+    UnicomCategoryBatchState,
     UnicomPersistResult,
     UnicomScrapeResult,
     UnicomShopScrapeConfig,
@@ -26,6 +27,7 @@ from stroyhub.scraping.unicom import (
     persist_unicom_scrape_result,
     scrape_unicom_category,
     scrape_unicom_shop,
+    unicom_category_batch_state,
     unicom_shop_scrape_config,
 )
 
@@ -38,6 +40,7 @@ __all__ = [
     "MetalltorgShopScrapeResult",
     "UnicomShopScrapeConfig",
     "UnicomShopScrapeResult",
+    "UnicomCategoryBatchState",
     "UnicomPersistResult",
     "UnicomScrapeResult",
     "metalltorg_shop_scrape_config",
@@ -51,5 +54,6 @@ __all__ = [
     "scrape_twogis_branch",
     "scrape_unicom_category",
     "scrape_unicom_shop",
+    "unicom_category_batch_state",
     "unicom_shop_scrape_config",
 ]

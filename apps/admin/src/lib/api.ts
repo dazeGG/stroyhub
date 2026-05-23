@@ -67,6 +67,7 @@ export interface ProductSearchResponse {
   items: ProductSearchItem[]
   limit: number
   offset: number
+  total: number
 }
 
 export interface ProductPriceSnapshot {
@@ -269,6 +270,7 @@ export interface ShopSourceCandidateListParams {
 export interface ProductSearchParams {
   q?: string
   categoryId?: number
+  uncategorized?: boolean
   shopId?: number
   sort?: ProductSort
   limit?: number
@@ -446,6 +448,7 @@ export function fetchProducts(
   const params = new URLSearchParams()
   appendOptionalParam(params, 'q', filters.q?.trim())
   appendOptionalParam(params, 'category_id', filters.categoryId)
+  appendOptionalParam(params, 'uncategorized', filters.uncategorized ? 'true' : undefined)
   appendOptionalParam(params, 'shop', filters.shopId)
   appendOptionalParam(params, 'sort', filters.sort)
   appendOptionalParam(params, 'limit', filters.limit)

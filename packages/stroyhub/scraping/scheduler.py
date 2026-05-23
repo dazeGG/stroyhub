@@ -6,6 +6,9 @@ from stroyhub.db.repositories import ShopRepository
 from stroyhub.models import Shop
 
 DEFAULT_SCRAPE_INTERVAL_SECONDS = 24 * 60 * 60
+BATCH_PROGRESS_INTERVAL_SECONDS = 15 * 60
+LARGE_SOURCE_PRODUCT_THRESHOLD = 5_000
+LARGE_SOURCE_SCRAPE_INTERVAL_SECONDS = 7 * 24 * 60 * 60
 MAX_BACKOFF_MULTIPLIER = 32
 
 
@@ -55,18 +58,22 @@ def mark_shop_scrape_completion(
 ) -> None:
     shop.last_scraped_at = completed_at
     if scrape_status == "success":
-        shop.next_scrape_at = next_successful_scrape_at(
-            completed_at=completed_at,
-            scrape_interval=shop.scrape_interval,
-        )
+        if _large_source_product_total(shop.raw) > LARGE_SOURCE_PRODUCT_THRESHOLD:
+            shop.next_scrape_at = completed_at + timedelta(
+                seconds=LARGE_SOURCE_SCRAPE_INTERVAL_SECONDS
+            )
+        else:
+            shop.next_scrape_at = next_successful_scrape_at(
+                completed_at=completed_at,
+                scrape_interval=shop.scrape_interval,
+            )
         shop.scrape_status = "success"
         shop.error_count = 0
         return
 
     if scrape_status == "partial" and partial_is_progress:
-        shop.next_scrape_at = next_successful_scrape_at(
-            completed_at=completed_at,
-            scrape_interval=shop.scrape_interval,
+        shop.next_scrape_at = completed_at + timedelta(
+            seconds=BATCH_PROGRESS_INTERVAL_SECONDS
         )
         shop.scrape_status = "partial"
         return
@@ -99,3 +106,21 @@ def _positive_interval(value: int | None) -> int:
     if value is None or value < 1:
         return DEFAULT_SCRAPE_INTERVAL_SECONDS
     return value
+
+
+def _large_source_product_total(raw: object) -> int:
+    if not isinstance(raw, dict):
+        return 0
+
+    twogis_state = raw.get("twogis_large_catalog")
+    twogis_total = twogis_state.get("total") if isinstance(twogis_state, dict) else None
+    if isinstance(twogis_total, int):
+        return twogis_total
+
+    unicom_state = raw.get("unicom_category_batch")
+    if isinstance(unicom_state, dict):
+        total_products = unicom_state.get("total_products")
+        if isinstance(total_products, int):
+            return total_products
+
+    return 0

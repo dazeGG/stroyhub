@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
@@ -22,6 +22,7 @@ const selectedCategoryId = ref('')
 const selectedShopId = ref('')
 const sort = ref<ProductSort>('-last_seen_at')
 const offset = ref(0)
+const totalProducts = ref(0)
 const products = ref<ProductSearchItem[]>([])
 const categories = ref<CategoryTreeItem[]>([])
 const shops = ref<ShopListItem[]>([])
@@ -32,7 +33,11 @@ const filterErrorMessage = ref('')
 
 let productRequest: AbortController | null = null
 let searchTimer: number | undefined
+let syncingSearchQuery = false
 let syncingShopQuery = false
+let syncingCategoryQuery = false
+let syncingSortQuery = false
+let syncingPageQuery = false
 
 const categoryOptions = computed(() => {
   const options: { id: number; label: string }[] = []
@@ -65,9 +70,12 @@ const categoryNameById = computed(() => {
   return names
 })
 
-const hasPreviousPage = computed(() => offset.value > 0)
-const hasNextPage = computed(() => products.value.length === pageSize)
-const currentPage = computed(() => Math.floor(offset.value / pageSize) + 1)
+const currentPage = computed({
+  get: () => Math.floor(offset.value / pageSize) + 1,
+  set: (page: number) => {
+    offset.value = Math.max(0, page - 1) * pageSize
+  },
+})
 
 function formatDateTime(value: string | null): string {
   if (!value) {
@@ -102,7 +110,7 @@ function formatPrice(product: ProductSearchItem): string {
 
 function categoryLabel(product: ProductSearchItem): string {
   if (!product.category_id) {
-    return 'Не нормализовано'
+    return 'Без категории'
   }
 
   return categoryNameById.value.get(product.category_id) || `ID ${product.category_id}`
@@ -121,6 +129,53 @@ function resetPaginationAndLoad(): void {
   resetPagination()
 }
 
+function replaceCatalogQuery(values: Record<string, string | undefined>): void {
+  const nextQuery = { ...route.query }
+
+  for (const [key, value] of Object.entries(values)) {
+    if (value) {
+      nextQuery[key] = value
+    } else {
+      delete nextQuery[key]
+    }
+  }
+
+  void router.replace({ query: nextQuery })
+}
+
+function resetCatalogPageAndQuery(values: Record<string, string | undefined>): void {
+  replaceCatalogQuery({ ...values, page: undefined })
+  resetPaginationAndLoad()
+}
+
+function productSortFromRoute(value: unknown): ProductSort {
+  const defaultSort: ProductSort = '-last_seen_at'
+  const allowedSorts: ProductSort[] = [
+    'latest_price',
+    '-latest_price',
+    'title',
+    '-title',
+    'shop',
+    '-shop',
+    'last_seen_at',
+    '-last_seen_at',
+  ]
+  return typeof value === 'string' && allowedSorts.includes(value as ProductSort)
+    ? (value as ProductSort)
+    : defaultSort
+}
+
+function syncSearchFromRoute(): void {
+  const routeSearch = route.query.q
+  const nextSearch = typeof routeSearch === 'string' ? routeSearch : ''
+  if (searchQuery.value === nextSearch) {
+    return
+  }
+
+  syncingSearchQuery = true
+  searchQuery.value = nextSearch
+}
+
 function syncSelectedShopFromRoute(): void {
   const routeShop = route.query.shop
   const nextShopId = typeof routeShop === 'string' ? routeShop : ''
@@ -130,6 +185,44 @@ function syncSelectedShopFromRoute(): void {
 
   syncingShopQuery = true
   selectedShopId.value = nextShopId
+}
+
+function syncSelectedCategoryFromRoute(): void {
+  const routeCategory = route.query.category
+  const nextCategoryId = typeof routeCategory === 'string' ? routeCategory : ''
+  if (selectedCategoryId.value === nextCategoryId) {
+    return
+  }
+
+  syncingCategoryQuery = true
+  selectedCategoryId.value = nextCategoryId
+}
+
+function syncPageFromRoute(): void {
+  const routePage = route.query.page
+  const page = typeof routePage === 'string' ? Number.parseInt(routePage, 10) : 1
+  const nextPage = Number.isFinite(page) && page > 1 ? page : 1
+  const nextOffset = (nextPage - 1) * pageSize
+  if (offset.value === nextOffset) {
+    return
+  }
+
+  syncingPageQuery = true
+  offset.value = nextOffset
+}
+
+function syncSortFromRoute(): void {
+  const nextSort = productSortFromRoute(route.query.sort)
+  if (sort.value === nextSort) {
+    return
+  }
+
+  syncingSortQuery = true
+  sort.value = nextSort
+}
+
+function shopOptionLabel(shop: ShopListItem): string {
+  return `${shop.name} · ${shop.source}`
 }
 
 async function loadFilters(): Promise<void> {
@@ -148,10 +241,11 @@ async function loadFilters(): Promise<void> {
   }
 }
 
-async function loadProducts(): Promise<void> {
+async function loadProducts(options: { preserveScroll?: boolean } = {}): Promise<void> {
   productRequest?.abort()
   const request = new AbortController()
   productRequest = request
+  const scrollY = options.preserveScroll ? window.scrollY : null
   isLoadingProducts.value = true
   errorMessage.value = ''
 
@@ -159,7 +253,11 @@ async function loadProducts(): Promise<void> {
     const response = await fetchProducts(
       {
         q: searchQuery.value,
-        categoryId: selectedCategoryId.value ? Number(selectedCategoryId.value) : undefined,
+        categoryId:
+          selectedCategoryId.value && selectedCategoryId.value !== 'uncategorized'
+            ? Number(selectedCategoryId.value)
+            : undefined,
+        uncategorized: selectedCategoryId.value === 'uncategorized',
         shopId: selectedShopId.value ? Number(selectedShopId.value) : undefined,
         sort: sort.value,
         limit: pageSize,
@@ -168,6 +266,7 @@ async function loadProducts(): Promise<void> {
       request.signal,
     )
     products.value = response.items
+    totalProducts.value = response.total
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       return
@@ -175,59 +274,89 @@ async function loadProducts(): Promise<void> {
 
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить товары'
     products.value = []
+    totalProducts.value = 0
   } finally {
     if (productRequest === request) {
       isLoadingProducts.value = false
+      if (scrollY !== null) {
+        await nextTick()
+        window.requestAnimationFrame(() => {
+          window.scrollTo({ top: scrollY })
+        })
+      }
     }
   }
 }
 
-function nextPage(): void {
-  if (hasNextPage.value) {
-    offset.value += pageSize
-  }
-}
-
-function previousPage(): void {
-  if (hasPreviousPage.value) {
-    offset.value = Math.max(0, offset.value - pageSize)
-  }
-}
-
-watch([selectedCategoryId, selectedShopId, sort], () => {
-  resetPaginationAndLoad()
-})
-
 watch(selectedShopId, (shopId) => {
   if (syncingShopQuery) {
     syncingShopQuery = false
+    void loadProducts()
     return
   }
 
-  const nextQuery = { ...route.query }
-  if (shopId) {
-    nextQuery.shop = shopId
-  } else {
-    delete nextQuery.shop
-  }
-  void router.replace({ query: nextQuery })
+  resetCatalogPageAndQuery({ shop: shopId || undefined })
 })
 
+watch(selectedCategoryId, (categoryId) => {
+  if (syncingCategoryQuery) {
+    syncingCategoryQuery = false
+    void loadProducts()
+    return
+  }
+
+  resetCatalogPageAndQuery({ category: categoryId || undefined })
+})
+
+watch(sort, (nextSort) => {
+  if (syncingSortQuery) {
+    syncingSortQuery = false
+    void loadProducts()
+    return
+  }
+
+  resetCatalogPageAndQuery({
+    sort: nextSort === '-last_seen_at' ? undefined : nextSort,
+  })
+})
+
+watch(() => route.query.q, syncSearchFromRoute)
 watch(() => route.query.shop, syncSelectedShopFromRoute)
+watch(() => route.query.category, syncSelectedCategoryFromRoute)
+watch(() => route.query.sort, syncSortFromRoute)
+watch(() => route.query.page, syncPageFromRoute)
 
 watch(offset, () => {
-  void loadProducts()
+  if (syncingPageQuery) {
+    syncingPageQuery = false
+  } else {
+    replaceCatalogQuery({
+      page: currentPage.value > 1 ? String(currentPage.value) : undefined,
+    })
+  }
+
+  void loadProducts({ preserveScroll: true })
 })
 
 watch(searchQuery, () => {
   window.clearTimeout(searchTimer)
+  if (syncingSearchQuery) {
+    syncingSearchQuery = false
+    void loadProducts()
+    return
+  }
+
   searchTimer = window.setTimeout(() => {
-    resetPaginationAndLoad()
+    resetCatalogPageAndQuery({ q: searchQuery.value.trim() || undefined })
   }, 250)
 })
 
 onMounted(() => {
+  syncSearchFromRoute()
   syncSelectedShopFromRoute()
+  syncSelectedCategoryFromRoute()
+  syncSortFromRoute()
+  syncPageFromRoute()
   void loadFilters()
   void loadProducts()
 })
@@ -239,7 +368,7 @@ onMounted(() => {
       <div>
         <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
           <Icon :icon="icons.package" class="size-4" aria-hidden="true" />
-          Товары
+          Исходные товары
         </p>
         <h2 class="mt-2 text-2xl font-semibold text-white">Инспекция исходных карточек</h2>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
@@ -271,6 +400,7 @@ onMounted(() => {
           :disabled="isLoadingFilters"
         >
           <option value="">Все категории</option>
+          <option value="uncategorized">Без категории</option>
           <option v-for="category in categoryOptions" :key="category.id" :value="String(category.id)">
             {{ category.label }}
           </option>
@@ -283,7 +413,7 @@ onMounted(() => {
         >
           <option value="">Все магазины</option>
           <option v-for="shop in shops" :key="shop.id" :value="String(shop.id)">
-            {{ shop.name }}
+            {{ shopOptionLabel(shop) }}
           </option>
         </select>
         <select
@@ -321,7 +451,7 @@ onMounted(() => {
         <span>Последний раз</span>
       </div>
 
-      <div v-if="isLoadingProducts" class="min-w-[920px] px-4 py-14 text-center text-sm text-neutral-500">
+      <div v-if="isLoadingProducts && products.length === 0" class="min-w-[920px] px-4 py-14 text-center text-sm text-neutral-500">
         <Icon :icon="icons.package" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         Загружаем каталог...
       </div>
@@ -342,7 +472,11 @@ onMounted(() => {
         По этим фильтрам товаров не найдено.
       </div>
 
-      <div v-else class="min-w-[920px] divide-y divide-neutral-800">
+      <div
+        v-else
+        class="min-w-[920px] divide-y divide-neutral-800 transition-opacity"
+        :class="isLoadingProducts ? 'opacity-60' : 'opacity-100'"
+      >
         <div
           v-for="product in products"
           :key="product.id"
@@ -387,28 +521,22 @@ onMounted(() => {
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <p class="text-sm text-neutral-500">
-        Страница {{ currentPage }} · показано {{ products.length }}
+        Страница {{ currentPage }} · показано {{ products.length }} из {{ totalProducts }}
       </p>
-      <div class="flex gap-2">
-        <button
-          class="inline-flex h-9 items-center gap-1 rounded-md border border-neutral-800 px-3 text-sm text-neutral-200 transition enabled:hover:border-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
-          :disabled="!hasPreviousPage || isLoadingProducts"
-          type="button"
-          @click="previousPage"
-        >
-          <Icon :icon="icons.chevronLeft" class="size-4" aria-hidden="true" />
-          Назад
-        </button>
-        <button
-          class="inline-flex h-9 items-center gap-1 rounded-md border border-neutral-800 px-3 text-sm text-neutral-200 transition enabled:hover:border-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
-          :disabled="!hasNextPage || isLoadingProducts"
-          type="button"
-          @click="nextPage"
-        >
-          Вперед
-          <Icon :icon="icons.chevronRight" class="size-4" aria-hidden="true" />
-        </button>
-      </div>
+      <UPagination
+        v-model:page="currentPage"
+        :disabled="isLoadingProducts"
+        :items-per-page="pageSize"
+        :show-controls="false"
+        show-edges
+        :sibling-count="1"
+        :total="totalProducts"
+        active-color="neutral"
+        active-variant="solid"
+        color="neutral"
+        size="sm"
+        variant="outline"
+      />
     </div>
   </section>
 </template>

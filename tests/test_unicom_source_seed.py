@@ -13,13 +13,33 @@ import scripts.seed_unicom_source as seed_unicom_source
 
 
 def test_seed_unicom_source_dry_run_lists_official_source(capsys) -> None:  # type: ignore[no-untyped-def]
-    result = seed_unicom_source.main(["--dry-run", "--category-uuid", "category-a"])
+    result = seed_unicom_source.main(
+        ["--dry-run", "--category-uuid", "category-a", "--categories-per-run", "10"]
+    )
 
     output = capsys.readouterr().out
     assert result == 0
     assert "schedule shop: source=unicom" in output
     assert "source_type=official_api" in output
     assert "category_uuids=1" in output
+    assert "categories_per_run=10" in output
+
+
+def test_seed_unicom_source_can_discover_leaf_categories(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+) -> None:  # type: ignore[no-untyped-def]
+    class FakeUnicomClient:
+        def fetch_leaf_category_uuids(self) -> tuple[str, ...]:
+            return ("leaf-a", "leaf-b", "leaf-c")
+
+    monkeypatch.setattr(seed_unicom_source, "UnicomClient", FakeUnicomClient)
+
+    result = seed_unicom_source.main(["--dry-run", "--discover-categories"])
+
+    output = capsys.readouterr().out
+    assert result == 0
+    assert "category_uuids=3" in output
 
 
 @pytest.fixture
@@ -113,10 +133,23 @@ def test_seed_unicom_source_preserves_existing_scrape_metadata(
             "source": "unicom_seed_test",
             "source_type": "official_api",
             "category_uuids": ["category-a", "category-b"],
+            "category_discovery": "explicit_or_default",
+            "categories_per_run": 50,
             "limit": 25,
             "max_pages": 4,
             "sort": "popular",
             "pacing": "sequential categories; no concurrent requests",
+            "unicom_category_batch": {
+                "enabled": False,
+                "total": 2,
+                "next_index": 0,
+                "categories_seen": 0,
+                "categories_per_run": 50,
+                "completed": False,
+                "category_product_counts": {},
+                "total_products": None,
+                "last_stop_reason": None,
+            },
             "last_scrape_error": "timeout",
         }
     finally:

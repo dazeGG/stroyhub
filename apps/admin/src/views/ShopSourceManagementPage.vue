@@ -750,11 +750,11 @@ onMounted(() => {
               <td class="px-4 py-4">
                 <div v-if="shop.identity" class="flex flex-col gap-2">
                   <RouterLink
-                    :to="{ path: '/', query: { shop: shop.id } }"
+                    :to="{ path: '/products', query: { shop: shop.id } }"
                     class="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
                   >
                     <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
-                    Товары
+                    Исходные товары
                   </RouterLink>
                   <button
                     type="button"
@@ -788,11 +788,11 @@ onMounted(() => {
                       Создать магазин
                     </button>
                     <RouterLink
-                      :to="{ path: '/', query: { shop: shop.id } }"
+                      :to="{ path: '/products', query: { shop: shop.id } }"
                       class="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
                     >
                       <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
-                      Товары
+                      Исходные товары
                     </RouterLink>
                   </div>
                 </div>

@@ -29,6 +29,7 @@ class ProductSearchFilters:
     q: str | None = None
     category_id: int | None = None
     category_slug: str | None = None
+    uncategorized: bool = False
     shop_id: int | None = None
     sort: ProductSort = "-last_seen_at"
     limit: int = 50
@@ -102,27 +103,7 @@ class ProductCatalog:
 
     def search_products(self, filters: ProductSearchFilters) -> list[ProductSearchItem]:
         statement, latest_prices = self._product_listing_statement()
-
-        if filters.q is not None:
-            query = filters.q.strip()
-            if query:
-                pattern = f"%{_escape_like_pattern(query)}%"
-                statement = statement.where(
-                    or_(
-                        SourceProduct.title.ilike(pattern, escape="\\"),
-                        SourceProduct.normalized_title.ilike(pattern.lower(), escape="\\"),
-                    )
-                )
-
-        category_ids = self._category_filter_ids(filters)
-        if category_ids is not None:
-            if category_ids:
-                statement = statement.where(SourceProduct.category_id.in_(category_ids))
-            else:
-                statement = statement.where(false())
-
-        if filters.shop_id is not None:
-            statement = statement.where(SourceProduct.shop_id == filters.shop_id)
+        statement = self._apply_product_filters(statement, filters)
 
         statement = (
             statement.order_by(*self._sort_expressions(filters.sort, latest_prices))
@@ -131,6 +112,15 @@ class ProductCatalog:
         )
 
         return [self._product_search_item(*row) for row in self._session.execute(statement)]
+
+    def count_products(self, filters: ProductSearchFilters) -> int:
+        statement = (
+            select(func.count(SourceProduct.id))
+            .join(Shop, SourceProduct.shop_id == Shop.id)
+            .where(SourceProduct.is_active.is_(True))
+        )
+        statement = self._apply_product_filters(statement, filters)
+        return int(self._session.scalar(statement) or 0)
 
     def get_product(self, product_id: int) -> ProductSearchItem | None:
         statement, _latest_prices = self._product_listing_statement()
@@ -214,6 +204,31 @@ class ProductCatalog:
         )
 
         return statement, latest_prices
+
+    def _apply_product_filters(self, statement: Any, filters: ProductSearchFilters) -> Any:
+        if filters.q is not None:
+            query = filters.q.strip()
+            if query:
+                pattern = f"%{_escape_like_pattern(query)}%"
+                statement = statement.where(
+                    or_(
+                        SourceProduct.title.ilike(pattern, escape="\\"),
+                        SourceProduct.normalized_title.ilike(pattern.lower(), escape="\\"),
+                    )
+                )
+
+        if filters.uncategorized:
+            statement = statement.where(SourceProduct.category_id.is_(None))
+        elif (category_ids := self._category_filter_ids(filters)) is not None:
+            if category_ids:
+                statement = statement.where(SourceProduct.category_id.in_(category_ids))
+            else:
+                statement = statement.where(false())
+
+        if filters.shop_id is not None:
+            statement = statement.where(SourceProduct.shop_id == filters.shop_id)
+
+        return statement
 
     def _product_search_item(
         self,

@@ -115,9 +115,63 @@ def test_scheduler_marks_success_and_failure_with_backoff(db_session: Session) -
     assert shop.raw == {"last_scrape_error": "timeout"}
 
 
-def test_celery_beat_runs_due_shop_dispatcher_at_midnight_yakutsk() -> None:
-    schedule = celery_app.conf.beat_schedule["scrape-due-shops-daily-midnight-yakutsk"]
+def test_scheduler_reschedules_batch_progress_after_fifteen_minutes(
+    db_session: Session,
+) -> None:
+    now = datetime(2026, 5, 17, 15, 0, tzinfo=UTC)
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="batch-shop",
+            name="Batch Shop",
+            scrape_interval=86400,
+        )
+    )
+
+    mark_shop_scrape_completion(
+        shop,
+        completed_at=now,
+        scrape_status="partial",
+        partial_is_progress=True,
+    )
+
+    assert shop.scrape_status == "partial"
+    assert shop.error_count == 0
+    assert shop.next_scrape_at == now + timedelta(minutes=15)
+
+
+def test_scheduler_reschedules_large_sources_weekly(db_session: Session) -> None:
+    now = datetime(2026, 5, 17, 15, 0, tzinfo=UTC)
+    repository = ShopRepository(db_session)
+    twogis_shop = repository.upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="large-2gis-shop",
+            name="Large 2GIS Shop",
+            scrape_interval=86400,
+            raw={"twogis_large_catalog": {"total": 5001}},
+        )
+    )
+    unicom_shop = repository.upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="large-unicom-shop",
+            name="Large Unicom Shop",
+            scrape_interval=86400,
+            raw={"unicom_category_batch": {"total_products": 5001}},
+        )
+    )
+
+    mark_shop_scrape_completion(twogis_shop, completed_at=now, scrape_status="success")
+    mark_shop_scrape_completion(unicom_shop, completed_at=now, scrape_status="success")
+
+    assert twogis_shop.next_scrape_at == now + timedelta(days=7)
+    assert unicom_shop.next_scrape_at == now + timedelta(days=7)
+
+
+def test_celery_beat_runs_due_shop_dispatcher_every_fifteen_minutes() -> None:
+    schedule = celery_app.conf.beat_schedule["scrape-due-shops-every-fifteen-minutes"]
 
     assert celery_app.conf.timezone == "Asia/Yakutsk"
     assert schedule["task"] == "stroyhub.scrape_due_shops"
-    assert str(schedule["schedule"]) == "<crontab: 0 0 * * * (m/h/dM/MY/d)>"
+    assert str(schedule["schedule"]) == "<crontab: */15 * * * * (m/h/dM/MY/d)>"
