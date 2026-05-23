@@ -33,8 +33,10 @@ const filterErrorMessage = ref('')
 
 let productRequest: AbortController | null = null
 let searchTimer: number | undefined
+let syncingSearchQuery = false
 let syncingShopQuery = false
 let syncingCategoryQuery = false
+let syncingSortQuery = false
 let syncingPageQuery = false
 
 const categoryOptions = computed(() => {
@@ -141,6 +143,39 @@ function replaceCatalogQuery(values: Record<string, string | undefined>): void {
   void router.replace({ query: nextQuery })
 }
 
+function resetCatalogPageAndQuery(values: Record<string, string | undefined>): void {
+  replaceCatalogQuery({ ...values, page: undefined })
+  resetPaginationAndLoad()
+}
+
+function productSortFromRoute(value: unknown): ProductSort {
+  const defaultSort: ProductSort = '-last_seen_at'
+  const allowedSorts: ProductSort[] = [
+    'latest_price',
+    '-latest_price',
+    'title',
+    '-title',
+    'shop',
+    '-shop',
+    'last_seen_at',
+    '-last_seen_at',
+  ]
+  return typeof value === 'string' && allowedSorts.includes(value as ProductSort)
+    ? (value as ProductSort)
+    : defaultSort
+}
+
+function syncSearchFromRoute(): void {
+  const routeSearch = route.query.q
+  const nextSearch = typeof routeSearch === 'string' ? routeSearch : ''
+  if (searchQuery.value === nextSearch) {
+    return
+  }
+
+  syncingSearchQuery = true
+  searchQuery.value = nextSearch
+}
+
 function syncSelectedShopFromRoute(): void {
   const routeShop = route.query.shop
   const nextShopId = typeof routeShop === 'string' ? routeShop : ''
@@ -174,6 +209,16 @@ function syncPageFromRoute(): void {
 
   syncingPageQuery = true
   offset.value = nextOffset
+}
+
+function syncSortFromRoute(): void {
+  const nextSort = productSortFromRoute(route.query.sort)
+  if (sort.value === nextSort) {
+    return
+  }
+
+  syncingSortQuery = true
+  sort.value = nextSort
 }
 
 function shopOptionLabel(shop: ShopListItem): string {
@@ -232,30 +277,42 @@ async function loadProducts(): Promise<void> {
   }
 }
 
-watch([selectedCategoryId, selectedShopId, sort], () => {
-  resetPaginationAndLoad()
-})
-
 watch(selectedShopId, (shopId) => {
   if (syncingShopQuery) {
     syncingShopQuery = false
+    void loadProducts()
     return
   }
 
-  replaceCatalogQuery({ shop: shopId || undefined, page: undefined })
+  resetCatalogPageAndQuery({ shop: shopId || undefined })
 })
 
 watch(selectedCategoryId, (categoryId) => {
   if (syncingCategoryQuery) {
     syncingCategoryQuery = false
+    void loadProducts()
     return
   }
 
-  replaceCatalogQuery({ category: categoryId || undefined, page: undefined })
+  resetCatalogPageAndQuery({ category: categoryId || undefined })
 })
 
+watch(sort, (nextSort) => {
+  if (syncingSortQuery) {
+    syncingSortQuery = false
+    void loadProducts()
+    return
+  }
+
+  resetCatalogPageAndQuery({
+    sort: nextSort === '-last_seen_at' ? undefined : nextSort,
+  })
+})
+
+watch(() => route.query.q, syncSearchFromRoute)
 watch(() => route.query.shop, syncSelectedShopFromRoute)
 watch(() => route.query.category, syncSelectedCategoryFromRoute)
+watch(() => route.query.sort, syncSortFromRoute)
 watch(() => route.query.page, syncPageFromRoute)
 
 watch(offset, () => {
@@ -272,14 +329,22 @@ watch(offset, () => {
 
 watch(searchQuery, () => {
   window.clearTimeout(searchTimer)
+  if (syncingSearchQuery) {
+    syncingSearchQuery = false
+    void loadProducts()
+    return
+  }
+
   searchTimer = window.setTimeout(() => {
-    resetPaginationAndLoad()
+    resetCatalogPageAndQuery({ q: searchQuery.value.trim() || undefined })
   }, 250)
 })
 
 onMounted(() => {
+  syncSearchFromRoute()
   syncSelectedShopFromRoute()
   syncSelectedCategoryFromRoute()
+  syncSortFromRoute()
   syncPageFromRoute()
   void loadFilters()
   void loadProducts()
@@ -446,6 +511,8 @@ onMounted(() => {
         v-model:page="currentPage"
         :disabled="isLoadingProducts"
         :items-per-page="pageSize"
+        :show-controls="false"
+        show-edges
         :sibling-count="1"
         :total="totalProducts"
         active-color="neutral"
