@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
@@ -849,6 +849,126 @@ def test_product_match_repository_enforces_one_accepted_match_per_source_product
                     status="accepted",
                 )
             )
+
+
+def test_raw_sql_updates_refresh_updated_at_via_db_triggers(db_session: Session) -> None:
+    identity = ShopIdentityRepository(db_session).create(
+        ShopIdentityCreate(display_name="Identity")
+    )
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="trigger-shop",
+            name="Trigger shop",
+            shop_identity_id=identity.id,
+        )
+    )
+    candidate = db_session.execute(
+        text(
+            """
+            INSERT INTO shop_source_candidates (
+                source, source_id, source_type, display_name, status, priority_reason
+            )
+            VALUES (
+                '2gis', 'trigger-candidate', '2gis', 'Trigger candidate', 'pending', 'seed'
+            )
+            RETURNING id;
+            """
+        )
+    ).scalar_one()
+    category = CategoryRepository(db_session).upsert(
+        CategoryUpsert(slug="trigger-category", name="Trigger category")
+    )
+    source_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="trigger-source-product",
+            title="Trigger source product",
+            normalized_title="trigger source product",
+            category_id=category.id,
+        )
+    )
+    override = CategoryOverrideRepository(db_session).create_or_replace(
+        CategoryOverrideCreate(source_product_id=source_product.id, category_id=category.id)
+    )
+    canonical_product = CanonicalProductRepository(db_session).create(
+        CanonicalProductCreate(
+            title="Trigger canonical",
+            normalized_title="trigger canonical",
+            category_id=category.id,
+        )
+    )
+
+    row_ids = {
+        "id": identity.id,
+        "shop_id": shop.id,
+        "candidate_id": candidate,
+        "category_id": category.id,
+        "source_product_id": source_product.id,
+        "override_id": override.id,
+        "canonical_product_id": canonical_product.id,
+    }
+    reset_statements = (
+        ("shop_identities", "id"),
+        ("shops", "shop_id"),
+        ("shop_source_candidates", "candidate_id"),
+        ("categories", "category_id"),
+        ("source_products", "source_product_id"),
+        ("category_overrides", "override_id"),
+        ("canonical_products", "canonical_product_id"),
+    )
+    for table_name, key in reset_statements:
+        db_session.execute(
+            text(
+                f"UPDATE {table_name} "
+                "SET updated_at = TIMESTAMPTZ '2000-01-01 00:00:00+00' "
+                f"WHERE id = :{key}"
+            ),
+            row_ids,
+        )
+
+    update_statements = (
+        ("shop_identities", "notes = 't'", "id"),
+        ("shops", "name = 'Trigger shop updated'", "shop_id"),
+        (
+            "shop_source_candidates",
+            "display_name = 'Trigger candidate updated'",
+            "candidate_id",
+        ),
+        ("categories", "name = 'Trigger category updated'", "category_id"),
+        ("source_products", "title = 'Trigger source product updated'", "source_product_id"),
+        ("category_overrides", "reason = 'trigger update'", "override_id"),
+        ("canonical_products", "title = 'Trigger canonical updated'", "canonical_product_id"),
+    )
+    for table_name, assignment, key in update_statements:
+        db_session.execute(
+            text(f"UPDATE {table_name} SET {assignment} WHERE id = :{key}"),
+            row_ids,
+        )
+
+    updated_values = db_session.execute(
+        text(
+            """
+            SELECT
+                (SELECT updated_at FROM shop_identities WHERE id = :id) AS shop_identity_updated_at,
+                (SELECT updated_at FROM shops WHERE id = :shop_id) AS shop_updated_at,
+                (SELECT updated_at FROM shop_source_candidates WHERE id = :candidate_id)
+                    AS candidate_updated_at,
+                (SELECT updated_at FROM categories WHERE id = :category_id) AS category_updated_at,
+                (SELECT updated_at FROM source_products WHERE id = :source_product_id)
+                    AS source_product_updated_at,
+                (SELECT updated_at FROM category_overrides WHERE id = :override_id)
+                    AS override_updated_at,
+                (SELECT updated_at FROM canonical_products WHERE id = :canonical_product_id)
+                    AS canonical_updated_at;
+            """
+        ),
+        row_ids,
+    ).mappings().one()
+
+    for value in updated_values.values():
+        assert value.year > 2000
 
 
 def _source_product(
