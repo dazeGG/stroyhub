@@ -54,6 +54,24 @@ def test_backfill_products_counts_unchanged_and_unmatched_products() -> None:
     assert result.unmatched == 1
 
 
+def test_backfill_products_skips_active_category_overrides() -> None:
+    product = _product(title="Цемент М500", category_id=None)
+    product.category_overrides = [FakeOverride(status="active")]
+
+    result = backfill_category_ids.backfill_products(
+        [product],
+        category_repository=FakeCategoryRepository(),
+        categorizer=backfill_category_ids.RuleBasedCategorizer(),
+        dry_run=False,
+    )
+
+    assert result.products_seen == 1
+    assert result.changed == 0
+    assert result.unchanged == 1
+    assert result.unmatched == 0
+    assert product.category_id is None
+
+
 def test_backfill_main_forwards_filters_and_prints_summary(monkeypatch, capsys) -> None:  # type: ignore[no-untyped-def]
     captured: dict[str, object] = {}
 
@@ -89,6 +107,12 @@ class FakeProduct:
     source: str = "2gis"
     category_raw: str | None = None
     description: str | None = None
+    category_overrides: list["FakeOverride"] | None = None
+
+
+@dataclass(frozen=True)
+class FakeOverride:
+    status: str
 
 
 @dataclass(frozen=True)

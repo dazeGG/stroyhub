@@ -5,12 +5,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import exists, not_, select
 from sqlalchemy.orm import Session
 from stroyhub.catalog.categorization import CategoryPrediction, RuleBasedCategorizer
 from stroyhub.db import SessionLocal
 from stroyhub.db.repositories import CategoryRepository, CategoryUpsert
-from stroyhub.models import SourceProduct
+from stroyhub.models import CategoryOverride, SourceProduct
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -64,6 +64,16 @@ def _list_source_products(
     statement = (
         select(SourceProduct)
         .where(SourceProduct.is_active.is_(True))
+        .where(
+            not_(
+                exists(
+                    select(CategoryOverride.id).where(
+                        CategoryOverride.source_product_id == SourceProduct.id,
+                        CategoryOverride.status == "active",
+                    )
+                )
+            )
+        )
         .order_by(SourceProduct.id.asc())
     )
     if source is not None:
@@ -85,6 +95,9 @@ def backfill_products(
     unmatched = 0
 
     for product in products:
+        if _has_active_category_override(product):
+            unchanged += 1
+            continue
         category_id = _category_id_for_product(
             category_repository=category_repository,
             categorizer=categorizer,
@@ -108,6 +121,13 @@ def backfill_products(
         unmatched=unmatched,
         dry_run=dry_run,
     )
+
+
+def _has_active_category_override(product: Any) -> bool:
+    overrides = getattr(product, "category_overrides", None)
+    if not isinstance(overrides, (list, tuple)):
+        return False
+    return any(getattr(override, "status", None) == "active" for override in overrides)
 
 
 def _category_id_for_product(
