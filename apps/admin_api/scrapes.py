@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from stroyhub.db import get_session
 from stroyhub.scraping.health import ScrapeHealthCatalog, ScrapeHealthFilters
 
+from apps.admin_api.validation import ScrapeRunStatus
+
 router = APIRouter(prefix="/scrapes", tags=["scrapes"])
 
 
@@ -40,8 +42,8 @@ class ScrapeHealthResponse(BaseModel):
 def get_scrape_health(
     session: Annotated[Session, Depends(get_session)],
     source: str | None = None,
-    shop: int | None = None,
-    status: str | None = None,
+    shop: Annotated[int | None, Query(gt=0)] = None,
+    status: ScrapeRunStatus | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> ScrapeHealthResponse:
     filters = ScrapeHealthFilters(

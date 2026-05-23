@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from stroyhub.catalog.canonical_products import (
@@ -13,6 +13,12 @@ from stroyhub.db import get_session
 from stroyhub.db.repositories import CanonicalProductCreate, CanonicalProductRepository
 from stroyhub.models import Category, SourceProduct
 from stroyhub.parsers.common import JsonObject, normalize_title
+
+from apps.admin_api.validation import (
+    CanonicalProductStatus,
+    NonEmptyTitle,
+    NormalizedTitleText,
+)
 
 router = APIRouter(prefix="/canonical-products", tags=["canonical-products"])
 
@@ -107,44 +113,44 @@ class CanonicalProductListResponse(BaseModel):
 
 
 class CanonicalProductCreateRequest(BaseModel):
-    title: str
-    normalized_title: str | None = None
+    title: NonEmptyTitle
+    normalized_title: NormalizedTitleText | None = None
     category_id: int | None = None
     brand: str | None = None
     model: str | None = None
     unit_raw: str | None = None
     attributes: dict[str, Any] | None = None
-    match_status: str = "active"
+    match_status: CanonicalProductStatus = "active"
 
 
 class CanonicalProductFromSourceRequest(BaseModel):
-    title: str | None = None
-    normalized_title: str | None = None
+    title: NonEmptyTitle | None = None
+    normalized_title: NormalizedTitleText | None = None
     category_id: int | None = None
     brand: str | None = None
     model: str | None = None
     unit_raw: str | None = None
     attributes: dict[str, Any] | None = None
-    match_status: str = "active"
+    match_status: CanonicalProductStatus = "active"
 
 
 class CanonicalProductUpdateRequest(BaseModel):
-    title: str | None = None
-    normalized_title: str | None = None
+    title: NonEmptyTitle | None = None
+    normalized_title: NormalizedTitleText | None = None
     category_id: int | None = None
     brand: str | None = None
     model: str | None = None
     unit_raw: str | None = None
     attributes: dict[str, Any] | None = None
-    match_status: str | None = None
+    match_status: CanonicalProductStatus | None = None
 
 
 @router.get("", response_model=CanonicalProductListResponse)
 def list_canonical_products(
     session: Annotated[Session, Depends(get_session)],
     q: str | None = None,
-    category_id: int | None = None,
-    match_status: str | None = None,
+    category_id: Annotated[int | None, Query(gt=0)] = None,
+    match_status: CanonicalProductStatus | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> CanonicalProductListResponse:
@@ -193,7 +199,7 @@ def create_canonical_product(
     status_code=201,
 )
 def create_canonical_product_from_source(
-    source_product_id: int,
+    source_product_id: Annotated[int, Path(gt=0)],
     payload: CanonicalProductFromSourceRequest,
     session: Annotated[Session, Depends(get_session)],
 ) -> CanonicalProductDetailResponse:
@@ -224,7 +230,7 @@ def create_canonical_product_from_source(
 
 @router.get("/{canonical_product_id}", response_model=CanonicalProductDetailResponse)
 def get_canonical_product(
-    canonical_product_id: int,
+    canonical_product_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> CanonicalProductDetailResponse:
     return _canonical_detail_response(session, canonical_product_id)
@@ -232,7 +238,7 @@ def get_canonical_product(
 
 @router.patch("/{canonical_product_id}", response_model=CanonicalProductDetailResponse)
 def update_canonical_product(
-    canonical_product_id: int,
+    canonical_product_id: Annotated[int, Path(gt=0)],
     payload: CanonicalProductUpdateRequest,
     session: Annotated[Session, Depends(get_session)],
 ) -> CanonicalProductDetailResponse:

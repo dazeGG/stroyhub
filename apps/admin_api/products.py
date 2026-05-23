@@ -2,8 +2,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from stroyhub.catalog.products import ProductCatalog, ProductSearchFilters, ProductSort
 from stroyhub.db import get_session
@@ -13,6 +13,8 @@ from stroyhub.db.repositories import (
     CategoryOverrideRevert,
     CategoryRepository,
 )
+
+from apps.admin_api.validation import ActorName, ReasonText
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -96,20 +98,20 @@ class ProductPriceHistoryResponse(BaseModel):
 
 
 class ProductCategoryOverrideRequest(BaseModel):
-    category_id: int
-    reason: str | None = None
-    actor: str | None = "admin"
+    category_id: Annotated[int, Field(gt=0)]
+    reason: ReasonText | None = None
+    actor: ActorName | None = "admin"
 
 
 @router.get("", response_model=ProductSearchResponse)
 def search_products(
     session: Annotated[Session, Depends(get_session)],
     q: str | None = None,
-    category: int | None = None,
-    category_id: int | None = None,
+    category: Annotated[int | None, Query(gt=0)] = None,
+    category_id: Annotated[int | None, Query(gt=0)] = None,
     category_slug: str | None = None,
     uncategorized: bool = False,
-    shop: int | None = None,
+    shop: Annotated[int | None, Query(gt=0)] = None,
     sort: ProductSort = "-last_seen_at",
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -139,7 +141,7 @@ def search_products(
 
 @router.get("/{product_id}", response_model=ProductSearchItemResponse)
 def get_product(
-    product_id: int,
+    product_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ProductSearchItemResponse:
     item = ProductCatalog(session).get_product(product_id)
@@ -151,7 +153,7 @@ def get_product(
 
 @router.put("/{product_id}/category-override", response_model=ProductSearchItemResponse)
 def assign_product_category_override(
-    product_id: int,
+    product_id: Annotated[int, Path(gt=0)],
     payload: ProductCategoryOverrideRequest,
     session: Annotated[Session, Depends(get_session)],
 ) -> ProductSearchItemResponse:
@@ -183,9 +185,9 @@ def assign_product_category_override(
 
 @router.delete("/{product_id}/category-override", response_model=ProductSearchItemResponse)
 def revert_product_category_override(
-    product_id: int,
+    product_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
-    actor: str | None = "admin",
+    actor: ActorName | None = "admin",
 ) -> ProductSearchItemResponse:
     catalog = ProductCatalog(session)
     if catalog.get_product(product_id) is None:
@@ -207,7 +209,7 @@ def revert_product_category_override(
 
 @router.get("/{product_id}/prices", response_model=ProductPriceHistoryResponse)
 def list_product_prices(
-    product_id: int,
+    product_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ProductPriceHistoryResponse:
     catalog = ProductCatalog(session)

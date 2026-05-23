@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,6 +19,7 @@ from stroyhub.parsers.unicom import UNICOM_DEFAULT_SHOP_SOURCE_ID, UNICOM_SOURCE
 from stroyhub.scraping.enqueue import clear_enqueue_failed, mark_enqueue_failed
 
 from apps.admin_api.scrape_queue import enqueue_shop_scrape
+from apps.admin_api.validation import ShopCandidateStatus
 
 router = APIRouter(prefix="/shop-source-candidates", tags=["shop-source-candidates"])
 
@@ -138,7 +139,7 @@ class OfficialStrategyMaterializeResponse(BaseModel):
 @router.get("", response_model=ShopSourceCandidateListResponse)
 def list_shop_source_candidates(
     session: Annotated[Session, Depends(get_session)],
-    status: str | None = None,
+    status: ShopCandidateStatus | None = None,
     include_approved: bool = False,
 ) -> ShopSourceCandidateListResponse:
     catalog = ShopCandidateCatalog(session)
@@ -180,7 +181,7 @@ def refresh_shop_source_candidates(
 
 @router.post("/{candidate_id}/approve", response_model=ShopSourceCandidateResponse)
 def approve_shop_source_candidate(
-    candidate_id: int,
+    candidate_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
     payload: ShopSourceCandidateApproveRequest | None = None,
 ) -> ShopSourceCandidateResponse:
@@ -225,7 +226,7 @@ def approve_shop_source_candidate(
     status_code=status.HTTP_202_ACCEPTED,
 )
 def verify_shop_source_candidate_twogis_data(
-    candidate_id: int,
+    candidate_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> AsyncOperationAcceptedResponse:
     del session

@@ -195,11 +195,16 @@ def test_shops_endpoint_filters_by_source_type_and_identity_relationship(
 def test_shops_endpoint_handles_empty_results(client: TestClient) -> None:
     response = client.get(
         "/shops",
-        params={"source": "source-with-no-shops", "status": "not-a-real-status"},
+        params={"source": "source-with-no-shops", "status": "failed"},
     )
 
     assert response.status_code == 200
     assert response.json() == {"items": []}
+
+
+def test_shops_endpoint_rejects_unknown_status_filter(client: TestClient) -> None:
+    response = client.get("/shops", params={"status": "not-a-real-status"})
+    assert response.status_code == 422
 
 
 def test_shop_identity_endpoints_create_update_link_and_unlink_sources(
