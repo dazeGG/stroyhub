@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { useToast } from '@nuxt/ui/composables'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import {
@@ -10,6 +11,7 @@ import {
   type ShopListItem,
 } from '../lib/api'
 import { icons } from '../lib/icons'
+import { messageFromError, toastError } from '../lib/notifications'
 
 const selectedSource = ref('')
 const selectedShopId = ref('')
@@ -19,6 +21,7 @@ const productsConsidered = ref(0)
 const candidates = ref<MatchCandidatePair[]>([])
 const isLoading = ref(false)
 const errorMessage = ref('')
+const toast = useToast()
 
 let candidateRequest: AbortController | null = null
 
@@ -85,8 +88,13 @@ async function loadCandidates(): Promise<void> {
       return
     }
 
-    errorMessage.value =
-      error instanceof Error ? error.message : 'Не удалось загрузить кандидатов матчинга'
+    errorMessage.value = messageFromError(error, 'Не удалось загрузить кандидатов матчинга')
+    toastError(
+      toast,
+      'Не удалось загрузить кандидатов матчинга',
+      error,
+      'Не удалось загрузить кандидатов матчинга',
+    )
     productsConsidered.value = 0
     candidates.value = []
   } finally {
@@ -165,13 +173,6 @@ onMounted(() => {
           <option value="0.95">95%+</option>
         </select>
       </div>
-    </div>
-
-    <div
-      v-if="errorMessage"
-      class="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100"
-    >
-      Не удалось загрузить кандидатов матчинга: {{ errorMessage }}
     </div>
 
     <div class="grid gap-4 md:grid-cols-3">

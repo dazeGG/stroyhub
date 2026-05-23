@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { useToast } from '@nuxt/ui/composables'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
@@ -11,6 +12,7 @@ import {
   type UncategorizedCategoryGroup,
 } from '../lib/api'
 import { icons } from '../lib/icons'
+import { messageFromError, toastError, toastSuccess, toastWarning } from '../lib/notifications'
 
 const selectedSource = ref('')
 const selectedShopId = ref('')
@@ -19,6 +21,7 @@ const quality = ref<CategoryQualityResponse | null>(null)
 const isLoading = ref(false)
 const errorMessage = ref('')
 const copyMessage = ref('')
+const toast = useToast()
 
 let qualityRequest: AbortController | null = null
 
@@ -81,8 +84,10 @@ async function copyExportText(): Promise<void> {
   try {
     await navigator.clipboard.writeText(exportText.value)
     copyMessage.value = 'Скопировано для issue comment'
+    toastSuccess(toast, 'Отчет скопирован', copyMessage.value)
   } catch {
     copyMessage.value = 'Не удалось скопировать автоматически, текст ниже можно выделить вручную'
+    toastWarning(toast, 'Не удалось скопировать', copyMessage.value)
   }
   window.setTimeout(() => {
     copyMessage.value = ''
@@ -116,8 +121,13 @@ async function loadQuality(): Promise<void> {
       return
     }
 
-    errorMessage.value =
-      error instanceof Error ? error.message : 'Не удалось загрузить качество категорий'
+    errorMessage.value = messageFromError(error, 'Не удалось загрузить качество категорий')
+    toastError(
+      toast,
+      'Не удалось загрузить качество категорий',
+      error,
+      'Не удалось загрузить качество категорий',
+    )
     quality.value = null
   } finally {
     if (qualityRequest === request) {
@@ -193,13 +203,6 @@ onMounted(() => {
           </option>
         </select>
       </div>
-    </div>
-
-    <div
-      v-if="errorMessage"
-      class="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100"
-    >
-      Не удалось загрузить качество категорий: {{ errorMessage }}
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">
@@ -306,7 +309,6 @@ onMounted(() => {
           <Icon :icon="icons.copy" class="size-4" aria-hidden="true" />
           Скопировать отчет
         </button>
-        <p v-if="copyMessage" class="text-sm text-emerald-300">{{ copyMessage }}</p>
         <textarea
           class="min-h-[420px] w-full resize-y rounded-lg border border-neutral-800 bg-neutral-950 p-3 font-mono text-xs leading-5 text-neutral-300 outline-none focus:border-amber-400"
           readonly

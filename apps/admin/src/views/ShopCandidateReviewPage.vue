@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { useToast } from '@nuxt/ui/composables'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
@@ -14,6 +15,7 @@ import {
   type ShopSourceCandidateStatus,
 } from '../lib/api'
 import { icons } from '../lib/icons'
+import { messageFromError, toastError, toastSuccess } from '../lib/notifications'
 
 const candidates = ref<ShopSourceCandidate[]>([])
 const candidateGroups = ref<ShopSourceCandidateGroup[]>([])
@@ -24,6 +26,7 @@ const approvingCandidateId = ref<number | null>(null)
 const materializingOfficialSource = ref<string | null>(null)
 const errorMessage = ref('')
 const saveMessage = ref('')
+const toast = useToast()
 const lastRefresh = ref<ShopSourceCandidateRefreshResponse | null>(null)
 
 let candidateRequest: AbortController | null = null
@@ -116,7 +119,8 @@ async function loadCandidates(): Promise<void> {
     if (error instanceof DOMException && error.name === 'AbortError') {
       return
     }
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить кандидатов'
+    errorMessage.value = messageFromError(error, 'Не удалось загрузить кандидатов')
+    toastError(toast, 'Не удалось загрузить кандидатов', error, 'Не удалось загрузить кандидатов')
     candidates.value = []
     candidateGroups.value = []
   } finally {
@@ -141,8 +145,10 @@ async function refreshCandidates(): Promise<void> {
       candidateGroups.value = response.groups
     }
     saveMessage.value = `Обновлено из 2GIS: проверено ${response.checked}, новых ${response.created}`
+    toastSuccess(toast, 'Кандидаты обновлены', saveMessage.value)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось обновить кандидатов'
+    errorMessage.value = messageFromError(error, 'Не удалось обновить кандидатов')
+    toastError(toast, 'Не удалось обновить кандидатов', error, 'Не удалось обновить кандидатов')
   } finally {
     isRefreshing.value = false
   }
@@ -162,11 +168,16 @@ async function materializeOfficialGroup(group: ShopSourceCandidateGroup): Promis
     const scrapeResult = response.scrape_result
     const scrapeMessage = formatScrapeMessage(scrapeResult)
     saveMessage.value = `${response.shop.name}: официальный источник ${response.shop.source} создан/обновлен. ${scrapeMessage}`
+    toastSuccess(toast, 'Официальный источник готов', saveMessage.value)
     await loadCandidates()
   } catch (error) {
-    errorMessage.value = error instanceof Error
-      ? error.message
-      : 'Не удалось создать официальный источник'
+    errorMessage.value = messageFromError(error, 'Не удалось создать официальный источник')
+    toastError(
+      toast,
+      'Не удалось создать официальный источник',
+      error,
+      'Не удалось создать официальный источник',
+    )
   } finally {
     materializingOfficialSource.value = null
   }
@@ -188,9 +199,11 @@ async function approveCandidate(
     const scrapeResult = approvedCandidate.scrape_result
     const scrapeMessage = formatScrapeMessage(scrapeResult)
     saveMessage.value = `${candidate.display_name} добавлен ${approvalTarget}. ${scrapeMessage}`
+    toastSuccess(toast, 'Кандидат утвержден', saveMessage.value)
     await loadCandidates()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось утвердить кандидата'
+    errorMessage.value = messageFromError(error, 'Не удалось утвердить кандидата')
+    toastError(toast, 'Не удалось утвердить кандидата', error, 'Не удалось утвердить кандидата')
   } finally {
     approvingCandidateId.value = null
   }
@@ -231,13 +244,6 @@ onMounted(() => {
           Новые магазины попадают сюда перед тем, как стать отслеживаемыми источниками. Приоритет выше у кандидатов с ценами и сайтом.
         </p>
       </div>
-    </div>
-
-    <div v-if="errorMessage" class="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100">
-      {{ errorMessage }}
-    </div>
-    <div v-if="saveMessage" class="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
-      {{ saveMessage }}
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">

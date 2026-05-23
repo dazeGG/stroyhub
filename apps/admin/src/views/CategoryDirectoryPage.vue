@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { useToast } from '@nuxt/ui/composables'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { fetchCategories, type CategoryTreeItem } from '../lib/api'
 import { icons } from '../lib/icons'
+import { messageFromError, toastError } from '../lib/notifications'
 
 interface CategoryDirectoryRow {
   id: number
@@ -22,6 +24,7 @@ const searchQuery = ref('')
 const expandedRootIds = ref<Set<number>>(new Set())
 const isLoading = ref(false)
 const errorMessage = ref('')
+const toast = useToast()
 
 const directoryRows = computed<CategoryDirectoryRow[]>(() => {
   const rows: CategoryDirectoryRow[] = []
@@ -111,7 +114,8 @@ async function loadCategories(): Promise<void> {
     const response = await fetchCategories()
     categories.value = response.items
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить категории'
+    errorMessage.value = messageFromError(error, 'Не удалось загрузить категории')
+    toastError(toast, 'Не удалось загрузить категории', error, 'Не удалось загрузить категории')
     categories.value = []
   } finally {
     isLoading.value = false
@@ -160,13 +164,6 @@ onMounted(() => {
           Проверка качества
         </RouterLink>
       </div>
-    </div>
-
-    <div
-      v-if="errorMessage"
-      class="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100"
-    >
-      Не удалось загрузить категории: {{ errorMessage }}
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">

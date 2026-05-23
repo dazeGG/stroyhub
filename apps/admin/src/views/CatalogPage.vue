@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { useToast } from '@nuxt/ui/composables'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -13,6 +14,7 @@ import {
   type ShopListItem,
 } from '../lib/api'
 import { icons } from '../lib/icons'
+import { messageFromError, toastError } from '../lib/notifications'
 
 const pageSize = 50
 const route = useRoute()
@@ -30,6 +32,7 @@ const isLoadingProducts = ref(false)
 const isLoadingFilters = ref(false)
 const errorMessage = ref('')
 const filterErrorMessage = ref('')
+const toast = useToast()
 
 let productRequest: AbortController | null = null
 let searchTimer: number | undefined
@@ -234,8 +237,8 @@ async function loadFilters(): Promise<void> {
     categories.value = categoryResponse.items
     shops.value = shopResponse.items
   } catch (error) {
-    filterErrorMessage.value =
-      error instanceof Error ? error.message : 'Не удалось загрузить фильтры каталога'
+    filterErrorMessage.value = messageFromError(error, 'Не удалось загрузить фильтры каталога')
+    toastError(toast, 'Не удалось загрузить фильтры каталога', error, 'Не удалось загрузить фильтры каталога')
   } finally {
     isLoadingFilters.value = false
   }
@@ -272,7 +275,8 @@ async function loadProducts(options: { preserveScroll?: boolean } = {}): Promise
       return
     }
 
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить товары'
+    errorMessage.value = messageFromError(error, 'Не удалось загрузить товары')
+    toastError(toast, 'Не удалось загрузить каталог', error, 'Не удалось загрузить товары')
     products.value = []
     totalProducts.value = 0
   } finally {
@@ -431,13 +435,6 @@ onMounted(() => {
           <option value="-shop">Магазин Z-A</option>
         </select>
       </div>
-    </div>
-
-    <div
-      v-if="filterErrorMessage"
-      class="rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100"
-    >
-      Фильтры не загрузились: {{ filterErrorMessage }}
     </div>
 
     <div class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { useToast } from '@nuxt/ui/composables'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
@@ -21,6 +22,7 @@ import {
   type SourceType,
 } from '../lib/api'
 import { icons } from '../lib/icons'
+import { messageFromError, toastError, toastSuccess, toastWarning } from '../lib/notifications'
 
 const statusOptions: Array<{ value: IdentityStatus; label: string }> = [
   { value: 'active', label: 'Активен' },
@@ -46,6 +48,7 @@ const selectedIdentityId = ref<number | ''>('')
 const isLoading = ref(false)
 const errorMessage = ref('')
 const saveMessage = ref('')
+const toast = useToast()
 const savingIdentityId = ref<number | null>(null)
 const deletingIdentityId = ref<number | null>(null)
 const linkingShopId = ref<number | null>(null)
@@ -307,7 +310,8 @@ async function loadShopManagement(): Promise<void> {
       return
     }
 
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить магазины'
+    errorMessage.value = messageFromError(error, 'Не удалось загрузить магазины')
+    toastError(toast, 'Не удалось загрузить магазины', error, 'Не удалось загрузить магазины')
     identities.value = []
     allShops.value = []
     shops.value = []
@@ -328,10 +332,12 @@ async function saveIdentity(identity: ShopIdentity): Promise<void> {
     identities.value = identities.value.map((item) => (item.id === updated.id ? updated : item))
     editForms[updated.id] = normalizePayload(updated)
     saveMessage.value = 'Метаданные магазина сохранены'
+    toastSuccess(toast, 'Магазин сохранен', saveMessage.value)
     closeEditModal()
     await loadShopManagement()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось сохранить магазин'
+    errorMessage.value = messageFromError(error, 'Не удалось сохранить магазин')
+    toastError(toast, 'Не удалось сохранить магазин', error, 'Не удалось сохранить магазин')
   } finally {
     savingIdentityId.value = null
   }
@@ -340,6 +346,7 @@ async function saveIdentity(identity: ShopIdentity): Promise<void> {
 async function createIdentity(): Promise<void> {
   if (!createForm.display_name.trim()) {
     errorMessage.value = 'Укажите название магазина'
+    toastWarning(toast, 'Не хватает данных', 'Укажите название магазина')
     return
   }
 
@@ -361,9 +368,11 @@ async function createIdentity(): Promise<void> {
     saveMessage.value = sourceShopId === null
       ? 'Магазин создан'
       : 'Магазин создан и привязан к источнику'
+    toastSuccess(toast, 'Магазин создан', saveMessage.value)
     await loadShopManagement()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось создать магазин'
+    errorMessage.value = messageFromError(error, 'Не удалось создать магазин')
+    toastError(toast, 'Не удалось создать магазин', error, 'Не удалось создать магазин')
   } finally {
     savingIdentityId.value = null
   }
@@ -378,9 +387,11 @@ async function deleteIdentity(identity: ShopIdentity): Promise<void> {
     await deleteShopIdentity(identity.id)
     closeDeleteModal()
     saveMessage.value = 'Магазин удалён, источники остались в системе'
+    toastSuccess(toast, 'Магазин удален', saveMessage.value)
     await loadShopManagement()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось удалить магазин'
+    errorMessage.value = messageFromError(error, 'Не удалось удалить магазин')
+    toastError(toast, 'Не удалось удалить магазин', error, 'Не удалось удалить магазин')
   } finally {
     deletingIdentityId.value = null
   }
@@ -400,9 +411,11 @@ async function linkSource(shop: ShopListItem): Promise<void> {
     await linkShopSource(Number(identityId), shop.id)
     linkTargets[shop.id] = ''
     saveMessage.value = 'Источник привязан'
+    toastSuccess(toast, 'Источник привязан')
     await loadShopManagement()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось привязать источник'
+    errorMessage.value = messageFromError(error, 'Не удалось привязать источник')
+    toastError(toast, 'Не удалось привязать источник', error, 'Не удалось привязать источник')
   } finally {
     linkingShopId.value = null
   }
@@ -416,9 +429,11 @@ async function unlinkSource(shop: ShopListItem): Promise<void> {
   try {
     await unlinkShopSource(shop.id)
     saveMessage.value = 'Источник отвязан'
+    toastSuccess(toast, 'Источник отвязан')
     await loadShopManagement()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось отвязать источник'
+    errorMessage.value = messageFromError(error, 'Не удалось отвязать источник')
+    toastError(toast, 'Не удалось отвязать источник', error, 'Не удалось отвязать источник')
   } finally {
     linkingShopId.value = null
   }
@@ -432,11 +447,16 @@ async function enableLargeCatalog(shop: ShopListItem): Promise<void> {
   try {
     await enableTwogisLargeCatalog(shop.id)
     saveMessage.value = 'Батчевая загрузка 2GIS включена'
+    toastSuccess(toast, 'Батчевая загрузка 2GIS включена')
     await loadShopManagement()
   } catch (error) {
-    errorMessage.value = error instanceof Error
-      ? error.message
-      : 'Не удалось включить батчевую загрузку 2GIS'
+    errorMessage.value = messageFromError(error, 'Не удалось включить батчевую загрузку 2GIS')
+    toastError(
+      toast,
+      'Не удалось включить батчевую загрузку 2GIS',
+      error,
+      'Не удалось включить батчевую загрузку 2GIS',
+    )
   } finally {
     largeCatalogActionShopId.value = null
   }
@@ -450,11 +470,16 @@ async function disableLargeCatalog(shop: ShopListItem): Promise<void> {
   try {
     await disableTwogisLargeCatalog(shop.id)
     saveMessage.value = 'Батчевая загрузка 2GIS остановлена'
+    toastSuccess(toast, 'Батчевая загрузка 2GIS остановлена')
     await loadShopManagement()
   } catch (error) {
-    errorMessage.value = error instanceof Error
-      ? error.message
-      : 'Не удалось остановить батчевую загрузку 2GIS'
+    errorMessage.value = messageFromError(error, 'Не удалось остановить батчевую загрузку 2GIS')
+    toastError(
+      toast,
+      'Не удалось остановить батчевую загрузку 2GIS',
+      error,
+      'Не удалось остановить батчевую загрузку 2GIS',
+    )
   } finally {
     largeCatalogActionShopId.value = null
   }
@@ -469,8 +494,10 @@ async function retryScrape(shop: ShopListItem): Promise<void> {
     await retryShopScrape(shop.id)
     await loadShopManagement()
     saveMessage.value = 'Скрейп поставлен в очередь'
+    toastSuccess(toast, 'Скрейп поставлен в очередь')
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось перезапустить скрейп'
+    errorMessage.value = messageFromError(error, 'Не удалось перезапустить скрейп')
+    toastError(toast, 'Не удалось перезапустить скрейп', error, 'Не удалось перезапустить скрейп')
   } finally {
     retryingShopId.value = null
   }
@@ -501,13 +528,6 @@ onMounted(() => {
           Магазины объединяют source-записи из 2GIS, официальных API и HTML-каталогов. Здесь только метаданные, статусы и связи источников.
         </p>
       </div>
-    </div>
-
-    <div v-if="errorMessage" class="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100">
-      {{ errorMessage }}
-    </div>
-    <div v-if="saveMessage" class="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
-      {{ saveMessage }}
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">

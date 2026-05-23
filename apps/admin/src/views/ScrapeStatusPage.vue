@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { useToast } from '@nuxt/ui/composables'
 import { computed, onMounted, ref, watch } from 'vue'
 
 import {
@@ -11,6 +12,7 @@ import {
   type ShopListItem,
 } from '../lib/api'
 import { icons } from '../lib/icons'
+import { messageFromError, toastError, toastSuccess } from '../lib/notifications'
 
 const selectedSource = ref('')
 const selectedStatus = ref('')
@@ -22,6 +24,7 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 const saveMessage = ref('')
 const retryingShopId = ref<number | null>(null)
+const toast = useToast()
 
 let dashboardRequest: AbortController | null = null
 
@@ -157,7 +160,8 @@ async function loadDashboard(): Promise<void> {
       return
     }
 
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить статус скрейпов'
+    errorMessage.value = messageFromError(error, 'Не удалось загрузить статус скрейпов')
+    toastError(toast, 'Не удалось загрузить статус скрейпов', error, 'Не удалось загрузить статус скрейпов')
     shops.value = []
     statusCounts.value = []
     recentRuns.value = []
@@ -176,9 +180,11 @@ async function retryScrape(shop: ShopListItem): Promise<void> {
   try {
     await retryShopScrape(shop.id)
     saveMessage.value = `${shop.name}: scrape поставлен в очередь`
+    toastSuccess(toast, 'Scrape поставлен в очередь', shop.name)
     await loadDashboard()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось перезапустить scrape'
+    errorMessage.value = messageFromError(error, 'Не удалось перезапустить scrape')
+    toastError(toast, 'Не удалось перезапустить scrape', error, 'Не удалось перезапустить scrape')
   } finally {
     retryingShopId.value = null
   }
@@ -232,19 +238,6 @@ onMounted(() => {
           </option>
         </select>
       </div>
-    </div>
-
-    <div
-      v-if="errorMessage"
-      class="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100"
-    >
-      Не удалось загрузить статус скрейпов: {{ errorMessage }}
-    </div>
-    <div
-      v-if="saveMessage"
-      class="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100"
-    >
-      {{ saveMessage }}
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">

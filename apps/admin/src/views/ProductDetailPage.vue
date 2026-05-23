@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { useToast } from '@nuxt/ui/composables'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
@@ -14,8 +15,10 @@ import {
   type ProductSearchItem,
 } from '../lib/api'
 import { icons } from '../lib/icons'
+import { messageFromError, toastError, toastSuccess } from '../lib/notifications'
 
 const route = useRoute()
+const toast = useToast()
 
 const product = ref<ProductSearchItem | null>(null)
 const categories = ref<CategoryTreeItem[]>([])
@@ -191,7 +194,8 @@ async function loadProduct(nextProductId: number): Promise<void> {
       return
     }
 
-    productErrorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить товар'
+    productErrorMessage.value = messageFromError(error, 'Не удалось загрузить товар')
+    toastError(toast, 'Не удалось загрузить товар', error, 'Не удалось загрузить товар')
     product.value = null
   } finally {
     if (productRequest === request) {
@@ -208,8 +212,8 @@ async function loadCategories(): Promise<void> {
     const response = await fetchCategories()
     categories.value = response.items
   } catch (error) {
-    categoryErrorMessage.value =
-      error instanceof Error ? error.message : 'Не удалось загрузить категории'
+    categoryErrorMessage.value = messageFromError(error, 'Не удалось загрузить категории')
+    toastError(toast, 'Не удалось загрузить категории', error, 'Не удалось загрузить категории')
   } finally {
     isLoadingCategories.value = false
   }
@@ -230,7 +234,8 @@ async function loadHistory(nextProductId: number): Promise<void> {
       return
     }
 
-    historyErrorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить историю цен'
+    historyErrorMessage.value = messageFromError(error, 'Не удалось загрузить историю цен')
+    toastError(toast, 'Не удалось загрузить историю цен', error, 'Не удалось загрузить историю цен')
     snapshots.value = []
   } finally {
     if (historyRequest === request) {
@@ -255,13 +260,14 @@ async function saveCategoryOverride(): Promise<void> {
   try {
     product.value = await assignProductCategoryOverride(nextProductId, nextCategoryId, request.signal)
     selectedCategoryId.value = product.value.category_id ? String(product.value.category_id) : ''
+    toastSuccess(toast, 'Категория сохранена')
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       return
     }
 
-    categoryErrorMessage.value =
-      error instanceof Error ? error.message : 'Не удалось сохранить категорию'
+    categoryErrorMessage.value = messageFromError(error, 'Не удалось сохранить категорию')
+    toastError(toast, 'Не удалось сохранить категорию', error, 'Не удалось сохранить категорию')
   } finally {
     if (categorySaveRequest === request) {
       isSavingCategory.value = false
@@ -284,13 +290,14 @@ async function revertCategoryOverride(): Promise<void> {
   try {
     product.value = await revertProductCategoryOverride(nextProductId, request.signal)
     selectedCategoryId.value = product.value.category_id ? String(product.value.category_id) : ''
+    toastSuccess(toast, 'Категория откатана')
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       return
     }
 
-    categoryErrorMessage.value =
-      error instanceof Error ? error.message : 'Не удалось откатить категорию'
+    categoryErrorMessage.value = messageFromError(error, 'Не удалось откатить категорию')
+    toastError(toast, 'Не удалось откатить категорию', error, 'Не удалось откатить категорию')
   } finally {
     if (categorySaveRequest === request) {
       isSavingCategory.value = false
@@ -304,6 +311,7 @@ function loadPage(): void {
     product.value = null
     snapshots.value = []
     productErrorMessage.value = 'Некорректный ID товара'
+    toastError(toast, 'Некорректный ID товара', new Error(productErrorMessage.value), productErrorMessage.value)
     historyErrorMessage.value = ''
     return
   }
@@ -344,13 +352,6 @@ onMounted(() => {
           Магазин, исходная категория, последняя цена и наблюдения по сбору.
         </p>
       </div>
-    </div>
-
-    <div
-      v-if="productErrorMessage"
-      class="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100"
-    >
-      Товар не загрузился: {{ productErrorMessage }}
     </div>
 
     <div
@@ -446,9 +447,6 @@ onMounted(() => {
               Откатить
             </button>
           </div>
-          <p v-if="categoryErrorMessage" class="mt-3 text-sm text-red-200">
-            {{ categoryErrorMessage }}
-          </p>
         </div>
       </div>
 
