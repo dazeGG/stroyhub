@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from sqlalchemy import false, or_, select
+from sqlalchemy import and_, exists, false, func, not_, or_, select
 from sqlalchemy.orm import Session
 
 from stroyhub.catalog.products import ProductLatestPrice, ProductShop
@@ -112,10 +112,9 @@ class ProductNormalizationQueue:
         self._session = session
 
     def list_items(self, filters: NormalizationQueueFilters) -> NormalizationQueuePage:
-        rows = self._list_source_rows(filters)
-        match_info_by_product_id = self._match_info_by_product_id(
-            [product.id for product, *_ in rows]
-        )
+        product_ids, total = self._page_product_ids(filters)
+        rows = self._list_source_rows(product_ids)
+        match_info_by_product_id = self._match_info_by_product_id(product_ids)
         items = [
             self._queue_item(
                 product,
@@ -140,18 +139,26 @@ class ProductNormalizationQueue:
             ) in rows
         ]
 
-        if filters.state is not None:
-            items = [item for item in items if item.state == filters.state]
-
-        total = len(items)
         return NormalizationQueuePage(
-            items=items[filters.offset : filters.offset + filters.limit],
+            items=items,
             limit=filters.limit,
             offset=filters.offset,
             total=total,
         )
 
-    def _list_source_rows(self, filters: NormalizationQueueFilters) -> list[tuple[Any, ...]]:
+    def _page_product_ids(self, filters: NormalizationQueueFilters) -> tuple[list[int], int]:
+        statement = self._product_id_statement(filters)
+        total = self._session.scalar(
+            select(func.count()).select_from(statement.order_by(None).subquery())
+        )
+        page_statement = statement.limit(filters.limit).offset(filters.offset)
+        product_ids = list(self._session.scalars(page_statement))
+        return product_ids, total or 0
+
+    def _list_source_rows(self, product_ids: list[int]) -> list[tuple[Any, ...]]:
+        if not product_ids:
+            return []
+
         latest_prices = (
             select(
                 PriceSnapshot.source_product_id.label("source_product_id"),
@@ -185,6 +192,17 @@ class ProductNormalizationQueue:
             .outerjoin(Category, SourceProduct.category_id == Category.id)
             .outerjoin(latest_prices, latest_prices.c.source_product_id == SourceProduct.id)
             .where(SourceProduct.is_active.is_(True))
+            .where(SourceProduct.id.in_(product_ids))
+            .order_by(SourceProduct.last_seen_at.desc(), SourceProduct.id.asc())
+        )
+
+        return [tuple(row) for row in self._session.execute(statement)]
+
+    def _product_id_statement(self, filters: NormalizationQueueFilters) -> Any:
+        statement = (
+            select(SourceProduct.id)
+            .join(Shop, SourceProduct.shop_id == Shop.id)
+            .where(SourceProduct.is_active.is_(True))
             .order_by(SourceProduct.last_seen_at.desc(), SourceProduct.id.asc())
         )
 
@@ -209,8 +227,46 @@ class ProductNormalizationQueue:
                 statement = statement.where(SourceProduct.category_id.in_(category_ids))
             else:
                 statement = statement.where(false())
+        if filters.state is not None:
+            statement = statement.where(self._state_predicate(filters.state))
 
-        return [tuple(row) for row in self._session.execute(statement)]
+        return statement
+
+    def _state_predicate(self, state: NormalizationQueueState) -> Any:
+        eligibility_status = SourceProduct.raw["catalog_eligibility"]["status"].astext
+        accepted_exists = exists(
+            select(ProductMatch.id).where(
+                ProductMatch.source_product_id == SourceProduct.id,
+                ProductMatch.status == "accepted",
+            )
+        )
+        candidate_exists = exists(
+            select(ProductMatch.id).where(
+                ProductMatch.source_product_id == SourceProduct.id,
+                ProductMatch.status == "candidate",
+            )
+        )
+        ineligible = or_(
+            SourceProduct.is_not_product.is_(True),
+            eligibility_status == "ineligible",
+        )
+        eligible_for_matching = and_(
+            not_(ineligible),
+            or_(
+                eligibility_status.is_(None),
+                eligibility_status != "needs_review",
+            ),
+        )
+
+        if state == "ineligible":
+            return ineligible
+        if state == "needs_review":
+            return and_(not_(ineligible), eligibility_status == "needs_review")
+        if state == "accepted":
+            return and_(eligible_for_matching, accepted_exists)
+        if state == "candidate_match":
+            return and_(eligible_for_matching, not_(accepted_exists), candidate_exists)
+        return and_(eligible_for_matching, not_(accepted_exists), not_(candidate_exists))
 
     def _match_info_by_product_id(self, product_ids: list[int]) -> dict[int, _MatchInfo]:
         if not product_ids:
