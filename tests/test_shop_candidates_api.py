@@ -98,10 +98,14 @@ def test_shop_source_candidate_api_lists_candidates(
             "missing_since": None,
             "approved_shop_id": None,
             "official_strategy": None,
+            "official_source_shop_id": None,
+            "official_source_status": None,
+            "official_source_last_scraped_at": None,
             "suggested_identity": None,
             "scrape_result": None,
         }
     ]
+    assert response.json()["groups"] == []
 
 
 def test_shop_source_candidate_api_exposes_official_strategy(
@@ -130,6 +134,8 @@ def test_shop_source_candidate_api_exposes_official_strategy(
         "label": "Металл Торг HTML",
         "status": "implemented",
     }
+    assert response.json()["groups"][0]["key"] == "official:metalltorg"
+    assert response.json()["groups"][0]["candidate_ids"] == [response.json()["items"][0]["id"]]
 
 
 def test_shop_source_candidate_api_refresh_uses_twogis_discovery(
@@ -208,7 +214,7 @@ def test_shop_source_candidate_api_approves_candidate(
         "products_saved": 4,
         "price_snapshots_saved": 4,
     }
-    assert client.get("/shop-source-candidates").json() == {"items": []}
+    assert client.get("/shop-source-candidates").json() == {"items": [], "groups": []}
     approved = client.get("/shop-source-candidates", params={"include_approved": True}).json()
     assert approved["items"][0]["source_id"] == "candidate-api-approve"
 
@@ -257,3 +263,51 @@ def test_shop_source_candidate_api_suggests_identity_and_approves_branch(
     shop = db_session.get(Shop, response.json()["approved_shop_id"])
     assert shop is not None
     assert shop.shop_identity_id == identity.id
+
+
+def test_shop_source_candidate_api_materializes_official_strategy(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ShopCandidateCatalog(db_session).refresh_from_twogis(
+        seeds=[
+            CandidateDiscoverySeed(
+                source_id="7037402698746785",
+                display_name="Юником",
+                address="Вилюйский тракт 3 километр, 1/4",
+                rubrics="Стройматериалы",
+                has_prices_signal=True,
+                has_website_signal=True,
+            )
+        ],
+    )
+    observed_shop_ids: list[int] = []
+
+    def fake_run_shop_scrape(session: Session, shop_id: int) -> dict[str, object]:
+        observed_shop_ids.append(shop_id)
+        return {
+            "shop_id": shop_id,
+            "source": "unicom",
+            "source_type": "official_api",
+            "status": "success",
+            "products_saved": 7,
+        }
+
+    monkeypatch.setattr("apps.api.shop_candidates.run_shop_scrape", fake_run_shop_scrape)
+
+    response = client.post(
+        "/shop-source-candidates/official-strategies/unicom/materialize",
+        json={"run_scrape": True},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"] == "unicom"
+    assert payload["shop"]["source"] == "unicom"
+    assert payload["shop"]["source_type"] == "official_api"
+    assert payload["identity"]["preferred_source"] == "unicom"
+    assert payload["related_candidate_ids"]
+    assert observed_shop_ids == [payload["shop"]["id"]]
+    assert payload["scrape_result"]["source"] == "unicom"
+    assert client.get("/shop-source-candidates").json()["items"][0]["status"] == "pending"

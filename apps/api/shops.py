@@ -15,6 +15,13 @@ from stroyhub.db.repositories import (
     ShopIdentityRepository,
     ShopIdentityUpdate,
 )
+from stroyhub.models import Shop
+from stroyhub.parsers.twogis import TwogisClient
+from stroyhub.scraping.twogis import (
+    TWOGIS_LARGE_CATALOG_PAGE_SIZE,
+    build_twogis_large_catalog_raw,
+    twogis_large_catalog_state,
+)
 
 router = APIRouter(prefix="/shops", tags=["shops"])
 identity_router = APIRouter(prefix="/shop-identities", tags=["shop-identities"])
@@ -27,6 +34,20 @@ class ShopIdentitySummaryResponse(BaseModel):
     display_name: str
     status: str
     preferred_source: str | None
+
+
+class TwogisLargeCatalogStateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    enabled: bool
+    threshold: int
+    total: int | None
+    page_size: int
+    pages_per_run: int
+    next_page: int
+    items_loaded: int
+    completed: bool
+    last_stop_reason: str | None = None
 
 
 class ShopListItemResponse(BaseModel):
@@ -47,6 +68,7 @@ class ShopListItemResponse(BaseModel):
     scrape_interval: int
     error_count: int
     is_preferred_source: bool
+    twogis_large_catalog: TwogisLargeCatalogStateResponse | None = None
 
 
 class ShopListResponse(BaseModel):
@@ -232,6 +254,67 @@ def unlink_shop_source(
     return _shop_response(shop.id, session)
 
 
+@router.post("/{shop_id}/twogis-large-catalog/enable", response_model=ShopListItemResponse)
+def enable_twogis_large_catalog(
+    shop_id: int,
+    session: Annotated[Session, Depends(get_session)],
+) -> ShopListItemResponse:
+    shop = _get_twogis_shop(shop_id, session)
+    page = TwogisClient().fetch_branch_page(
+        branch_id=shop.source_id,
+        page=1,
+        page_size=TWOGIS_LARGE_CATALOG_PAGE_SIZE,
+    )
+    existing_state = twogis_large_catalog_state(shop.raw)
+    raw = dict(shop.raw or {})
+    prior_items_seen = raw.get("items_seen")
+    inferred_next_page = (
+        int(prior_items_seen) // TWOGIS_LARGE_CATALOG_PAGE_SIZE + 1
+        if isinstance(prior_items_seen, int) and prior_items_seen > 0
+        else 1
+    )
+    raw["twogis_large_catalog"] = build_twogis_large_catalog_raw(
+        enabled=True,
+        total=page.total,
+        next_page=existing_state.next_page if existing_state is not None else inferred_next_page,
+        items_loaded=(
+            existing_state.items_loaded
+            if existing_state is not None
+            else max(inferred_next_page - 1, 0) * TWOGIS_LARGE_CATALOG_PAGE_SIZE
+        ),
+        completed=False,
+        last_stop_reason="operator_enabled",
+    )
+    shop.raw = raw
+    shop.scrape_status = "scheduled"
+    session.commit()
+    session.expire_all()
+    return _shop_response(shop_id, session)
+
+
+@router.post("/{shop_id}/twogis-large-catalog/disable", response_model=ShopListItemResponse)
+def disable_twogis_large_catalog(
+    shop_id: int,
+    session: Annotated[Session, Depends(get_session)],
+) -> ShopListItemResponse:
+    shop = _get_twogis_shop(shop_id, session)
+    state = twogis_large_catalog_state(shop.raw)
+    raw = dict(shop.raw or {})
+    raw["twogis_large_catalog"] = build_twogis_large_catalog_raw(
+        enabled=False,
+        total=state.total if state is not None else None,
+        next_page=state.next_page if state is not None else 1,
+        items_loaded=state.items_loaded if state is not None else 0,
+        completed=state.completed if state is not None else False,
+        last_stop_reason="operator_disabled",
+    )
+    shop.raw = raw
+    shop.scrape_status = "disabled"
+    session.commit()
+    session.expire_all()
+    return _shop_response(shop_id, session)
+
+
 def _identity_response(identity_id: int, session: Session) -> ShopIdentityResponse:
     items = ShopCatalog(session).list_identities(ShopIdentityListFilters())
     for item in items:
@@ -246,6 +329,15 @@ def _shop_response(shop_id: int, session: Session) -> ShopListItemResponse:
         if item.id == shop_id:
             return ShopListItemResponse.model_validate(item)
     raise HTTPException(status_code=404, detail="shop not found")
+
+
+def _get_twogis_shop(shop_id: int, session: Session) -> Shop:
+    shop = session.get(Shop, shop_id)
+    if shop is None:
+        raise HTTPException(status_code=404, detail="shop not found")
+    if shop.source != "2gis":
+        raise HTTPException(status_code=400, detail="large catalog mode is only for 2GIS shops")
+    return shop
 
 
 def _http_error(error: ValueError) -> HTTPException:

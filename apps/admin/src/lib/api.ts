@@ -112,6 +112,7 @@ export interface ShopListItem {
   scrape_interval: number
   error_count: number
   is_preferred_source: boolean
+  twogis_large_catalog: TwogisLargeCatalogState | null
 }
 
 export interface ShopListResponse {
@@ -145,6 +146,18 @@ export interface ShopIdentityListResponse {
   items: ShopIdentity[]
 }
 
+export interface TwogisLargeCatalogState {
+  enabled: boolean
+  threshold: number
+  total: number | null
+  page_size: number
+  pages_per_run: number
+  next_page: number
+  items_loaded: number
+  completed: boolean
+  last_stop_reason: string | null
+}
+
 export type ShopSourceCandidateStatus = 'pending' | 'stale' | 'hidden' | 'archived' | 'approved'
 
 export interface ShopSourceCandidate {
@@ -174,6 +187,9 @@ export interface ShopSourceCandidate {
     label: string
     status: string
   } | null
+  official_source_shop_id: number | null
+  official_source_status: string | null
+  official_source_last_scraped_at: string | null
   suggested_identity: {
     id: number
     display_name: string
@@ -195,8 +211,22 @@ export interface ShopSourceCandidate {
   } | null
 }
 
+export interface ShopSourceCandidateGroup {
+  key: string
+  label: string
+  official_strategy: ShopSourceCandidate['official_strategy']
+  candidate_ids: number[]
+  size: number
+  pending_count: number
+  has_prices: boolean
+  has_website: boolean
+  priority: number
+  items: ShopSourceCandidate[]
+}
+
 export interface ShopSourceCandidateListResponse {
   items: ShopSourceCandidate[]
+  groups: ShopSourceCandidateGroup[]
 }
 
 export interface ShopSourceCandidateRefreshResponse {
@@ -206,6 +236,29 @@ export interface ShopSourceCandidateRefreshResponse {
   stale: number
   skipped_approved: number
   items: ShopSourceCandidate[]
+  groups: ShopSourceCandidateGroup[]
+}
+
+export interface OfficialStrategyMaterializeResponse {
+  source: string
+  shop: {
+    id: number
+    shop_identity_id: number | null
+    source: string
+    source_id: string
+    source_type: SourceType
+    name: string
+    scrape_status: string
+    last_scraped_at: string | null
+  }
+  identity: {
+    id: number
+    display_name: string
+    preferred_source: string | null
+    status: IdentityStatus
+  }
+  related_candidate_ids: number[]
+  scrape_result: ShopSourceCandidate['scrape_result']
 }
 
 export interface ShopSourceCandidateListParams {
@@ -534,6 +587,28 @@ export function unlinkShopSource(
   )
 }
 
+export function enableTwogisLargeCatalog(
+  shopId: number,
+  signal?: AbortSignal,
+): Promise<ShopListItem> {
+  return writeJson<ShopListItem>(
+    `/shops/${shopId}/twogis-large-catalog/enable`,
+    { method: 'POST' },
+    signal,
+  )
+}
+
+export function disableTwogisLargeCatalog(
+  shopId: number,
+  signal?: AbortSignal,
+): Promise<ShopListItem> {
+  return writeJson<ShopListItem>(
+    `/shops/${shopId}/twogis-large-catalog/disable`,
+    { method: 'POST' },
+    signal,
+  )
+}
+
 export function fetchShopSourceCandidates(
   filters: ShopSourceCandidateListParams = {},
   signal?: AbortSignal,
@@ -571,6 +646,21 @@ export function approveShopSourceCandidate(
     {
       method: 'POST',
       body: JSON.stringify({ shop_identity_id: shopIdentityId ?? null }),
+    },
+    signal,
+  )
+}
+
+export function materializeOfficialStrategy(
+  source: string,
+  runScrape = true,
+  signal?: AbortSignal,
+): Promise<OfficialStrategyMaterializeResponse> {
+  return writeJson<OfficialStrategyMaterializeResponse>(
+    `/shop-source-candidates/official-strategies/${source}/materialize`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ run_scrape: runScrape }),
     },
     signal,
   )

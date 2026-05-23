@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from stroyhub.models.tables import Shop, ShopIdentity
+from stroyhub.scraping.twogis import TwogisLargeCatalogState, twogis_large_catalog_state
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -41,6 +42,7 @@ class ShopListItem:
     scrape_interval: int
     error_count: int
     is_preferred_source: bool
+    twogis_large_catalog: TwogisLargeCatalogState | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -110,6 +112,7 @@ class ShopCatalog:
                 scrape_interval=shop.scrape_interval,
                 error_count=shop.error_count,
                 is_preferred_source=_is_preferred_source(shop),
+                twogis_large_catalog=twogis_large_catalog_state(shop.raw),
             )
             for shop in self._session.scalars(statement)
         ]

@@ -11,6 +11,10 @@ from stroyhub.core.config import settings
 from stroyhub.models import Category, PriceSnapshot, ScrapeRun, Shop, SourceProduct
 from stroyhub.parsers.twogis import TwogisClient
 from stroyhub.scraping import persist_twogis_scrape_result, scrape_twogis_branch
+from stroyhub.scraping.twogis import (
+    build_twogis_large_catalog_raw,
+    update_twogis_large_catalog_progress,
+)
 
 
 @pytest.fixture
@@ -152,6 +156,68 @@ def test_persist_twogis_scrape_result_marks_partial_run_but_failed_shop_status(
     assert scrape_run.status == "partial"
 
 
+def test_persist_twogis_large_catalog_batch_keeps_partial_shop_status(
+    db_session: Session,
+) -> None:
+    client = TwogisClient(
+        client=httpx.Client(transport=httpx.MockTransport(_large_window_handler))
+    )
+    result = scrape_twogis_branch(
+        branch_id="branch-large-test",
+        client=client,
+        start_page=2,
+        page_size=1,
+        max_pages=2,
+        parsed_at=datetime(2026, 5, 17, 10, 0, tzinfo=UTC),
+    )
+
+    persisted = persist_twogis_scrape_result(
+        db_session,
+        result,
+        shop_name="Large Test Shop",
+        finished_at=datetime(2026, 5, 17, 10, 1, tzinfo=UTC),
+        partial_shop_status="partial",
+    )
+    shop = db_session.get(Shop, persisted.shop_id)
+    assert shop is not None
+    shop.raw = update_twogis_large_catalog_progress(shop.raw, result)
+
+    assert result.stop_reason == "large_catalog_batch_limit"
+    assert persisted.scrape_status == "partial"
+    assert shop.scrape_status == "partial"
+    assert shop.raw["twogis_large_catalog"]["next_page"] == 4
+    assert shop.raw["twogis_large_catalog"]["items_loaded"] == 3
+
+
+def test_twogis_large_catalog_progress_restarts_after_completed_cycle() -> None:
+    result = scrape_twogis_branch(
+        branch_id="branch-large-test",
+        client=TwogisClient(
+            client=httpx.Client(transport=httpx.MockTransport(_large_window_handler))
+        ),
+        start_page=1,
+        page_size=1,
+        max_pages=2,
+        parsed_at=datetime(2026, 5, 17, 10, 0, tzinfo=UTC),
+    )
+    raw = {
+        "twogis_large_catalog": build_twogis_large_catalog_raw(
+            enabled=True,
+            total=10,
+            next_page=1,
+            items_loaded=10,
+            completed=True,
+        )
+    }
+
+    updated = update_twogis_large_catalog_progress(raw, result)
+
+    state = updated["twogis_large_catalog"]
+    assert state["items_loaded"] == 2
+    assert state["next_page"] == 3
+    assert state["completed"] is False
+
+
 def _twogis_handler(request: httpx.Request) -> httpx.Response:
     page_number = int(request.url.params["page"])
     if page_number == 1:
@@ -193,6 +259,21 @@ def _partial_handler(request: httpx.Request) -> httpx.Response:
                 "total": 3,
                 "updated_at": "Обновлено 13 января 2026",
                 "items": items,
+            },
+        },
+    )
+
+
+def _large_window_handler(request: httpx.Request) -> httpx.Response:
+    page_number = int(request.url.params["page"])
+    return httpx.Response(
+        200,
+        json={
+            "meta": {"code": 200},
+            "result": {
+                "total": 10,
+                "updated_at": "Обновлено 13 января 2026",
+                "items": [_item(product_id=f"large-{page_number}", name="Цемент М500", price=100)],
             },
         },
     )

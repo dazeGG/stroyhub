@@ -3,14 +3,18 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import select
 from sqlalchemy.orm import Session
+from stroyhub.catalog.official_sources import materialize_official_source
 from stroyhub.catalog.shop_candidates import (
     CandidateListFilters,
     CandidateRefreshSummary,
     ShopCandidateCatalog,
 )
 from stroyhub.db import get_session
-from stroyhub.models import ShopSourceCandidate
+from stroyhub.models import Shop, ShopIdentity, ShopSourceCandidate
+from stroyhub.parsers.metalltorg import METALLTORG_SHOP_SOURCE_ID, METALLTORG_SOURCE
+from stroyhub.parsers.unicom import UNICOM_DEFAULT_SHOP_SOURCE_ID, UNICOM_SOURCE
 from stroyhub.scraping.runner import run_shop_scrape
 
 router = APIRouter(prefix="/shop-source-candidates", tags=["shop-source-candidates"])
@@ -40,6 +44,9 @@ class ShopSourceCandidateResponse(BaseModel):
     missing_since: datetime | None
     approved_shop_id: int | None
     official_strategy: dict[str, object] | None = None
+    official_source_shop_id: int | None = None
+    official_source_status: str | None = None
+    official_source_last_scraped_at: datetime | None = None
     suggested_identity: dict[str, object] | None = None
     scrape_result: dict[str, object] | None = None
 
@@ -48,8 +55,26 @@ class ShopSourceCandidateApproveRequest(BaseModel):
     shop_identity_id: int | None = None
 
 
+class OfficialStrategyMaterializeRequest(BaseModel):
+    run_scrape: bool = True
+
+
+class ShopSourceCandidateGroupResponse(BaseModel):
+    key: str
+    label: str
+    official_strategy: dict[str, object] | None = None
+    candidate_ids: list[int]
+    size: int
+    pending_count: int
+    has_prices: bool
+    has_website: bool
+    priority: int
+    items: list[ShopSourceCandidateResponse]
+
+
 class ShopSourceCandidateListResponse(BaseModel):
     items: list[ShopSourceCandidateResponse]
+    groups: list[ShopSourceCandidateGroupResponse] = []
 
 
 class ShopSourceCandidateRefreshResponse(BaseModel):
@@ -59,6 +84,37 @@ class ShopSourceCandidateRefreshResponse(BaseModel):
     stale: int
     skipped_approved: int
     items: list[ShopSourceCandidateResponse]
+    groups: list[ShopSourceCandidateGroupResponse] = []
+
+
+class OfficialSourceShopResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    shop_identity_id: int | None
+    source: str
+    source_id: str
+    source_type: str
+    name: str
+    scrape_status: str
+    last_scraped_at: datetime | None
+
+
+class OfficialSourceIdentityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    display_name: str
+    preferred_source: str | None
+    status: str
+
+
+class OfficialStrategyMaterializeResponse(BaseModel):
+    source: str
+    shop: OfficialSourceShopResponse
+    identity: OfficialSourceIdentityResponse
+    related_candidate_ids: list[int]
+    scrape_result: dict[str, object] | None = None
 
 
 @router.get("", response_model=ShopSourceCandidateListResponse)
@@ -75,8 +131,10 @@ def list_shop_source_candidates(
     except ValueError as exc:
         raise _http_error(exc) from exc
 
+    response_items = [_candidate_response_model(item, catalog, session=session) for item in items]
     return ShopSourceCandidateListResponse(
-        items=[_candidate_response_model(item, catalog) for item in items]
+        items=response_items,
+        groups=_candidate_groups(response_items),
     )
 
 
@@ -89,7 +147,7 @@ def refresh_shop_source_candidates(
     session.commit()
     session.expire_all()
     items = catalog.list_candidates(CandidateListFilters())
-    return _refresh_response(summary, items, catalog)
+    return _refresh_response(summary, items, catalog, session=session)
 
 
 @router.post("/{candidate_id}/approve", response_model=ShopSourceCandidateResponse)
@@ -124,18 +182,66 @@ def approve_shop_source_candidate(
     return _candidate_response(approved_candidate_id, session, scrape_result=scrape_result)
 
 
+@router.post(
+    "/official-strategies/{source}/materialize",
+    response_model=OfficialStrategyMaterializeResponse,
+)
+def materialize_official_strategy(
+    source: str,
+    session: Annotated[Session, Depends(get_session)],
+    payload: OfficialStrategyMaterializeRequest | None = None,
+) -> OfficialStrategyMaterializeResponse:
+    try:
+        materialized = materialize_official_source(session, source)
+    except ValueError as exc:
+        raise _http_error(exc) from exc
+
+    shop_id = materialized.shop.id
+    session.commit()
+    scrape_result: dict[str, object] | None = None
+    if payload is None or payload.run_scrape:
+        try:
+            scrape_result = run_shop_scrape(session, shop_id)
+        except Exception as exc:
+            session.rollback()
+            scrape_result = {
+                "shop_id": shop_id,
+                "source": source,
+                "status": "failed",
+                "error": str(exc),
+            }
+
+    session.expire_all()
+    shop = session.get(Shop, shop_id)
+    identity = session.get(ShopIdentity, materialized.identity.id)
+    if shop is None or identity is None:
+        raise HTTPException(status_code=404, detail="official source was not found")
+    return OfficialStrategyMaterializeResponse(
+        source=source,
+        shop=OfficialSourceShopResponse.model_validate(shop),
+        identity=OfficialSourceIdentityResponse.model_validate(identity),
+        related_candidate_ids=materialized.related_candidate_ids,
+        scrape_result=scrape_result,
+    )
+
+
 def _refresh_response(
     summary: CandidateRefreshSummary,
     items: list[ShopSourceCandidate],
     catalog: ShopCandidateCatalog,
+    session: Session,
 ) -> ShopSourceCandidateRefreshResponse:
+    response_items = [
+        _candidate_response_model(item, catalog, session=session) for item in items
+    ]
     return ShopSourceCandidateRefreshResponse(
         checked=summary.checked,
         created=summary.created,
         updated=summary.updated,
         stale=summary.stale,
         skipped_approved=summary.skipped_approved,
-        items=[_candidate_response_model(item, catalog) for item in items],
+        items=response_items,
+        groups=_candidate_groups(response_items),
     )
 
 
@@ -149,7 +255,12 @@ def _candidate_response(
         CandidateListFilters(include_approved=True)
     ):
         if item.id == candidate_id:
-            return _candidate_response_model(item, catalog, scrape_result=scrape_result)
+            return _candidate_response_model(
+                item,
+                catalog,
+                scrape_result=scrape_result,
+                session=session,
+            )
     raise HTTPException(status_code=404, detail="shop source candidate not found")
 
 
@@ -157,6 +268,7 @@ def _candidate_response_model(
     candidate: ShopSourceCandidate,
     catalog: ShopCandidateCatalog,
     scrape_result: dict[str, object] | None = None,
+    session: Session | None = None,
 ) -> ShopSourceCandidateResponse:
     response = ShopSourceCandidateResponse.model_validate(candidate)
     response.scrape_result = scrape_result
@@ -164,6 +276,12 @@ def _candidate_response_model(
         strategy = candidate.raw.get("official_strategy")
         if isinstance(strategy, dict):
             response.official_strategy = strategy
+            if session is not None:
+                official_shop = _official_shop_for_strategy(session, strategy)
+                if official_shop is not None:
+                    response.official_source_shop_id = official_shop.id
+                    response.official_source_status = official_shop.scrape_status
+                    response.official_source_last_scraped_at = official_shop.last_scraped_at
     suggestion = catalog.suggest_identity(candidate)
     if suggestion is not None:
         response.suggested_identity = {
@@ -174,6 +292,81 @@ def _candidate_response_model(
             "reason": suggestion.reason,
         }
     return response
+
+
+def _candidate_groups(
+    items: list[ShopSourceCandidateResponse],
+) -> list[ShopSourceCandidateGroupResponse]:
+    grouped: dict[str, list[ShopSourceCandidateResponse]] = {}
+    for item in items:
+        grouped.setdefault(_group_key(item), []).append(item)
+
+    groups = [
+        _candidate_group(key, group_items)
+        for key, group_items in grouped.items()
+        if len(group_items) > 1 or group_items[0].official_strategy is not None
+    ]
+    groups.sort(key=lambda group: (-group.priority, group.label.casefold(), group.key))
+    return groups
+
+
+def _candidate_group(
+    key: str,
+    items: list[ShopSourceCandidateResponse],
+) -> ShopSourceCandidateGroupResponse:
+    first = items[0]
+    official_strategy = first.official_strategy
+    label = (
+        str(official_strategy.get("label"))
+        if official_strategy is not None and official_strategy.get("label")
+        else first.display_name
+    )
+    return ShopSourceCandidateGroupResponse(
+        key=key,
+        label=label,
+        official_strategy=official_strategy,
+        candidate_ids=[item.id for item in items],
+        size=len(items),
+        pending_count=sum(1 for item in items if item.status == "pending"),
+        has_prices=any(item.has_prices for item in items),
+        has_website=any(item.has_website for item in items),
+        priority=max(item.priority for item in items),
+        items=items,
+    )
+
+
+def _group_key(item: ShopSourceCandidateResponse) -> str:
+    if item.official_strategy is not None:
+        source = item.official_strategy.get("source")
+        if isinstance(source, str) and source:
+            return f"official:{source}"
+    return f"name:{_normalize_candidate_name(item.display_name)}"
+
+
+def _normalize_candidate_name(value: str) -> str:
+    import re
+
+    normalized = value.casefold().replace("ё", "е")
+    return re.sub(r"[^0-9a-zа-я]+", "", normalized)
+
+
+def _official_shop_for_strategy(session: Session, strategy: dict[str, object]) -> Shop | None:
+    source = strategy.get("source")
+    if source == UNICOM_SOURCE:
+        return session.scalar(
+            select(Shop).where(
+                Shop.source == UNICOM_SOURCE,
+                Shop.source_id == UNICOM_DEFAULT_SHOP_SOURCE_ID,
+            )
+        )
+    if source == METALLTORG_SOURCE:
+        return session.scalar(
+            select(Shop).where(
+                Shop.source == METALLTORG_SOURCE,
+                Shop.source_id == METALLTORG_SHOP_SOURCE_ID,
+            )
+        )
+    return None
 
 
 def _http_error(error: ValueError) -> HTTPException:
