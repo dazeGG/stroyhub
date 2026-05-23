@@ -6,9 +6,10 @@ import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { icons } from './lib/icons'
 
 const navItems = [
+  { label: 'Дашборд', to: '/', icon: icons.layoutDashboard },
   { label: 'Магазины', to: '/shops', icon: icons.buildingStore },
   { label: 'Категории', to: '/categories', icon: icons.category },
-  { label: 'Товары', to: '/', icon: icons.package },
+  { label: 'Исходные товары', to: '/products', icon: icons.package },
   { label: 'Скрейпы', to: '/scrapes', icon: icons.activity },
   { label: 'Матчинг', to: '/matches', icon: icons.gitCompare },
 ]

@@ -19,6 +19,7 @@ import filterIcon from '@iconify-icons/tabler/filter'
 import gitCompareIcon from '@iconify-icons/tabler/git-compare'
 import helpCircleIcon from '@iconify-icons/tabler/help-circle'
 import historyIcon from '@iconify-icons/tabler/history'
+import layoutDashboardIcon from '@iconify-icons/tabler/layout-dashboard'
 import linkIcon from '@iconify-icons/tabler/link'
 import linkOffIcon from '@iconify-icons/tabler/link-off'
 import listCheckIcon from '@iconify-icons/tabler/list-check'
@@ -58,6 +59,7 @@ export const icons = {
   gitCompare: gitCompareIcon,
   helpCircle: helpCircleIcon,
   history: historyIcon,
+  layoutDashboard: layoutDashboardIcon,
   link: linkIcon,
   linkOff: linkOffIcon,
   listCheck: listCheckIcon,

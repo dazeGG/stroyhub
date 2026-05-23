@@ -327,11 +327,11 @@ onMounted(() => {
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <RouterLink
-          to="/"
+          to="/products"
           class="inline-flex items-center gap-2 text-sm font-medium text-neutral-400 transition hover:text-white"
         >
           <Icon :icon="icons.chevronLeft" class="size-4" aria-hidden="true" />
-          Назад в каталог
+          Назад к исходным товарам
         </RouterLink>
         <p class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-amber-300">
           <Icon :icon="icons.package" class="size-4" aria-hidden="true" />

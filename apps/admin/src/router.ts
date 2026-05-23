@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import CatalogPage from './views/CatalogPage.vue'
 import CategoryDirectoryPage from './views/CategoryDirectoryPage.vue'
 import CategoryReviewPage from './views/CategoryReviewPage.vue'
+import DashboardPage from './views/DashboardPage.vue'
 import HelpPage from './views/HelpPage.vue'
 import MatchReviewPage from './views/MatchReviewPage.vue'
 import ProductDetailPage from './views/ProductDetailPage.vue'
@@ -13,7 +14,8 @@ import ShopSourceManagementPage from './views/ShopSourceManagementPage.vue'
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'catalog', component: CatalogPage },
+    { path: '/', name: 'dashboard', component: DashboardPage },
+    { path: '/products', name: 'source-products', component: CatalogPage },
     { path: '/shops', name: 'shops', component: ShopSourceManagementPage },
     { path: '/shops/candidates', name: 'shop-candidates', component: ShopCandidateReviewPage },
     { path: '/products/:productId', name: 'product-detail', component: ProductDetailPage },

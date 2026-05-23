@@ -256,12 +256,12 @@ onMounted(() => {
             </div>
             <div class="flex items-start justify-start md:justify-end">
               <RouterLink
-                :to="{ path: '/', query: { category: category.id } }"
+                :to="{ path: '/products', query: { category: category.id } }"
                 class="inline-flex h-8 items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
                 @click.stop
               >
                 <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
-                Товары
+                Исходные товары
               </RouterLink>
             </div>
           </div>
@@ -286,11 +286,11 @@ onMounted(() => {
               <p class="font-medium text-neutral-200 md:text-right">{{ child.product_count }}</p>
               <div class="flex justify-start md:justify-end">
                 <RouterLink
-                  :to="{ path: '/', query: { category: child.id } }"
+                  :to="{ path: '/products', query: { category: child.id } }"
                   class="inline-flex h-8 items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
                 >
                   <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
-                  Товары
+                  Исходные товары
                 </RouterLink>
               </div>
             </div>
