@@ -67,6 +67,7 @@ export interface ProductSearchResponse {
   items: ProductSearchItem[]
   limit: number
   offset: number
+  total: number
 }
 
 export interface ProductPriceSnapshot {

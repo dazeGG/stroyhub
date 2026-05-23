@@ -76,6 +76,7 @@ class ProductSearchResponse(BaseModel):
     items: list[ProductSearchItemResponse]
     limit: int
     offset: int
+    total: int
 
 
 class ProductPriceSnapshotResponse(BaseModel):
@@ -121,11 +122,17 @@ def search_products(
         limit=limit,
         offset=offset,
     )
+    catalog = ProductCatalog(session)
     items = [
         ProductSearchItemResponse.model_validate(item)
-        for item in ProductCatalog(session).search_products(filters)
+        for item in catalog.search_products(filters)
     ]
-    return ProductSearchResponse(items=items, limit=limit, offset=offset)
+    return ProductSearchResponse(
+        items=items,
+        limit=limit,
+        offset=offset,
+        total=catalog.count_products(filters),
+    )
 
 
 @router.get("/{product_id}", response_model=ProductSearchItemResponse)

@@ -22,6 +22,7 @@ const selectedCategoryId = ref('')
 const selectedShopId = ref('')
 const sort = ref<ProductSort>('-last_seen_at')
 const offset = ref(0)
+const totalProducts = ref(0)
 const products = ref<ProductSearchItem[]>([])
 const categories = ref<CategoryTreeItem[]>([])
 const shops = ref<ShopListItem[]>([])
@@ -66,9 +67,12 @@ const categoryNameById = computed(() => {
   return names
 })
 
-const hasPreviousPage = computed(() => offset.value > 0)
-const hasNextPage = computed(() => products.value.length === pageSize)
-const currentPage = computed(() => Math.floor(offset.value / pageSize) + 1)
+const currentPage = computed({
+  get: () => Math.floor(offset.value / pageSize) + 1,
+  set: (page: number) => {
+    offset.value = Math.max(0, page - 1) * pageSize
+  },
+})
 
 function formatDateTime(value: string | null): string {
   if (!value) {
@@ -184,6 +188,7 @@ async function loadProducts(): Promise<void> {
       request.signal,
     )
     products.value = response.items
+    totalProducts.value = response.total
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       return
@@ -191,22 +196,11 @@ async function loadProducts(): Promise<void> {
 
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить товары'
     products.value = []
+    totalProducts.value = 0
   } finally {
     if (productRequest === request) {
       isLoadingProducts.value = false
     }
-  }
-}
-
-function nextPage(): void {
-  if (hasNextPage.value) {
-    offset.value += pageSize
-  }
-}
-
-function previousPage(): void {
-  if (hasPreviousPage.value) {
-    offset.value = Math.max(0, offset.value - pageSize)
   }
 }
 
@@ -420,28 +414,20 @@ onMounted(() => {
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <p class="text-sm text-neutral-500">
-        Страница {{ currentPage }} · показано {{ products.length }}
+        Страница {{ currentPage }} · показано {{ products.length }} из {{ totalProducts }}
       </p>
-      <div class="flex gap-2">
-        <button
-          class="inline-flex h-9 items-center gap-1 rounded-md border border-neutral-800 px-3 text-sm text-neutral-200 transition enabled:hover:border-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
-          :disabled="!hasPreviousPage || isLoadingProducts"
-          type="button"
-          @click="previousPage"
-        >
-          <Icon :icon="icons.chevronLeft" class="size-4" aria-hidden="true" />
-          Назад
-        </button>
-        <button
-          class="inline-flex h-9 items-center gap-1 rounded-md border border-neutral-800 px-3 text-sm text-neutral-200 transition enabled:hover:border-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
-          :disabled="!hasNextPage || isLoadingProducts"
-          type="button"
-          @click="nextPage"
-        >
-          Вперед
-          <Icon :icon="icons.chevronRight" class="size-4" aria-hidden="true" />
-        </button>
-      </div>
+      <UPagination
+        v-model:page="currentPage"
+        :disabled="isLoadingProducts"
+        :items-per-page="pageSize"
+        :sibling-count="1"
+        :total="totalProducts"
+        active-color="neutral"
+        active-variant="solid"
+        color="neutral"
+        size="sm"
+        variant="outline"
+      />
     </div>
   </section>
 </template>

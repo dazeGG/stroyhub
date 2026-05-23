@@ -100,6 +100,7 @@ def test_products_endpoint_returns_latest_price_and_shop(
     payload = response.json()
     assert payload["limit"] == 50
     assert payload["offset"] == 0
+    assert payload["total"] == 1
     assert len(payload["items"]) == 1
     item = payload["items"][0]
     assert item["id"] == product.id
@@ -167,6 +168,7 @@ def test_products_endpoint_filters_by_search_shop_and_category(
     assert [item["id"] for item in payload["items"]] == [matching_product.id]
     assert payload["limit"] == 10
     assert payload["offset"] == 0
+    assert payload["total"] == 1
 
 
 def test_products_endpoint_filters_parent_category_by_descendants(
@@ -227,7 +229,9 @@ def test_products_endpoint_filters_parent_category_by_descendants(
     response = client.get("/products", params={"category_id": root.id})
 
     assert response.status_code == 200
-    assert {item["id"] for item in response.json()["items"]} == {
+    payload = response.json()
+    assert payload["total"] == 2
+    assert {item["id"] for item in payload["items"]} == {
         grandchild_product.id,
         leaf_product.id,
     }
@@ -381,7 +385,7 @@ def test_products_endpoint_handles_empty_results(client: TestClient) -> None:
     response = client.get("/products", params={"q": "nothing-here"})
 
     assert response.status_code == 200
-    assert response.json() == {"items": [], "limit": 50, "offset": 0}
+    assert response.json() == {"items": [], "limit": 50, "offset": 0, "total": 0}
 
 
 def test_products_endpoint_treats_search_wildcards_as_literal_text(
