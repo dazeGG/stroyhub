@@ -16,6 +16,7 @@ venv/
 .uv-cache/
 .uv-python/
 .var/
+data/
 dist/
 build/
 
