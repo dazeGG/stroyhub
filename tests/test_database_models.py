@@ -3,6 +3,7 @@ from stroyhub.db.base import Base
 from stroyhub.models import (
     CanonicalProduct,
     Category,
+    CategoryOverride,
     PriceSnapshot,
     ProductMatch,
     ScrapeRun,
@@ -11,6 +12,19 @@ from stroyhub.models import (
     ShopSourceCandidate,
     SourceProduct,
 )
+
+
+def _check_names(model: type[object]) -> set[str]:
+    table = model.__table__  # type: ignore[attr-defined]
+    return {
+        constraint.name
+        for constraint in table.constraints
+        if constraint.name is not None
+    }
+
+
+def _has_check(model: type[object], name_suffix: str) -> bool:
+    return any(name.endswith(name_suffix) for name in _check_names(model))
 
 
 def test_m1_tables_are_registered_in_metadata() -> None:
@@ -109,3 +123,17 @@ def test_product_matching_models_have_expected_columns() -> None:
     assert "status" in match_columns
     assert "method" in match_columns
     assert "reason" in match_columns
+
+
+def test_db_invariant_check_constraints_are_declared() -> None:
+    assert _has_check(Shop, "ck_shops_scrape_status_known")
+    assert _has_check(Shop, "ck_shops_scrape_interval_positive")
+    assert _has_check(Shop, "ck_shops_error_count_nonnegative")
+    assert _has_check(SourceProduct, "ck_source_products_has_stable_identity")
+    assert _has_check(CategoryOverride, "ck_category_overrides_status_known")
+    assert _has_check(CanonicalProduct, "ck_canonical_products_match_status_known")
+    assert _has_check(ProductMatch, "ck_product_matches_confidence_range")
+    assert _has_check(ProductMatch, "ck_product_matches_status_known")
+    assert _has_check(ProductMatch, "ck_product_matches_method_known")
+    assert _has_check(PriceSnapshot, "ck_price_snapshots_price_nonnegative")
+    assert _has_check(ScrapeRun, "ck_scrape_runs_status_known")

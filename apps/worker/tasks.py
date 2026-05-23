@@ -1,6 +1,6 @@
 import logging
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
 from sqlalchemy.orm import Session
 from stroyhub.catalog.shop_candidates import CandidateListFilters, ShopCandidateCatalog
@@ -74,7 +74,7 @@ def scrape_due_shops(
 @celery_app.task(name="stroyhub.scrape_shop")  # type: ignore[untyped-decorator]
 def scrape_shop(shop_id: int) -> dict[str, Any]:
     with SessionLocal() as session:
-        return cast(dict[str, Any], run_shop_scrape(session, shop_id))
+        return run_shop_scrape(session, shop_id)
 
 
 @celery_app.task(name="stroyhub.refresh_shop_source_candidates")  # type: ignore[untyped-decorator]

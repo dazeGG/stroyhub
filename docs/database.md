@@ -77,6 +77,9 @@ Constraints and indexes:
 
 - Unique: `source`, `source_id`
 - Check: `source_type` is one of `2gis`, `official_api`, `official_html`
+- Check: `scrape_status` is one of `new`, `ok`, `scheduled`, `running`, `success`, `partial`, `failed`, `disabled`
+- Check: `scrape_interval > 0`
+- Check: `error_count >= 0`
 - Index: `shop_identity_id`
 - Index: `source_type`
 - Index: `next_scrape_at`
@@ -156,6 +159,9 @@ Constraints and indexes:
 - Unique: `source`, `source_id`
 - Check: known `source`
 - Check: known `status`
+- Check: `product_count >= 0`
+- Check: `priced_product_count >= 0`
+- Check: `priority >= 0`
 - Index: `status`
 - Index: `priority`
 - Index: `last_seen_at`
@@ -282,6 +288,7 @@ Status values:
 Constraints and indexes:
 
 - Unique partial index: `source_product_id` where `status = 'active'`.
+- Check: `status` is one of `active`, `replaced`, `reverted`.
 - Index: `category_id`.
 - Index: `status`.
 - Index: `created_at`.
@@ -301,6 +308,7 @@ Constraints and indexes:
 
 - Unique partial index: `source`, `shop_id`, `source_product_id` where `source_product_id` is not null
 - Unique partial index: `source`, `shop_id`, `fingerprint` where `fingerprint` is not null
+- Check: at least one non-empty stable identity (`source_product_id` or `fingerprint`) must be present
 - Index: `shop_id`
 - Index: `category_id`
 - Index: `normalized_title`
@@ -332,6 +340,7 @@ Constraints and indexes:
 
 - Index: `source_product_id`, `parsed_at`
 - Index: `parsed_at`
+- Check: `price IS NULL OR price >= 0`
 - `price` should be a decimal type, not a floating-point type.
 
 ### `scrape_runs`
@@ -362,6 +371,9 @@ Constraints and indexes:
 - Index: `shop_id`, `started_at`
 - Index: `source`, `started_at`
 - Index: `status`
+- Check: `status` is one of `running`, `success`, `partial`, `failed`, `skipped`
+- Check: `items_seen >= 0`
+- Check: `items_saved >= 0`
 
 ### `canonical_products`
 
@@ -404,6 +416,7 @@ Constraints and indexes:
 
 - Index: `category_id`
 - Index: `normalized_title`
+- Check: `match_status` is one of `active`, `inactive`
 - Optional future index: trigram or full-text index on `normalized_title` after
   real query patterns justify it.
 
@@ -435,6 +448,7 @@ Status values:
 Method values:
 
 - `exact_title`
+- `exact_normalized_title`
 - `token_similarity`
 - `attribute_rules`
 - `manual`
@@ -456,6 +470,9 @@ Constraints and indexes:
 - Index: `canonical_product_id`.
 - Index: `source_product_id`.
 - Index: `status`, `confidence`.
+- Check: `0 <= confidence <= 1`
+- Check: known `status`
+- Check: known `method`
 
 ## PostgreSQL Type Rules
 
