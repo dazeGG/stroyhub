@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from stroyhub import __version__
 
+from apps.api.canonical_products import router as canonical_products_router
 from apps.api.categories import router as categories_router
 from apps.api.matches import router as matches_router
 from apps.api.product_normalization import router as product_normalization_router
@@ -13,6 +14,7 @@ from apps.api.shops import router as shops_router
 
 def create_app() -> FastAPI:
     app = FastAPI(title="StroyHub API", version=__version__)
+    app.include_router(canonical_products_router)
     app.include_router(categories_router)
     app.include_router(matches_router)
     app.include_router(product_normalization_router)
