@@ -1,6 +1,87 @@
 name: stroyhub
 
 services:
+  api:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    working_dir: /app
+    environment:
+      STROYHUB_DATABASE_URL: postgresql+psycopg://stroyhub:stroyhub@postgres:5432/stroyhub
+      STROYHUB_REDIS_URL: redis://redis:6379/0
+      UV_LINK_MODE: copy
+    command:
+      - sh
+      - -c
+      - >
+        uv sync --all-extras &&
+        uv run alembic upgrade head &&
+        uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - .:/app
+      - stroyhub_uv_cache:/root/.cache/uv
+      - stroyhub_venv:/app/.venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  worker:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    working_dir: /app
+    environment:
+      STROYHUB_DATABASE_URL: postgresql+psycopg://stroyhub:stroyhub@postgres:5432/stroyhub
+      STROYHUB_REDIS_URL: redis://redis:6379/0
+      UV_LINK_MODE: copy
+    command:
+      - sh
+      - -c
+      - >
+        uv sync --all-extras &&
+        uv run celery -A apps.worker.celery_app:celery_app worker --beat
+        --loglevel=INFO --schedule=/tmp/celerybeat-schedule
+    volumes:
+      - .:/app
+      - stroyhub_uv_cache:/root/.cache/uv
+      - stroyhub_venv:/app/.venv
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  admin:
+    image: node:22-bookworm-slim
+    working_dir: /app/apps/admin
+    environment:
+      VITE_API_PROXY_TARGET: http://api:8000
+    command:
+      - sh
+      - -c
+      - >
+        corepack enable &&
+        pnpm install --frozen-lockfile &&
+        pnpm dev --host 0.0.0.0 --port 5173
+    ports:
+      - "${ADMIN_PORT:-5173}:5173"
+    volumes:
+      - .:/app
+      - stroyhub_admin_node_modules:/app/apps/admin/node_modules
+    depends_on:
+      api:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -35,3 +116,6 @@ services:
 volumes:
   stroyhub_postgres_data:
   stroyhub_redis_data:
+  stroyhub_uv_cache:
+  stroyhub_venv:
+  stroyhub_admin_node_modules:

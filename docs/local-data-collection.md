@@ -5,7 +5,7 @@ StroyHub product data.
 
 ## 1. Start Local Services
 
-Start PostgreSQL and Redis:
+Start the full local development stack:
 
 ```bash
 docker compose up -d
@@ -15,6 +15,19 @@ If your Docker installation uses standalone Compose:
 
 ```bash
 docker-compose up -d
+```
+
+This starts PostgreSQL, Redis, the FastAPI API, the admin Vite dev server, and
+the Celery worker with beat. To start only PostgreSQL and Redis:
+
+```bash
+docker compose up -d postgres redis
+```
+
+or, with standalone Compose:
+
+```bash
+docker-compose up -d postgres redis
 ```
 
 Check service health:
@@ -27,6 +40,8 @@ Expected local ports:
 
 - PostgreSQL: `localhost:5432`
 - Redis: `localhost:6379`
+- API: `localhost:8000`
+- Admin: `localhost:5173`
 
 ## 2. Prepare the Python Environment
 
@@ -167,7 +182,10 @@ The command can be repeated. Repeated successful runs should upsert existing
 
 ## 6. Run Scheduled Collection Locally
 
-Start a Celery worker:
+If you use Docker Compose for local development, the worker and beat are already
+started by `docker compose up -d`.
+
+For a manual local run, start a Celery worker:
 
 ```bash
 uv run celery -A apps.worker.celery_app:celery_app worker --loglevel=info
@@ -179,7 +197,7 @@ Start Celery Beat in another terminal:
 uv run celery -A apps.worker.celery_app:celery_app beat --loglevel=info
 ```
 
-Beat dispatches due shops every day at `00:00 Asia/Yakutsk`.
+Beat dispatches due shops every 15 minutes.
 
 The due-shop dispatcher currently supports:
 

@@ -35,7 +35,7 @@ cp .env.example .env
 
 This creates a local `.venv` using the Python version pinned in `.python-version`. The virtual environment is not committed; dependency versions are committed in `uv.lock`.
 
-Start local services:
+Start the full development stack:
 
 ```bash
 docker compose up -d
@@ -47,7 +47,27 @@ If your Docker installation uses the standalone Compose command:
 docker-compose up -d
 ```
 
-Docker Desktop or another Docker daemon must be running before starting the services.
+This starts PostgreSQL, Redis, the FastAPI app, the Celery worker with beat, and
+the admin Vite dev server.
+
+Useful local URLs:
+
+- API: `http://127.0.0.1:8000`
+- API docs: `http://127.0.0.1:8000/docs`
+- Admin: `http://127.0.0.1:5173`
+
+Docker Desktop or another Docker daemon must be running before starting the
+services. To start only the infrastructure services, use:
+
+```bash
+docker compose up -d postgres redis
+```
+
+or, with standalone Compose:
+
+```bash
+docker-compose up -d postgres redis
+```
 
 Run the current smoke test:
 

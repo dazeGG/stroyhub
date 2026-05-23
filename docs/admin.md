@@ -39,6 +39,19 @@ cd apps/admin
 pnpm install
 ```
 
+For the full local development stack, including PostgreSQL, Redis, API, Celery
+worker with beat, and the admin dev server, run from the repository root:
+
+```bash
+docker compose up -d
+```
+
+If your Docker installation uses standalone Compose:
+
+```bash
+docker-compose up -d
+```
+
 Run the API from the repository root:
 
 ```bash
@@ -53,7 +66,8 @@ pnpm dev
 ```
 
 The admin dev server proxies `/api/*` requests to the local FastAPI app on
-`http://127.0.0.1:8000`.
+`http://127.0.0.1:8000` by default. In Docker Compose, it uses the internal
+`http://api:8000` service URL through `VITE_API_PROXY_TARGET`.
 
 ## Initial M12 Jobs
 

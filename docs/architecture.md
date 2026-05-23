@@ -60,17 +60,22 @@ Development is managed with `uv`:
 - `uv.lock` pins dependency versions.
 - `.venv` is local and ignored by git.
 
-The API can be run with `uv run uvicorn apps.api.main:app --reload`.
+The full local development stack can be run with `docker compose up -d`. This
+starts PostgreSQL, Redis, the API, the admin Vite dev server, and the Celery
+worker with beat.
 
-The admin UI can be run from `apps/admin` with its Vite development server.
+The API can also be run manually with
+`uv run uvicorn apps.api.main:app --reload`.
 
-The worker can be run with:
+The admin UI can also be run from `apps/admin` with its Vite development server.
+
+The worker can also be run manually with:
 
 ```bash
 uv run celery -A apps.worker.celery_app:celery_app worker --loglevel=info
 ```
 
-Celery Beat dispatches due shop scraping once per day at `00:00 Asia/Yakutsk`:
+Celery Beat dispatches due shop scraping every 15 minutes:
 
 ```bash
 uv run celery -A apps.worker.celery_app:celery_app beat --loglevel=info

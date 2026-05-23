@@ -13,6 +13,7 @@ htmlcov/
 
 .venv/
 venv/
+.pnpm-store/
 .uv-cache/
 .uv-python/
 .var/
