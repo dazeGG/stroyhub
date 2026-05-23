@@ -596,6 +596,25 @@ def test_source_product_repository_requires_stable_identity(db_session: Session)
         )
 
 
+def test_source_product_table_rejects_empty_stable_identity_values(db_session: Session) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-test-empty-identity", name="Shop")
+    )
+    product = SourceProduct(
+        shop_id=shop.id,
+        source="2gis",
+        source_product_id="   ",
+        fingerprint="   ",
+        title="Unknown product",
+        normalized_title="unknown product",
+    )
+
+    with pytest.raises(IntegrityError):
+        with db_session.begin_nested():
+            db_session.add(product)
+            db_session.flush()
+
+
 def test_price_snapshot_repository_is_append_only(db_session: Session) -> None:
     shop = ShopRepository(db_session).upsert(
         ShopUpsert(source="2gis", source_id="branch-test-6", name="Shop")
@@ -636,6 +655,30 @@ def test_price_snapshot_repository_is_append_only(db_session: Session) -> None:
     assert first.raw == {"price": "10.50"}
     assert second.raw == {"price": "10.50"}
     assert count == 2
+
+
+def test_price_snapshot_table_rejects_negative_price(db_session: Session) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-test-negative-price", name="Shop")
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="product-negative-price",
+            title="Brick",
+            normalized_title="brick",
+        )
+    )
+
+    with pytest.raises(IntegrityError):
+        with db_session.begin_nested():
+            PriceSnapshotRepository(db_session).add(
+                PriceSnapshotCreate(
+                    source_product_id=product.id,
+                    price=Decimal("-1.00"),
+                )
+            )
 
 
 def test_scrape_run_repository_tracks_run_lifecycle(db_session: Session) -> None:
