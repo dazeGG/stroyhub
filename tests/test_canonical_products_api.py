@@ -307,3 +307,19 @@ def test_canonical_product_detail_and_update_show_linked_source_products(
     assert payload["candidate_source_products"][0]["match_id"] == candidate_match.id
     assert payload["rejected_source_products"][0]["id"] == rejected_source.id
     assert payload["rejected_source_products"][0]["match_id"] == rejected_match.id
+
+
+def test_canonical_product_validation_rejects_invalid_status_and_blank_title(
+    client: TestClient,
+) -> None:
+    invalid_status = client.post(
+        "/canonical-products",
+        json={"title": "Valid title", "match_status": "unknown"},
+    )
+    blank_title = client.post(
+        "/canonical-products",
+        json={"title": "   ", "match_status": "active"},
+    )
+
+    assert invalid_status.status_code == 422
+    assert blank_title.status_code == 422

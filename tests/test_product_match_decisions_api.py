@@ -227,6 +227,34 @@ def test_reject_candidate_match_records_review_metadata(
     assert payload["reason"] == {"action": "reject", "note": "different package"}
 
 
+def test_product_match_validation_rejects_blank_or_too_long_actor(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    canonical = _canonical(db_session, title="Actor Validate Canonical")
+    source_product = _source_product(db_session, source_id="actor-validate-source")
+
+    blank_actor = client.post(
+        "/product-matches/accept",
+        json={
+            "canonical_product_id": canonical.id,
+            "source_product_id": source_product.id,
+            "actor": "   ",
+        },
+    )
+    long_actor = client.post(
+        "/product-matches/accept",
+        json={
+            "canonical_product_id": canonical.id,
+            "source_product_id": source_product.id,
+            "actor": "a" * 121,
+        },
+    )
+
+    assert blank_actor.status_code == 422
+    assert long_actor.status_code == 422
+
+
 def test_reject_non_candidate_match_returns_conflict(
     client: TestClient,
     db_session: Session,

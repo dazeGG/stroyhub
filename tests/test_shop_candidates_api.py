@@ -108,6 +108,13 @@ def test_shop_source_candidate_api_lists_candidates(
     assert response.json()["groups"] == []
 
 
+def test_shop_source_candidate_api_rejects_unknown_status_filter(
+    client: TestClient,
+) -> None:
+    response = client.get("/shop-source-candidates", params={"status": "invalid-status"})
+    assert response.status_code == 422
+
+
 def test_shop_source_candidate_api_exposes_official_strategy(
     client: TestClient,
     db_session: Session,

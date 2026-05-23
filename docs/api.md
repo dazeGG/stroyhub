@@ -11,6 +11,13 @@ uv run uvicorn apps.admin_api.main:app --port 8001 --reload
 Interactive OpenAPI docs are available at `GET /docs`; the raw schema is
 available at `GET /openapi.json`.
 
+Validation notes:
+
+- Invalid enum/status inputs return `422` with FastAPI validation details.
+- ID path/query params for admin mutation/read endpoints are validated as
+  positive integers.
+- Admin-facing actor/reason text fields are trimmed and length-constrained.
+
 ## System
 
 ### `GET /health`
@@ -125,6 +132,7 @@ Query params:
 - `category_id`: optional normalized category filter; parent categories include
   descendants.
 - `match_status`: optional canonical product status filter.
+  Allowed: `active`, `inactive`.
 - `limit`: 1-100, default `50`.
 - `offset`: default `0`.
 
@@ -187,6 +195,7 @@ excluded from offer and candidate context.
 
 Updates editable canonical fields: `title`, `normalized_title`, `category_id`,
 `brand`, `model`, `unit_raw`, `attributes`, and `match_status`.
+`title`/`normalized_title` are validated as non-blank trimmed strings.
 
 ## Product Match Decisions
 
@@ -211,6 +220,8 @@ Request:
   "limit": 100
 }
 ```
+
+`actor` is optional (defaults to `admin`), trimmed, and length-limited.
 
 Example response:
 
@@ -821,3 +832,5 @@ Example response:
   ]
 }
 ```
+Query param `status` is optional; allowed:
+`pending`, `stale`, `hidden`, `archived`, `approved`.
