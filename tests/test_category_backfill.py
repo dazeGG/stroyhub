@@ -72,6 +72,20 @@ def test_backfill_products_skips_active_category_overrides() -> None:
     assert product.category_id is None
 
 
+def test_backfill_products_does_not_lazy_load_unloaded_category_overrides() -> None:
+    product = LazyOverrideProduct(title="Цемент М500", category_id=None)
+
+    result = backfill_category_ids.backfill_products(
+        [product],
+        category_repository=FakeCategoryRepository(),
+        categorizer=backfill_category_ids.RuleBasedCategorizer(),
+        dry_run=False,
+    )
+
+    assert result.changed == 1
+    assert product.category_id == 2
+
+
 def test_backfill_main_forwards_filters_and_prints_summary(monkeypatch, capsys) -> None:  # type: ignore[no-untyped-def]
     captured: dict[str, object] = {}
 
@@ -113,6 +127,20 @@ class FakeProduct:
 @dataclass(frozen=True)
 class FakeOverride:
     status: str
+
+
+class LazyOverrideProduct:
+    source = "2gis"
+    category_raw = None
+    description = None
+
+    def __init__(self, *, title: str, category_id: int | None) -> None:
+        self.title = title
+        self.category_id = category_id
+
+    @property
+    def category_overrides(self) -> list[FakeOverride]:
+        raise AssertionError("category_overrides should not be lazy-loaded")
 
 
 @dataclass(frozen=True)

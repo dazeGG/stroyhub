@@ -88,6 +88,7 @@ class ProductMatchCandidateGenerator:
                     canonical_product_id=canonical_product_id,
                     candidate=candidate,
                 )
+                existing_pairs.add((source_product.id, canonical_product_id))
                 candidates_created += 1
                 if candidates_created >= filters.limit:
                     return ProductMatchGenerationResult(

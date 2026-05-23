@@ -107,8 +107,9 @@ class ProductPriceSnapshot:
 
 
 class ProductCatalog:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, public_visibility: bool = False) -> None:
         self._session = session
+        self._public_visibility = public_visibility
 
     def search_products(self, filters: ProductSearchFilters) -> list[ProductSearchItem]:
         statement, latest_prices = self._product_listing_statement()
@@ -128,8 +129,9 @@ class ProductCatalog:
             .join(Shop, SourceProduct.shop_id == Shop.id)
             .outerjoin(ShopIdentity, Shop.shop_identity_id == ShopIdentity.id)
             .where(SourceProduct.is_active.is_(True))
-            .where(self._public_visibility_predicate())
         )
+        if self._public_visibility:
+            statement = statement.where(self._public_visibility_predicate())
         statement = self._apply_product_filters(statement, filters)
         return int(self._session.scalar(statement) or 0)
 
@@ -150,8 +152,9 @@ class ProductCatalog:
             .outerjoin(ShopIdentity, Shop.shop_identity_id == ShopIdentity.id)
             .where(SourceProduct.id == product_id)
             .where(SourceProduct.is_active.is_(True))
-            .where(self._public_visibility_predicate())
         )
+        if self._public_visibility:
+            statement = statement.where(self._public_visibility_predicate())
         return self._session.scalar(statement) is not None
 
     def list_price_history(self, product_id: int) -> list[ProductPriceSnapshot]:
@@ -204,8 +207,9 @@ class ProductCatalog:
                 ),
             )
             .where(SourceProduct.is_active.is_(True))
-            .where(self._public_visibility_predicate())
         )
+        if self._public_visibility:
+            statement = statement.where(self._public_visibility_predicate())
 
         return statement, latest_prices
 

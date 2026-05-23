@@ -179,13 +179,22 @@ def _handle_decision_error(
     exc: ProductMatchDecisionNotFound | ProductMatchDecisionConflict,
 ) -> NoReturn:
     if isinstance(exc, ProductMatchDecisionNotFound):
+        message = str(exc)
         raise ApiError(
             status_code=404,
-            code="product_match_not_found",
-            message=str(exc),
+            code=_not_found_code(message),
+            message=message,
         ) from exc
     raise ApiError(
         status_code=409,
         code="product_match_conflict",
         message=str(exc),
     ) from exc
+
+
+def _not_found_code(message: str) -> str:
+    if message == "Canonical product not found":
+        return "canonical_product_not_found"
+    if message == "Source product not found":
+        return "source_product_not_found"
+    return "product_match_not_found"

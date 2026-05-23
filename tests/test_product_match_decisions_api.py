@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
@@ -276,6 +276,37 @@ def test_reject_non_candidate_match_returns_conflict(
     assert response.status_code == 409
 
 
+def test_product_match_decisions_return_specific_not_found_codes(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    canonical = _canonical(db_session, title="Not Found Code Canonical")
+    source_product = _source_product(db_session, source_id="not-found-code-source")
+
+    missing_canonical = client.post(
+        "/product-matches/accept",
+        json={
+            "canonical_product_id": 999999999,
+            "source_product_id": source_product.id,
+        },
+    )
+    missing_source = client.post(
+        "/product-matches/accept",
+        json={
+            "canonical_product_id": canonical.id,
+            "source_product_id": 999999999,
+        },
+    )
+    missing_match = client.post("/product-matches/999999999/reject", json={})
+
+    assert missing_canonical.status_code == 404
+    assert missing_canonical.json()["code"] == "canonical_product_not_found"
+    assert missing_source.status_code == 404
+    assert missing_source.json()["code"] == "source_product_not_found"
+    assert missing_match.status_code == 404
+    assert missing_match.json()["code"] == "product_match_not_found"
+
+
 def test_generate_candidates_persists_reviewable_matches_idempotently(
     client: TestClient,
     db_session: Session,
@@ -311,6 +342,51 @@ def test_generate_candidates_persists_reviewable_matches_idempotently(
     assert match is not None
     assert match.status == "candidate"
     assert match.method == "exact_normalized_title"
+
+
+def test_generate_candidates_deduplicates_references_in_same_run(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    canonical = _canonical(db_session, title="Duplicate Reference Cement M500 50kg")
+    accepted_source = _source_product(
+        db_session,
+        source_id="duplicate-reference-accepted-source",
+        title="Duplicate Reference Cement M500 50kg",
+        category_id=canonical.category_id,
+    )
+    source_product = _source_product(
+        db_session,
+        source_id="duplicate-reference-source",
+        title="Duplicate Reference Cement M500 50kg",
+        category_id=canonical.category_id,
+    )
+    ProductMatchRepository(db_session).create(
+        ProductMatchCreate(
+            canonical_product_id=canonical.id,
+            source_product_id=accepted_source.id,
+            confidence=Decimal("1.000"),
+            method="manual",
+            status="accepted",
+        )
+    )
+
+    response = client.post(
+        "/product-matches/generate-candidates",
+        json={"source": "2gis", "category_id": canonical.category_id, "min_confidence": 0.9},
+    )
+
+    match_count = db_session.scalar(
+        select(func.count())
+        .select_from(ProductMatch)
+        .where(
+            ProductMatch.source_product_id == source_product.id,
+            ProductMatch.canonical_product_id == canonical.id,
+        )
+    )
+    assert response.status_code == 200
+    assert response.json()["candidates_created"] == 1
+    assert match_count == 1
 
 
 def test_generate_candidates_skips_ineligible_and_blocked_products(
