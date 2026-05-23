@@ -509,7 +509,11 @@ def test_product_detail_endpoint_returns_404_for_missing_product(
     response = client.get("/products/999999999")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Source product not found"}
+    assert response.json() == {
+        "code": "source_product_not_found",
+        "message": "Source product not found",
+        "details": {},
+    }
 
 
 def test_product_category_override_endpoint_creates_reads_and_reverts_override(
@@ -610,7 +614,11 @@ def test_product_category_override_endpoint_rejects_root_category(
     )
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "Category override must target a leaf category"}
+    assert response.json() == {
+        "code": "category_override_requires_leaf",
+        "message": "Category override must target a leaf category",
+        "details": {},
+    }
 
 
 def test_product_category_override_revert_returns_404_without_active_override(
@@ -632,7 +640,11 @@ def test_product_category_override_revert_returns_404_without_active_override(
     response = client.delete(f"/products/{product.id}/category-override")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Active category override not found"}
+    assert response.json() == {
+        "code": "active_category_override_not_found",
+        "message": "Active category override not found",
+        "details": {},
+    }
 
 
 def test_product_category_override_put_is_idempotent_for_same_payload(
@@ -758,4 +770,8 @@ def test_product_price_history_endpoint_returns_404_for_missing_product(
     response = client.get("/products/999999999/prices")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Source product not found"}
+    assert response.json() == {
+        "code": "source_product_not_found",
+        "message": "Source product not found",
+        "details": {},
+    }

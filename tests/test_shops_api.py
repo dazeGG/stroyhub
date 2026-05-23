@@ -290,7 +290,8 @@ def test_shop_identity_api_rejects_manual_source_boundary(client: TestClient) ->
     )
 
     assert response.status_code == 400
-    assert "manual is not an accepted shop source" in response.json()["detail"]
+    assert response.json()["code"] == "invalid_shop_source"
+    assert response.json()["message"] == "manual is not an accepted shop source"
 
 
 def test_retry_shop_scrape_marks_source_scheduled_and_enqueues_task(
@@ -389,7 +390,8 @@ def test_retry_shop_scrape_rejects_running_source(
     response = client.post(f"/shops/{shop.id}/scrape/retry")
 
     assert response.status_code == 409
-    assert response.json()["detail"] == "shop scrape is already running"
+    assert response.json()["code"] == "shop_scrape_already_running"
+    assert response.json()["message"] == "shop scrape is already running"
 
 
 def test_retry_shop_scrape_returns_503_when_enqueue_fails(
@@ -418,7 +420,8 @@ def test_retry_shop_scrape_returns_503_when_enqueue_fails(
     response = client.post(f"/shops/{shop.id}/scrape/retry")
 
     assert response.status_code == 503
-    assert response.json()["detail"] == "redis unavailable"
+    assert response.json()["code"] == "enqueue_failed"
+    assert response.json()["message"] == "redis unavailable"
     db_session.expire(shop)
     assert isinstance(shop.raw, dict)
     enqueue_failed = shop.raw.get("enqueue_failed")
