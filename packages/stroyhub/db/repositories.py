@@ -389,22 +389,33 @@ class CategoryOverrideRepository:
 
         now = datetime.now(UTC)
         active_override = self.get_active(data.source_product_id)
+        normalized_reason = _normalized_optional_text(data.reason)
+        normalized_actor = _normalized_optional_text(data.actor)
         previous_category_id = product.category_id
         if active_override is not None:
+            if (
+                active_override.category_id == data.category_id
+                and _normalized_optional_text(active_override.reason) == normalized_reason
+                and _normalized_optional_text(active_override.created_by) == normalized_actor
+            ):
+                if product.category_id != data.category_id:
+                    product.category_id = data.category_id
+                    self._session.flush()
+                return active_override
             previous_category_id = active_override.previous_category_id
             active_override.status = "replaced"
-            active_override.updated_by = data.actor
-            active_override.deactivated_by = data.actor
+            active_override.updated_by = normalized_actor
+            active_override.deactivated_by = normalized_actor
             active_override.deactivated_at = now
 
         override = CategoryOverride(
             source_product_id=data.source_product_id,
             category_id=data.category_id,
             previous_category_id=previous_category_id,
-            reason=data.reason,
+            reason=normalized_reason,
             status="active",
-            created_by=data.actor,
-            updated_by=data.actor,
+            created_by=normalized_actor,
+            updated_by=normalized_actor,
         )
         self._session.add(override)
         product.category_id = data.category_id
@@ -499,6 +510,13 @@ class SourceProductRepository:
 
         self._session.flush()
         return product
+
+
+def _normalized_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
 
 
 class PriceSnapshotRepository:

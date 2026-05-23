@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
@@ -16,7 +16,7 @@ from stroyhub.db import (
     SourceProductRepository,
     SourceProductUpsert,
 )
-from stroyhub.models import Category
+from stroyhub.models import Category, CategoryOverride
 
 from apps.admin_api.main import create_app
 from apps.admin_api.products import get_session
@@ -633,6 +633,62 @@ def test_product_category_override_revert_returns_404_without_active_override(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Active category override not found"}
+
+
+def test_product_category_override_put_is_idempotent_for_same_payload(
+    client: TestClient, db_session: Session
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="branch-api-idempotent-override",
+            name="Idempotent Shop",
+        )
+    )
+    root = Category(slug="api-idempotent-override-root", name="Idempotent Override Root")
+    db_session.add(root)
+    db_session.flush()
+    original = Category(
+        slug="api-idempotent-override-original",
+        name="Idempotent Override Original",
+        parent_id=root.id,
+    )
+    manual = Category(
+        slug="api-idempotent-override-manual",
+        name="Idempotent Override Manual",
+        parent_id=root.id,
+    )
+    db_session.add_all([original, manual])
+    db_session.flush()
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="idempotent-override-api-1",
+            title="Idempotent Override Product",
+            normalized_title="idempotent override product",
+            category_id=original.id,
+        )
+    )
+
+    first = client.put(
+        f"/products/{product.id}/category-override",
+        json={"category_id": manual.id, "reason": "same", "actor": "admin"},
+    )
+    second = client.put(
+        f"/products/{product.id}/category-override",
+        json={"category_id": manual.id, "reason": "  same  ", "actor": "  admin  "},
+    )
+    total = db_session.scalar(
+        select(func.count())
+        .select_from(CategoryOverride)
+        .where(CategoryOverride.source_product_id == product.id)
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["category_override"]["id"] == second.json()["category_override"]["id"]
+    assert total == 1
 
 
 def test_product_price_history_endpoint_returns_ordered_snapshots(
