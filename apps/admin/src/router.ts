@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import CatalogPage from './views/CatalogPage.vue'
+import CanonicalProductDetailPage from './views/CanonicalProductDetailPage.vue'
 import CategoryDirectoryPage from './views/CategoryDirectoryPage.vue'
 import CategoryReviewPage from './views/CategoryReviewPage.vue'
 import DashboardPage from './views/DashboardPage.vue'
@@ -32,6 +33,11 @@ export const router = createRouter({
       path: '/products/normalization',
       name: 'product-normalization',
       component: ProductNormalizationInboxPage,
+    },
+    {
+      path: '/canonical-products/:canonicalProductId',
+      name: 'canonical-product-detail',
+      component: CanonicalProductDetailPage,
     },
     { path: '/shops', name: 'shops', component: ShopSourceManagementPage },
     { path: '/shops/candidates', name: 'shop-candidates', component: ShopCandidateReviewPage },

@@ -602,9 +602,13 @@ onMounted(() => {
               </div>
             </dl>
 
-            <p v-if="item.match_summary.accepted_canonical_title" class="mt-4 text-sm text-neutral-300">
+            <RouterLink
+              v-if="item.match_summary.accepted_canonical_product_id && item.match_summary.accepted_canonical_title"
+              :to="`/canonical-products/${item.match_summary.accepted_canonical_product_id}`"
+              class="mt-4 block text-sm font-semibold text-neutral-200 transition hover:text-amber-200"
+            >
               {{ item.match_summary.accepted_canonical_title }}
-            </p>
+            </RouterLink>
             <p v-else-if="item.state === 'ineligible'" class="mt-4 text-sm text-red-100/80">
               Эта карточка не попадает в основной поток нормализации.
             </p>
@@ -634,7 +638,12 @@ onMounted(() => {
                   :key="match.id"
                   class="space-y-2"
                 >
-                  <p class="text-sm font-semibold text-white">{{ match.canonical_title }}</p>
+                  <RouterLink
+                    :to="`/canonical-products/${match.canonical_product_id}`"
+                    class="block text-sm font-semibold text-white transition hover:text-amber-200"
+                  >
+                    {{ match.canonical_title }}
+                  </RouterLink>
                   <p class="text-xs text-neutral-500">
                     {{ match.canonical_normalized_title }} · {{ confidencePercent(match.confidence) }} · {{ match.method }}
                   </p>

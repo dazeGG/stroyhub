@@ -177,10 +177,10 @@ source card includes its latest observed price snapshot when available, raw unit
 and category text, source URL/image when available, `last_seen_at`, and match
 confidence.
 
-`candidate_source_products` lists candidate matches for the same canonical
-product separately from accepted offers. Source cards marked ineligible by the
-2GIS/source-product eligibility gate are excluded from offer and candidate
-context.
+`candidate_source_products` and `rejected_source_products` list pending and
+rejected matches for the same canonical product separately from accepted offers.
+Source cards marked ineligible by the 2GIS/source-product eligibility gate are
+excluded from offer and candidate context.
 
 ### `PATCH /canonical-products/{canonical_product_id}`
 

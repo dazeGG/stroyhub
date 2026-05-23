@@ -96,6 +96,7 @@ class CanonicalProductDetailResponse(CanonicalProductResponse):
     accepted_source_products: list[CanonicalLinkedSourceProductResponse]
     accepted_offer_groups: list[CanonicalOfferGroupResponse]
     candidate_source_products: list[CanonicalLinkedSourceProductResponse]
+    rejected_source_products: list[CanonicalLinkedSourceProductResponse]
 
 
 class CanonicalProductListResponse(BaseModel):
