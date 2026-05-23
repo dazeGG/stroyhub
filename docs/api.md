@@ -704,7 +704,8 @@ Example response:
         "accepted_canonical_title": null,
         "candidate_count": 0,
         "rejected_count": 0
-      }
+      },
+      "candidate_matches": []
     }
   ],
   "limit": 50,
@@ -712,6 +713,11 @@ Example response:
   "total": 1
 }
 ```
+
+For `candidate_match` items, `candidate_matches` contains the persisted
+candidate rows with `id`, canonical product title/normalized title/category,
+`confidence`, `method`, and `reason` so the admin UI can accept or reject a
+specific proposal.
 
 ## Matches
 

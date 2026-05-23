@@ -53,6 +53,19 @@ class NormalizationMatchSummaryResponse(BaseModel):
     rejected_count: int
 
 
+class NormalizationCandidateMatchResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    canonical_product_id: int
+    canonical_title: str
+    canonical_normalized_title: str
+    canonical_category_id: int | None
+    confidence: Decimal
+    method: str
+    reason: dict[str, object] | None
+
+
 class NormalizationQueueItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -74,6 +87,7 @@ class NormalizationQueueItemResponse(BaseModel):
     latest_price: NormalizationLatestPriceResponse | None
     catalog_eligibility: CatalogEligibilityResponse | None
     match_summary: NormalizationMatchSummaryResponse
+    candidate_matches: tuple[NormalizationCandidateMatchResponse, ...]
 
 
 class NormalizationQueueResponse(BaseModel):
