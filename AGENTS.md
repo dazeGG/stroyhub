@@ -44,7 +44,9 @@ Current layout:
 
 ```text
 apps/
-  api/                  FastAPI entrypoint: apps.api.main
+  api/                  Public FastAPI entrypoint: apps.api.main
+  admin_api/            Admin/operator FastAPI entrypoint: apps.admin_api.main
+  admin/                Vue admin UI
   worker/               Celery worker entrypoint: apps.worker.celery_app
 packages/
   stroyhub/             Reusable domain package
@@ -56,7 +58,9 @@ tests/                  Automated tests
 
 Important boundaries:
 
-- `apps/api` owns the HTTP entrypoint and API composition.
+- `apps/api` owns the public read-only HTTP entrypoint and API composition.
+- `apps/admin_api` owns admin/operator HTTP routes and API composition.
+- `apps/admin` owns the Vue admin UI.
 - `apps/worker` owns Celery startup and background task registration.
 - `packages/stroyhub` owns reusable parsing, catalog, persistence, and scraping logic.
 - `docs` stores long-lived project knowledge, not task tracking.
@@ -65,6 +69,7 @@ Important boundaries:
 Do not add `stroyhub_api` or `stroyhub_worker` packages. The project intentionally uses direct app modules:
 
 - `apps/api/main.py`
+- `apps/admin_api/main.py`
 - `apps/worker/celery_app.py`
 
 ## Package Boundaries
@@ -83,7 +88,8 @@ ml/         Later classification and matching experiments
 
 Rules:
 
-- `apps/api` and `apps/worker` may import from `stroyhub`.
+- `apps/api`, `apps/admin_api`, and `apps/worker` may import from `stroyhub`.
+- `apps/api` and `apps/admin_api` should not import each other's route modules.
 - `stroyhub` must not import app modules.
 - Parsers should not write to the database directly.
 - Parsers should fetch source data and map it into shared parsed records.
@@ -122,13 +128,19 @@ uv run ruff check .
 Run type checks:
 
 ```bash
-uv run mypy packages/stroyhub apps/api apps/worker
+uv run mypy packages/stroyhub apps/api apps/admin_api apps/worker
 ```
 
-Run the API:
+Run the public API:
 
 ```bash
 uv run uvicorn apps.api.main:app --reload
+```
+
+Run the admin API:
+
+```bash
+uv run uvicorn apps.admin_api.main:app --port 8001 --reload
 ```
 
 ## Local Services
@@ -410,7 +422,7 @@ For most code changes:
 ```bash
 uv run pytest
 uv run ruff check .
-uv run mypy packages/stroyhub apps/api apps/worker
+uv run mypy packages/stroyhub apps/api apps/admin_api apps/worker
 ```
 
 For Docker Compose changes:
@@ -451,6 +463,12 @@ API:
 
 ```text
 apps.api.main:app
+```
+
+Admin API:
+
+```text
+apps.admin_api.main:app
 ```
 
 Worker:
