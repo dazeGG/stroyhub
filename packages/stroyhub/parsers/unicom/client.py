@@ -119,6 +119,9 @@ class UnicomClient:
 
         return [_parse_category(item) for item in payload if isinstance(item, dict)]
 
+    def fetch_leaf_category_uuids(self) -> tuple[str, ...]:
+        return leaf_category_uuids(self.fetch_catalog_menu())
+
     def fetch_product_page(
         self,
         *,
@@ -276,6 +279,21 @@ def _json_payload(
             page=page,
             status_code=response.status_code,
         ) from exc
+
+
+def leaf_category_uuids(categories: list[UnicomCategory]) -> tuple[str, ...]:
+    uuids: list[str] = []
+    seen: set[str] = set()
+
+    def walk(items: list[UnicomCategory]) -> None:
+        for category in items:
+            if category.is_leaf and category.uuid and category.uuid not in seen:
+                seen.add(category.uuid)
+                uuids.append(category.uuid)
+            walk(category.children)
+
+    walk(categories)
+    return tuple(uuids)
 
 
 def _parse_category(raw: JsonObject) -> UnicomCategory:

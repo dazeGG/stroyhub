@@ -8,6 +8,7 @@ from stroyhub.parsers.unicom.client import (
     UnicomClientError,
     UnicomProductPage,
     UnicomProductsResult,
+    leaf_category_uuids,
 )
 from stroyhub.parsers.unicom.parser import (
     UNICOM_DEFAULT_CURRENCY,
@@ -29,6 +30,7 @@ __all__ = [
     "UnicomClientError",
     "UnicomProductPage",
     "UnicomProductsResult",
+    "leaf_category_uuids",
     "parse_created_date",
     "parse_product",
     "parse_products",

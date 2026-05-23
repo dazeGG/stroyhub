@@ -33,6 +33,20 @@ def test_unicom_client_fetches_catalog_menu() -> None:
     assert categories[1].children[0].uuid == "d68e4fb83d4d11e8af077062b8b53ba3"
 
 
+def test_unicom_client_fetches_leaf_category_uuids_without_duplicates() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/catalog-menu-2.php"
+        return httpx.Response(200, json=_load_fixture("catalog-menu-excerpt.json"))
+
+    client = UnicomClient(client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+    assert client.fetch_leaf_category_uuids() == (
+        "fac247f1ae6111eca255000c29d1f857",
+        "9ad35f1538fe11efa2a0000c29d1f857",
+        "d68e4fb83d4d11e8af077062b8b53ba3",
+    )
+
+
 def test_unicom_client_fetches_product_page_with_configurable_params() -> None:
     category_uuid = "d68e4fb83d4d11e8af077062b8b53ba3"
 

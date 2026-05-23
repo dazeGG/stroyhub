@@ -12,7 +12,7 @@ from stroyhub.db.repositories import (
 )
 from stroyhub.models import Shop, ShopIdentity, ShopSourceCandidate
 from stroyhub.parsers.metalltorg import METALLTORG_SHOP_SOURCE_ID, METALLTORG_SOURCE
-from stroyhub.parsers.unicom import UNICOM_DEFAULT_SHOP_SOURCE_ID, UNICOM_SOURCE
+from stroyhub.parsers.unicom import UNICOM_DEFAULT_SHOP_SOURCE_ID, UNICOM_SOURCE, UnicomClient
 from stroyhub.scraping.metalltorg import (
     METALLTORG_DEFAULT_CATEGORY_URLS,
     METALLTORG_DEFAULT_MAX_PAGES,
@@ -21,12 +21,14 @@ from stroyhub.scraping.metalltorg import (
     METALLTORG_DEFAULT_TIMEOUT,
 )
 from stroyhub.scraping.unicom import (
+    UNICOM_DEFAULT_CATEGORIES_PER_RUN,
     UNICOM_DEFAULT_CATEGORY_UUIDS,
     UNICOM_DEFAULT_LIMIT,
     UNICOM_DEFAULT_MAX_PAGES,
     UNICOM_DEFAULT_SHOP_NAME,
     UNICOM_DEFAULT_SHOP_URL,
     UNICOM_DEFAULT_SORT,
+    build_unicom_category_batch_raw,
 )
 
 
@@ -62,6 +64,7 @@ def _materialize_unicom(
         website_url=UNICOM_DEFAULT_SHOP_URL,
         preferred_source=UNICOM_SOURCE,
     )
+    category_uuids = _discover_unicom_category_uuids()
     repository = ShopRepository(session)
     existing = repository.get_by_source_id(
         source=UNICOM_SOURCE,
@@ -72,11 +75,18 @@ def _materialize_unicom(
         {
             "source": UNICOM_SOURCE,
             "source_type": "official_api",
-            "category_uuids": list(UNICOM_DEFAULT_CATEGORY_UUIDS),
+            "category_uuids": list(category_uuids),
+            "category_discovery": "catalog_menu_leaf_categories",
+            "categories_per_run": UNICOM_DEFAULT_CATEGORIES_PER_RUN,
             "limit": UNICOM_DEFAULT_LIMIT,
             "max_pages": UNICOM_DEFAULT_MAX_PAGES,
             "sort": UNICOM_DEFAULT_SORT,
             "pacing": "sequential categories; no concurrent requests",
+            "unicom_category_batch": build_unicom_category_batch_raw(
+                enabled=len(category_uuids) > UNICOM_DEFAULT_CATEGORIES_PER_RUN,
+                total=len(category_uuids),
+                categories_per_run=UNICOM_DEFAULT_CATEGORIES_PER_RUN,
+            ),
         }
     )
     shop = repository.upsert(
@@ -192,6 +202,11 @@ def _get_or_create_identity(
             locked_fields={"display_name": True, "website_url": True},
         )
     )
+
+
+def _discover_unicom_category_uuids() -> tuple[str, ...]:
+    discovered = UnicomClient().fetch_leaf_category_uuids()
+    return discovered or UNICOM_DEFAULT_CATEGORY_UUIDS
 
 
 def _next_scrape_at(existing: Shop | None) -> datetime:

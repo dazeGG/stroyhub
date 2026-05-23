@@ -12,9 +12,9 @@ celery_app.conf.update(
     timezone=settings.timezone,
     enable_utc=True,
     beat_schedule={
-        "scrape-due-shops-daily-midnight-yakutsk": {
+        "scrape-due-shops-every-fifteen-minutes": {
             "task": "stroyhub.scrape_due_shops",
-            "schedule": crontab(minute=0, hour=0),
+            "schedule": crontab(minute="*/15"),
         },
     },
 )

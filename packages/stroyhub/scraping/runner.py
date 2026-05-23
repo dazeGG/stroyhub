@@ -142,7 +142,9 @@ def run_shop_scrape(session: Session, shop_id: int) -> dict[str, Any]:
             products_seen = persisted_unicom.products_seen
             products_saved = persisted_unicom.source_products_saved
             price_snapshots_saved = persisted_unicom.price_snapshots_saved
-            partial_progress = False
+            partial_progress = (
+                scrape_status == "partial" and persisted_unicom.batch_progress
+            )
         else:
             persisted_metalltorg = scrape_metalltorg_shop(
                 session,
