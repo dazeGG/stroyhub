@@ -149,3 +149,55 @@ def test_match_candidates_endpoint_returns_readonly_candidate_pairs(
             },
         }
     ]
+
+
+def test_match_candidates_endpoint_excludes_non_matchable_source_products(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    category = Category(slug="match-api-eligibility", name="Match API Eligibility")
+    db_session.add(category)
+    db_session.flush()
+
+    first_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="match-api-eligibility-1", name="First Shop")
+    )
+    second_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="match-api-eligibility-2", name="Second Shop")
+    )
+    products = SourceProductRepository(db_session)
+    products.upsert(
+        SourceProductUpsert(
+            shop_id=first_shop.id,
+            source="2gis",
+            source_product_id="match-api-eligible-left",
+            title="Цемент М500 50кг",
+            normalized_title="цемент м500 50кг",
+            category_id=category.id,
+            category_raw="Цемент",
+            raw={"catalog_eligibility": {"status": "eligible"}},
+        )
+    )
+    products.upsert(
+        SourceProductUpsert(
+            shop_id=second_shop.id,
+            source="2gis",
+            source_product_id="match-api-ineligible-right",
+            title="Цемент М500 50кг",
+            normalized_title="цемент м500 50кг",
+            category_id=category.id,
+            category_raw="Цемент",
+            raw={"catalog_eligibility": {"status": "ineligible"}},
+            is_not_product=True,
+        )
+    )
+
+    response = client.get(
+        "/matches/candidates",
+        params={"source": "2gis", "category_id": category.id, "min_confidence": 0.9},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["products_considered"] == 1
+    assert payload["candidates"] == []

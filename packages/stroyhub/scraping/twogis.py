@@ -4,6 +4,11 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from stroyhub.catalog.categorization import RuleBasedCategorizer
+from stroyhub.catalog.eligibility import (
+    ProductEligibilityInput,
+    evaluate_product_eligibility,
+    with_catalog_eligibility,
+)
 from stroyhub.db.repositories import (
     CategoryRepository,
     CategoryUpsert,
@@ -245,6 +250,14 @@ def persist_twogis_scrape_result(
     price_snapshots_saved = 0
 
     for product in result.products:
+        eligibility = evaluate_product_eligibility(
+            ProductEligibilityInput(
+                source=product.source,
+                title=product.title,
+                price=product.price,
+                raw=product.raw,
+            )
+        )
         category_id = None
         prediction = categorizer.categorize(
             title=product.title,
@@ -286,8 +299,9 @@ def persist_twogis_scrape_result(
                 unit_raw=product.unit_raw,
                 image_url=product.image_url,
                 source_updated_at=product.source_updated_at,
-                raw=product.raw,
+                raw=with_catalog_eligibility(product.raw, eligibility),
                 observed_at=product.parsed_at,
+                is_not_product=eligibility.is_not_product,
             )
         )
         source_products_saved += 1

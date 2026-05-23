@@ -4,6 +4,7 @@ from typing import cast
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from stroyhub.catalog.eligibility import is_matchable_source_product
 from stroyhub.ml.matching import (
     ProductMatchCandidate,
     SourceProductLike,
@@ -127,6 +128,10 @@ class MatchCandidateCatalog:
                 category_raw=product.category_raw,
             )
             for product, shop in self._session.execute(statement)
+            if is_matchable_source_product(
+                product.raw,
+                is_not_product=product.is_not_product,
+            )
         ]
 
     def _candidate_pair(
