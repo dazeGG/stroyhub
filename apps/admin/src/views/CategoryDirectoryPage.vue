@@ -81,23 +81,6 @@ const filteredCategoryGroups = computed(() => {
     })
 })
 
-function visibleChildCount(category: CategoryTreeItem): number {
-  return category.children.length
-}
-
-function emptyChildCount(category: CategoryTreeItem): number {
-  return category.children.filter((child) => child.product_count === 0).length
-}
-
-function childSummary(category: CategoryTreeItem): string {
-  const count = visibleChildCount(category)
-  if (count === 0) {
-    return 'Нет дочерних категорий'
-  }
-
-  return `${count} дочерних категорий`
-}
-
 function isCategoryExpanded(category: CategoryTreeItem): boolean {
   if (searchQuery.value.trim()) {
     return true
@@ -240,7 +223,7 @@ onMounted(() => {
         >
           <button
             type="button"
-            class="grid w-full gap-3 px-4 py-4 text-left text-sm transition hover:bg-neutral-900/60 md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_160px]"
+            class="grid w-full gap-3 px-4 py-4 text-left text-sm transition hover:bg-neutral-900/60 md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px]"
             :aria-expanded="isCategoryExpanded(category)"
             :aria-controls="`category-children-${category.id}`"
             @click="toggleCategory(category)"
@@ -269,13 +252,6 @@ onMounted(() => {
               <p class="text-xs uppercase tracking-wide text-neutral-600">Товары</p>
               <p class="mt-1 font-semibold text-neutral-100">{{ category.product_count }}</p>
             </div>
-            <div class="md:text-right">
-              <p class="text-xs uppercase tracking-wide text-neutral-600">Дочерние</p>
-              <p class="mt-1 text-neutral-300">{{ childSummary(category) }}</p>
-              <p v-if="emptyChildCount(category) > 0" class="mt-1 text-xs text-amber-200">
-                пустых: {{ emptyChildCount(category) }}
-              </p>
-            </div>
           </button>
 
           <div
@@ -286,7 +262,7 @@ onMounted(() => {
             <div
               v-for="child in category.children"
               :key="child.id"
-              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_160px]"
+              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px]"
               data-testid="category-directory-row"
             >
               <div class="min-w-0 pl-10 md:pl-12">
@@ -296,9 +272,6 @@ onMounted(() => {
                 {{ child.slug }}
               </p>
               <p class="font-medium text-neutral-200 md:text-right">{{ child.product_count }}</p>
-              <div class="text-neutral-500 md:text-right">
-                {{ child.children.length }}
-              </div>
             </div>
           </div>
         </section>
