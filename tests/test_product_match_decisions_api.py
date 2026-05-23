@@ -1,0 +1,271 @@
+from collections.abc import Iterator
+from decimal import Decimal
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
+from stroyhub.core.config import settings
+from stroyhub.db import (
+    CanonicalProductCreate,
+    CanonicalProductRepository,
+    ProductMatchCreate,
+    ProductMatchRepository,
+    ShopRepository,
+    ShopUpsert,
+    SourceProductRepository,
+    SourceProductUpsert,
+)
+from stroyhub.models import CanonicalProduct, SourceProduct
+
+from apps.api.main import create_app
+from apps.api.product_matches import get_session
+
+
+@pytest.fixture
+def db_session() -> Iterator[Session]:
+    engine = create_engine(settings.database_url, connect_args={"connect_timeout": 1})
+
+    try:
+        connection = engine.connect()
+    except OperationalError:
+        engine.dispose()
+        pytest.skip("PostgreSQL is not available")
+
+    transaction = connection.begin()
+    session = Session(bind=connection, autoflush=False, expire_on_commit=False)
+
+    try:
+        yield session
+    finally:
+        session.close()
+        transaction.rollback()
+        connection.close()
+        engine.dispose()
+
+
+@pytest.fixture
+def client(db_session: Session) -> Iterator[TestClient]:
+    app = create_app()
+
+    def override_get_session() -> Iterator[Session]:
+        yield db_session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    with TestClient(app) as test_client:
+        yield test_client
+
+    app.dependency_overrides.clear()
+
+
+def test_accept_product_match_creates_manual_accepted_match(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    canonical = _canonical(db_session, title="Accept Canonical")
+    source_product = _source_product(db_session, source_id="accept-source")
+
+    response = client.post(
+        "/product-matches/accept",
+        json={
+            "canonical_product_id": canonical.id,
+            "source_product_id": source_product.id,
+            "actor": "admin",
+            "reason": "looks exact",
+        },
+    )
+    second_response = client.post(
+        "/product-matches/accept",
+        json={
+            "canonical_product_id": canonical.id,
+            "source_product_id": source_product.id,
+            "actor": "admin",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert second_response.status_code == 200
+    assert second_response.json()["id"] == payload["id"]
+    assert payload["canonical_product_id"] == canonical.id
+    assert payload["source_product_id"] == source_product.id
+    assert payload["status"] == "accepted"
+    assert payload["method"] == "manual"
+    assert payload["confidence"] == "1.000"
+    assert payload["reviewed_by"] == "admin"
+    assert payload["reason"] == {"action": "accept", "note": "looks exact"}
+
+
+def test_accept_product_match_conflicts_until_superseded(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    first_canonical = _canonical(db_session, title="First Canonical")
+    second_canonical = _canonical(db_session, title="Second Canonical")
+    source_product = _source_product(db_session, source_id="supersede-source")
+    first_match = ProductMatchRepository(db_session).create(
+        ProductMatchCreate(
+            canonical_product_id=first_canonical.id,
+            source_product_id=source_product.id,
+            confidence=Decimal("1.000"),
+            method="manual",
+            status="accepted",
+        )
+    )
+
+    conflict_response = client.post(
+        "/product-matches/accept",
+        json={
+            "canonical_product_id": second_canonical.id,
+            "source_product_id": source_product.id,
+        },
+    )
+    supersede_response = client.post(
+        "/product-matches/supersede",
+        json={
+            "canonical_product_id": second_canonical.id,
+            "source_product_id": source_product.id,
+            "actor": "admin",
+            "reason": "better normalized product",
+        },
+    )
+
+    db_session.expire(first_match)
+    assert conflict_response.status_code == 409
+    assert supersede_response.status_code == 200
+    assert supersede_response.json()["status"] == "accepted"
+    assert supersede_response.json()["canonical_product_id"] == second_canonical.id
+    assert first_match.status == "superseded"
+    assert first_match.reason == {
+        "action": "supersede",
+        "note": "better normalized product",
+    }
+
+
+def test_create_canonical_from_source_and_accept_links_in_one_transaction(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    source_product = _source_product(db_session, source_id="create-and-accept")
+
+    response = client.post(
+        f"/product-matches/from-source/{source_product.id}/accept",
+        json={"actor": "admin", "reason": "new normalized product"},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    canonical = db_session.get(CanonicalProduct, payload["canonical_product_id"])
+    assert canonical is not None
+    assert canonical.title == source_product.title
+    assert payload["status"] == "accepted"
+    assert payload["reason"] == {"action": "accept", "note": "new normalized product"}
+
+
+def test_accept_candidate_match_records_manual_method(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    canonical = _canonical(db_session, title="Candidate Accept Canonical")
+    source_product = _source_product(db_session, source_id="candidate-accept-source")
+    candidate = ProductMatchRepository(db_session).create(
+        ProductMatchCreate(
+            canonical_product_id=canonical.id,
+            source_product_id=source_product.id,
+            confidence=Decimal("0.850"),
+            method="token_similarity",
+            status="candidate",
+        )
+    )
+
+    response = client.post(
+        "/product-matches/accept",
+        json={
+            "canonical_product_id": canonical.id,
+            "source_product_id": source_product.id,
+            "actor": "admin",
+        },
+    )
+
+    db_session.expire(candidate)
+    assert response.status_code == 200
+    assert response.json()["id"] == candidate.id
+    assert response.json()["method"] == "manual"
+    assert candidate.method == "manual"
+    assert candidate.confidence == Decimal("1.000")
+
+
+def test_reject_candidate_match_records_review_metadata(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    canonical = _canonical(db_session, title="Reject Canonical")
+    source_product = _source_product(db_session, source_id="reject-source")
+    candidate = ProductMatchRepository(db_session).create(
+        ProductMatchCreate(
+            canonical_product_id=canonical.id,
+            source_product_id=source_product.id,
+            confidence=Decimal("0.850"),
+            method="token_similarity",
+            status="candidate",
+        )
+    )
+
+    response = client.post(
+        f"/product-matches/{candidate.id}/reject",
+        json={"actor": "admin", "reason": "different package"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == candidate.id
+    assert payload["status"] == "rejected"
+    assert payload["reviewed_by"] == "admin"
+    assert payload["reason"] == {"action": "reject", "note": "different package"}
+
+
+def test_reject_non_candidate_match_returns_conflict(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    canonical = _canonical(db_session, title="Reject Accepted Canonical")
+    source_product = _source_product(db_session, source_id="reject-accepted-source")
+    accepted = ProductMatchRepository(db_session).create(
+        ProductMatchCreate(
+            canonical_product_id=canonical.id,
+            source_product_id=source_product.id,
+            confidence=Decimal("1.000"),
+            method="manual",
+            status="accepted",
+        )
+    )
+
+    response = client.post(f"/product-matches/{accepted.id}/reject", json={})
+
+    assert response.status_code == 409
+
+
+def _canonical(session: Session, *, title: str) -> CanonicalProduct:
+    return CanonicalProductRepository(session).create(
+        CanonicalProductCreate(
+            title=title,
+            normalized_title=" ".join(title.casefold().split()),
+        )
+    )
+
+
+def _source_product(session: Session, *, source_id: str) -> SourceProduct:
+    shop = ShopRepository(session).upsert(
+        ShopUpsert(source="2gis", source_id=f"shop-{source_id}", name="Decision Shop")
+    )
+    return SourceProductRepository(session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id=source_id,
+            title=f"Decision Product {source_id}",
+            normalized_title=f"decision product {source_id}",
+        )
+    )

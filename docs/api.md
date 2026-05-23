@@ -174,6 +174,64 @@ Returns one canonical product with match counts and accepted source products.
 Updates editable canonical fields: `title`, `normalized_title`, `category_id`,
 `brand`, `model`, `unit_raw`, `attributes`, and `match_status`.
 
+## Product Match Decisions
+
+These endpoints record admin decisions that link source product cards to
+canonical products. They preserve source product rows and write audit metadata
+to `product_matches.reviewed_at`, `reviewed_by`, and `reason`.
+
+### `POST /product-matches/accept`
+
+Accepts a source product into an existing canonical product. If the same
+accepted link already exists, the response is idempotent. If the source product
+is accepted into a different canonical product, the endpoint returns `409`; use
+the supersede endpoint to move it.
+
+Request:
+
+```json
+{
+  "canonical_product_id": 1,
+  "source_product_id": 10,
+  "actor": "admin",
+  "reason": "looks exact"
+}
+```
+
+### `POST /product-matches/supersede`
+
+Moves a source product from its current accepted canonical product to another
+canonical product. The previous accepted match becomes `superseded`; the new
+match becomes `accepted`.
+
+### `POST /product-matches/from-source/{source_product_id}/accept`
+
+Creates a new canonical product from the source product and accepts the source
+link in one transaction. This is the main action for an eligible unmatched
+source card.
+
+### `POST /product-matches/{match_id}/reject`
+
+Rejects a candidate match and stores reviewer metadata. Non-candidate matches
+return `409`.
+
+Example decision response:
+
+```json
+{
+  "id": 22,
+  "canonical_product_id": 1,
+  "source_product_id": 10,
+  "confidence": "1.000",
+  "status": "accepted",
+  "method": "manual",
+  "matched_at": "2026-05-23T09:10:00Z",
+  "reviewed_at": "2026-05-23T09:10:00Z",
+  "reviewed_by": "admin",
+  "reason": {"action": "accept", "note": "looks exact"}
+}
+```
+
 ## Categories
 
 ### `GET /categories`
