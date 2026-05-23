@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
@@ -18,6 +18,7 @@ from stroyhub.db import (
     SourceProductUpsert,
 )
 from stroyhub.models import CanonicalProduct, SourceProduct
+from stroyhub.models.tables import Category, ProductMatch
 
 from apps.api.main import create_app
 from apps.api.product_matches import get_session
@@ -247,25 +248,107 @@ def test_reject_non_candidate_match_returns_conflict(
     assert response.status_code == 409
 
 
+def test_generate_candidates_persists_reviewable_matches_idempotently(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    canonical = _canonical(db_session, title="Generate Unique Cement M500 50kg")
+    source_product = _source_product(
+        db_session,
+        source_id="generate-source",
+        title="Generate Unique Cement M500 50kg",
+        category_id=canonical.category_id,
+    )
+
+    response = client.post(
+        "/product-matches/generate-candidates",
+        json={"source": "2gis", "category_id": canonical.category_id, "min_confidence": 0.9},
+    )
+    second_response = client.post(
+        "/product-matches/generate-candidates",
+        json={"source": "2gis", "category_id": canonical.category_id, "min_confidence": 0.9},
+    )
+
+    match = db_session.scalar(
+        select(ProductMatch).where(
+            ProductMatch.source_product_id == source_product.id,
+            ProductMatch.canonical_product_id == canonical.id,
+        )
+    )
+    assert response.status_code == 200
+    assert response.json()["candidates_created"] == 1
+    assert second_response.status_code == 200
+    assert second_response.json()["candidates_created"] == 0
+    assert second_response.json()["candidates_skipped_existing"] >= 1
+    assert match is not None
+    assert match.status == "candidate"
+    assert match.method == "exact_normalized_title"
+
+
+def test_generate_candidates_skips_ineligible_and_blocked_products(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    canonical = _canonical(db_session, title="Blocked Unique Cement M500 50kg")
+    _source_product(
+        db_session,
+        source_id="generate-ineligible",
+        title="Blocked Unique Cement M500 50kg",
+        category_id=canonical.category_id,
+        raw={"catalog_eligibility": {"status": "ineligible"}},
+        is_not_product=True,
+    )
+    _source_product(
+        db_session,
+        source_id="generate-blocked",
+        title="Blocked Unique Cement M500 25kg",
+        category_id=canonical.category_id,
+    )
+
+    response = client.post(
+        "/product-matches/generate-candidates",
+        json={"source": "2gis", "category_id": canonical.category_id, "min_confidence": 0},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["candidates_created"] == 0
+
+
 def _canonical(session: Session, *, title: str) -> CanonicalProduct:
+    category = Category(slug=f"category-{title.casefold().replace(' ', '-')}", name=title)
+    session.add(category)
+    session.flush()
     return CanonicalProductRepository(session).create(
         CanonicalProductCreate(
             title=title,
             normalized_title=" ".join(title.casefold().split()),
+            category_id=category.id,
         )
     )
 
 
-def _source_product(session: Session, *, source_id: str) -> SourceProduct:
+def _source_product(
+    session: Session,
+    *,
+    source_id: str,
+    title: str | None = None,
+    category_id: int | None = None,
+    raw: dict[str, object] | None = None,
+    is_not_product: bool | None = None,
+) -> SourceProduct:
     shop = ShopRepository(session).upsert(
         ShopUpsert(source="2gis", source_id=f"shop-{source_id}", name="Decision Shop")
     )
+    selected_title = title or f"Decision Product {source_id}"
     return SourceProductRepository(session).upsert(
         SourceProductUpsert(
             shop_id=shop.id,
             source="2gis",
             source_product_id=source_id,
-            title=f"Decision Product {source_id}",
-            normalized_title=f"decision product {source_id}",
+            title=selected_title,
+            normalized_title=" ".join(selected_title.casefold().split()),
+            category_id=category_id,
+            raw=raw or {"catalog_eligibility": {"status": "eligible"}},
+            is_not_product=is_not_product,
         )
     )
