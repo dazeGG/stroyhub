@@ -23,6 +23,8 @@ from stroyhub.scraping.twogis import (
     twogis_large_catalog_state,
 )
 
+from apps.api.scrape_queue import enqueue_shop_scrape
+
 router = APIRouter(prefix="/shops", tags=["shops"])
 identity_router = APIRouter(prefix="/shop-identities", tags=["shop-identities"])
 
@@ -379,17 +381,6 @@ def _get_twogis_shop(shop_id: int, session: Session) -> Shop:
     if shop.source != "2gis":
         raise HTTPException(status_code=400, detail="large catalog mode is only for 2GIS shops")
     return shop
-
-
-def enqueue_shop_scrape(shop_id: int) -> dict[str, object]:
-    from apps.worker.tasks import scrape_shop
-
-    task = scrape_shop.delay(shop_id)
-    return {
-        "shop_id": shop_id,
-        "status": "queued",
-        "task_id": task.id,
-    }
 
 
 def _http_error(error: ValueError) -> HTTPException:

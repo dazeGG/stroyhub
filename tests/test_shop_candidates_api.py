@@ -184,19 +184,19 @@ def test_shop_source_candidate_api_approves_candidate(
     candidate_id = client.get("/shop-source-candidates").json()["items"][0]["id"]
     observed_shop_ids: list[int] = []
 
-    def fake_run_shop_scrape(session: Session, shop_id: int) -> dict[str, object]:
+    def fake_enqueue_shop_scrape(shop_id: int) -> dict[str, object]:
         observed_shop_ids.append(shop_id)
         return {
             "shop_id": shop_id,
-            "source": "2gis",
-            "source_type": "2gis",
-            "status": "success",
-            "products_seen": 4,
-            "products_saved": 4,
-            "price_snapshots_saved": 4,
+            "status": "queued",
+            "task_id": "task-2gis",
         }
 
-    monkeypatch.setattr("apps.api.shop_candidates.run_shop_scrape", fake_run_shop_scrape)
+    monkeypatch.setattr("apps.api.shop_candidates.enqueue_shop_scrape", fake_enqueue_shop_scrape)
+    monkeypatch.setattr(
+        "stroyhub.catalog.shop_candidates._resolve_candidate_website",
+        lambda source_id: "https://candidate.example.test/",
+    )
     monkeypatch.setattr(
         "stroyhub.catalog.official_sources._discover_unicom_category_uuids",
         lambda: ("category-a", "category-b", "category-c"),
@@ -211,12 +211,8 @@ def test_shop_source_candidate_api_approves_candidate(
     assert observed_shop_ids == [payload["approved_shop_id"]]
     assert payload["scrape_result"] == {
         "shop_id": payload["approved_shop_id"],
-        "source": "2gis",
-        "source_type": "2gis",
-        "status": "success",
-        "products_seen": 4,
-        "products_saved": 4,
-        "price_snapshots_saved": 4,
+        "status": "queued",
+        "task_id": "task-2gis",
     }
     assert client.get("/shop-source-candidates").json() == {"items": [], "groups": []}
     approved = client.get("/shop-source-candidates", params={"include_approved": True}).json()
@@ -253,8 +249,8 @@ def test_shop_source_candidate_api_suggests_identity_and_approves_branch(
         "reason": "name_match",
     }
     monkeypatch.setattr(
-        "apps.api.shop_candidates.run_shop_scrape",
-        lambda session, shop_id: {"shop_id": shop_id, "status": "success"},
+        "apps.api.shop_candidates.enqueue_shop_scrape",
+        lambda shop_id: {"shop_id": shop_id, "status": "queued"},
     )
 
     response = client.post(

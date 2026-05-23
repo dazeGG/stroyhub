@@ -186,9 +186,7 @@ async function approveCandidate(
       ? `как филиал ${candidate.suggested_identity.display_name}`
       : 'в магазины'
     const scrapeResult = approvedCandidate.scrape_result
-    const scrapeMessage = scrapeResult?.status === 'success'
-      ? `Товары загружены, сохранено ${scrapeResult.products_saved ?? 0}.`
-      : `Загрузка товаров завершилась со статусом ${scrapeResult?.status || 'unknown'}.`
+    const scrapeMessage = formatScrapeMessage(scrapeResult)
     saveMessage.value = `${candidate.display_name} добавлен ${approvalTarget}. ${scrapeMessage}`
     await loadCandidates()
   } catch (error) {

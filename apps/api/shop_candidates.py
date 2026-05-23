@@ -15,7 +15,8 @@ from stroyhub.db import get_session
 from stroyhub.models import Shop, ShopIdentity, ShopSourceCandidate
 from stroyhub.parsers.metalltorg import METALLTORG_SHOP_SOURCE_ID, METALLTORG_SOURCE
 from stroyhub.parsers.unicom import UNICOM_DEFAULT_SHOP_SOURCE_ID, UNICOM_SOURCE
-from stroyhub.scraping.runner import run_shop_scrape
+
+from apps.api.scrape_queue import enqueue_shop_scrape
 
 router = APIRouter(prefix="/shop-source-candidates", tags=["shop-source-candidates"])
 
@@ -170,14 +171,7 @@ def approve_shop_source_candidate(
     session.commit()
     scrape_result: dict[str, object] | None = None
     if approved_shop_id is not None:
-        try:
-            scrape_result = run_shop_scrape(session, approved_shop_id)
-        except Exception as exc:
-            scrape_result = {
-                "shop_id": approved_shop_id,
-                "status": "failed",
-                "error": str(exc),
-            }
+        scrape_result = enqueue_shop_scrape(approved_shop_id)
     session.expire_all()
     return _candidate_response(approved_candidate_id, session, scrape_result=scrape_result)
 
@@ -358,17 +352,6 @@ def _official_shop_for_strategy(session: Session, strategy: dict[str, object]) -
             )
         )
     return None
-
-
-def enqueue_shop_scrape(shop_id: int) -> dict[str, object]:
-    from apps.worker.tasks import scrape_shop
-
-    task = scrape_shop.delay(shop_id)
-    return {
-        "shop_id": shop_id,
-        "status": "queued",
-        "task_id": task.id,
-    }
 
 
 def _http_error(error: ValueError) -> HTTPException:
