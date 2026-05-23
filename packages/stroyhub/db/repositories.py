@@ -208,7 +208,7 @@ class ShopRepository:
         limit: int | None = None,
     ) -> list[Shop]:
         statement = select(Shop).where(
-            Shop.scrape_status != "disabled",
+            Shop.scrape_status.not_in(["disabled", "running"]),
             (Shop.next_scrape_at.is_(None) | (Shop.next_scrape_at <= now)),
         )
         if source is not None:

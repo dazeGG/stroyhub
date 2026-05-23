@@ -9,7 +9,11 @@ from stroyhub.models import Shop
 from stroyhub.parsers.metalltorg import METALLTORG_SOURCE
 from stroyhub.parsers.unicom import UNICOM_SOURCE
 from stroyhub.scraping.metalltorg import persist_metalltorg_scrape_failure, scrape_metalltorg_shop
-from stroyhub.scraping.scheduler import mark_shop_scrape_completion, mark_shop_scrape_failure
+from stroyhub.scraping.scheduler import (
+    mark_shop_scrape_completion,
+    mark_shop_scrape_failure,
+    mark_shop_scrape_started,
+)
 from stroyhub.scraping.twogis import (
     TWOGIS_LARGE_CATALOG_PAGE_SIZE,
     TWOGIS_LARGE_CATALOG_THRESHOLD,
@@ -47,6 +51,19 @@ def run_shop_scrape(session: Session, shop_id: int) -> dict[str, Any]:
             "reason": "source_disabled",
         }
 
+    if shop.scrape_status == "running":
+        logger.info(
+            "shop source already running; skipping duplicate scrape",
+            extra={"shop_id": shop.id, "source": shop.source, "source_type": shop.source_type},
+        )
+        return {
+            "shop_id": shop.id,
+            "source": shop.source,
+            "source_type": shop.source_type,
+            "status": "skipped",
+            "reason": "scrape_already_running",
+        }
+
     if shop.source not in SUPPORTED_SCHEDULED_SOURCES:
         error = f"unsupported source: {shop.source}"
         failed_at = datetime.now(UTC)
@@ -60,6 +77,8 @@ def run_shop_scrape(session: Session, shop_id: int) -> dict[str, Any]:
 
     try:
         completed_at = datetime.now(UTC)
+        mark_shop_scrape_started(shop, started_at=completed_at)
+        session.commit()
         if shop.source == "2gis":
             large_state = twogis_large_catalog_state(shop.raw)
             if large_state is None or not large_state.enabled:

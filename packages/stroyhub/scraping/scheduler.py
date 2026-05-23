@@ -102,6 +102,14 @@ def mark_shop_scrape_failure(shop: Shop, *, failed_at: datetime, error: str) -> 
     shop.raw = raw
 
 
+def mark_shop_scrape_started(shop: Shop, *, started_at: datetime) -> None:
+    shop.scrape_status = "running"
+    raw = dict(shop.raw or {})
+    raw["last_scrape_started_at"] = started_at.isoformat()
+    raw.pop("last_scrape_error", None)
+    shop.raw = raw
+
+
 def _positive_interval(value: int | None) -> int:
     if value is None or value < 1:
         return DEFAULT_SCRAPE_INTERVAL_SECONDS

@@ -69,6 +69,15 @@ def test_shop_repository_lists_due_shops_without_disabled_shops(db_session: Sess
             scrape_status="disabled",
         )
     )
+    repository.upsert(
+        ShopUpsert(
+            source=source,
+            source_id="running-shop",
+            name="Running Shop",
+            next_scrape_at=now - timedelta(minutes=1),
+            scrape_status="running",
+        )
+    )
 
     due_shops = list_due_shops(db_session, now=now, source=source)
 

@@ -170,6 +170,82 @@ def test_scrape_shop_skips_disabled_source_without_live_network(
         _delete_worker_test_shops(db_session)
 
 
+def test_scrape_shop_marks_source_running_before_scraping(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="worker-running-unicom",
+            source_type="official_api",
+            name="Running Unicom",
+            raw={"category_uuids": ["category-a"]},
+        )
+    )
+    db_session.commit()
+    observed_statuses: list[str] = []
+
+    def fake_scrape_unicom_shop(*args: object, **kwargs: object) -> SimpleNamespace:
+        db_session.expire(shop)
+        observed_statuses.append(shop.scrape_status)
+        assert isinstance(shop.raw, dict)
+        assert "last_scrape_started_at" in shop.raw
+        return SimpleNamespace(
+            scrape_status="success",
+            products_seen=0,
+            source_products_saved=0,
+            price_snapshots_saved=0,
+            batch_progress=False,
+        )
+
+    monkeypatch.setattr(scrape_runner, "scrape_unicom_shop", fake_scrape_unicom_shop)
+
+    try:
+        result = worker_tasks.scrape_shop.run(shop.id)
+
+        assert observed_statuses == ["running"]
+        assert result["status"] == "success"
+        db_session.expire(shop)
+        assert shop.scrape_status == "success"
+    finally:
+        _delete_worker_test_shops(db_session)
+
+
+def test_scrape_shop_skips_duplicate_running_source_without_live_network(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="worker-already-running-unicom",
+            source_type="official_api",
+            name="Already Running Unicom",
+            scrape_status="running",
+        )
+    )
+    db_session.commit()
+
+    def fail_if_called(*args: object, **kwargs: object) -> None:
+        raise AssertionError("running source should not be scraped twice")
+
+    monkeypatch.setattr(scrape_runner, "scrape_unicom_shop", fail_if_called)
+
+    try:
+        result = worker_tasks.scrape_shop.run(shop.id)
+
+        assert result == {
+            "shop_id": shop.id,
+            "source": "unicom",
+            "source_type": "official_api",
+            "status": "skipped",
+            "reason": "scrape_already_running",
+        }
+    finally:
+        _delete_worker_test_shops(db_session)
+
+
 def test_scrape_source_controls_cli_enqueues_due_source_type(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -469,6 +545,8 @@ def _delete_worker_test_shops(session: Session) -> None:
                         "worker-due-unsupported",
                         "worker-due-source-type-unicom",
                         "worker-disabled-2gis",
+                        "worker-running-unicom",
+                        "worker-already-running-unicom",
                         "worker-cli-due-unicom",
                         "worker-cli-due-metalltorg",
                         "worker-cli-disabled-2gis",

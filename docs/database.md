@@ -487,6 +487,7 @@ Initial values:
 
 - `new`: shop is known but has not been scraped yet.
 - `scheduled`: shop is queued or due for scraping.
+- `running`: scrape task has started and has not finished yet.
 - `success`: latest scrape completed successfully.
 - `failed`: latest scrape failed.
 - `disabled`: shop should not be scraped.
