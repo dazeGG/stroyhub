@@ -160,13 +160,39 @@ class TwogisClient:
         if max_pages < 1:
             raise ValueError("max_pages must be at least 1")
 
+        return self.fetch_branch_items_window(
+            branch_id=branch_id,
+            start_page=1,
+            page_size=page_size,
+            locale=locale,
+            max_pages=max_pages,
+            limit_stop_reason="max_pages_reached",
+        )
+
+    def fetch_branch_items_window(
+        self,
+        *,
+        branch_id: str,
+        start_page: int,
+        page_size: int = 50,
+        locale: str = "ru_RU",
+        max_pages: int = 100,
+        limit_stop_reason: str = "window_limit_reached",
+    ) -> TwogisBranchItems:
+        if start_page < 1:
+            raise ValueError("start_page must be at least 1")
+        if page_size < 1:
+            raise ValueError("page_size must be at least 1")
+        if max_pages < 1:
+            raise ValueError("max_pages must be at least 1")
+
         pages: list[TwogisBranchPage] = []
         items: list[JsonObject] = []
         pinned_items_by_product_id: dict[str, JsonObject] = {}
         total: int | None = None
         stop_reason = "empty_page"
 
-        for page_number in range(1, max_pages + 1):
+        for page_number in range(start_page, start_page + max_pages):
             page = self.fetch_branch_page(
                 branch_id=branch_id,
                 page=page_number,
@@ -181,7 +207,8 @@ class TwogisClient:
             items.extend(page.items)
             _merge_pinned_items(pinned_items_by_product_id, page.pinned_items)
 
-            if total is not None and len(items) >= total:
+            fetched_until = (start_page - 1) * page_size + len(items)
+            if total is not None and fetched_until >= total:
                 stop_reason = "source_total_reached"
                 break
 
@@ -189,7 +216,7 @@ class TwogisClient:
                 stop_reason = "empty_page"
                 break
         else:
-            stop_reason = "max_pages_reached"
+            stop_reason = limit_stop_reason
 
         completeness = _completeness(
             pages=pages,
@@ -267,6 +294,9 @@ def _completeness(
 
     if total is None:
         return "complete" if stop_reason == "empty_page" else "partial"
+
+    if stop_reason == "source_total_reached":
+        return "complete"
 
     if item_count >= total:
         return "complete"

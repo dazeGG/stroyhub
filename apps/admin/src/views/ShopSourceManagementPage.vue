@@ -6,6 +6,8 @@ import { RouterLink } from 'vue-router'
 import {
   createShopIdentity,
   deleteShopIdentity,
+  disableTwogisLargeCatalog,
+  enableTwogisLargeCatalog,
   fetchShopIdentities,
   fetchShops,
   linkShopSource,
@@ -46,6 +48,7 @@ const saveMessage = ref('')
 const savingIdentityId = ref<number | null>(null)
 const deletingIdentityId = ref<number | null>(null)
 const linkingShopId = ref<number | null>(null)
+const largeCatalogActionShopId = ref<number | null>(null)
 const isCreateModalOpen = ref(false)
 const editingIdentity = ref<ShopIdentity | null>(null)
 const deletingIdentity = ref<ShopIdentity | null>(null)
@@ -167,6 +170,17 @@ function formatDateTime(value: string | null): string {
 function placeholder(value: string | null | undefined, fallback: string): string {
   const normalized = value?.trim()
   return normalized || fallback
+}
+
+function largeCatalogProgress(shop: ShopListItem): string {
+  const state = shop.twogis_large_catalog
+  if (!state) {
+    return ''
+  }
+
+  const total = state.total === null ? '?' : state.total.toLocaleString('ru-RU')
+  const loaded = state.items_loaded.toLocaleString('ru-RU')
+  return `${loaded} / ${total} · стр. ${state.next_page}`
 }
 
 function linkedSourceSummary(identity: ShopIdentity): string {
@@ -401,6 +415,42 @@ async function unlinkSource(shop: ShopListItem): Promise<void> {
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось отвязать источник'
   } finally {
     linkingShopId.value = null
+  }
+}
+
+async function enableLargeCatalog(shop: ShopListItem): Promise<void> {
+  largeCatalogActionShopId.value = shop.id
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    await enableTwogisLargeCatalog(shop.id)
+    saveMessage.value = 'Батчевая загрузка 2GIS включена'
+    await loadShopManagement()
+  } catch (error) {
+    errorMessage.value = error instanceof Error
+      ? error.message
+      : 'Не удалось включить батчевую загрузку 2GIS'
+  } finally {
+    largeCatalogActionShopId.value = null
+  }
+}
+
+async function disableLargeCatalog(shop: ShopListItem): Promise<void> {
+  largeCatalogActionShopId.value = shop.id
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    await disableTwogisLargeCatalog(shop.id)
+    saveMessage.value = 'Батчевая загрузка 2GIS остановлена'
+    await loadShopManagement()
+  } catch (error) {
+    errorMessage.value = error instanceof Error
+      ? error.message
+      : 'Не удалось остановить батчевую загрузку 2GIS'
+  } finally {
+    largeCatalogActionShopId.value = null
   }
 }
 
@@ -671,6 +721,27 @@ onMounted(() => {
                   {{ statusLabel(shop.scrape_status) }}
                 </span>
                 <p class="mt-2 text-xs text-neutral-500">ошибок: {{ shop.error_count }}</p>
+                <div v-if="shop.twogis_large_catalog" class="mt-3 max-w-[220px] rounded-md border border-amber-300/20 bg-amber-300/10 p-2 text-xs text-amber-100">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="font-medium">2GIS large</span>
+                    <span class="rounded-full border px-2 py-0.5" :class="statusClass(shop.twogis_large_catalog.enabled ? 'running' : 'disabled')">
+                      {{ shop.twogis_large_catalog.completed ? 'готово' : shop.twogis_large_catalog.enabled ? 'включено' : 'пауза' }}
+                    </span>
+                  </div>
+                  <p class="mt-2 text-amber-100/80">{{ largeCatalogProgress(shop) }}</p>
+                  <p v-if="shop.twogis_large_catalog.last_stop_reason" class="mt-1 truncate text-amber-100/60" :title="shop.twogis_large_catalog.last_stop_reason">
+                    {{ shop.twogis_large_catalog.last_stop_reason }}
+                  </p>
+                  <button
+                    v-if="!shop.twogis_large_catalog.completed"
+                    type="button"
+                    class="mt-2 inline-flex h-8 w-full items-center justify-center rounded-md border border-amber-300/30 px-3 text-xs font-medium text-amber-100 transition hover:border-amber-200 hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="largeCatalogActionShopId === shop.id"
+                    @click="shop.twogis_large_catalog.enabled ? disableLargeCatalog(shop) : enableLargeCatalog(shop)"
+                  >
+                    {{ shop.twogis_large_catalog.enabled ? 'Остановить батчи' : 'Включить батчи' }}
+                  </button>
+                </div>
               </td>
               <td class="px-4 py-4 text-xs text-neutral-400">
                 <p>последний: {{ formatDateTime(shop.last_scraped_at) }}</p>

@@ -19,6 +19,7 @@ interface CategoryDirectoryRow {
 
 const categories = ref<CategoryTreeItem[]>([])
 const searchQuery = ref('')
+const expandedRootIds = ref<Set<number>>(new Set())
 const isLoading = ref(false)
 const errorMessage = ref('')
 
@@ -80,12 +81,12 @@ const filteredCategoryGroups = computed(() => {
     })
 })
 
-function groupProductCount(category: CategoryTreeItem): number {
-  return category.children.reduce((total, child) => total + child.product_count, category.product_count)
-}
-
 function visibleChildCount(category: CategoryTreeItem): number {
   return category.children.length
+}
+
+function emptyChildCount(category: CategoryTreeItem): number {
+  return category.children.filter((child) => child.product_count === 0).length
 }
 
 function childSummary(category: CategoryTreeItem): string {
@@ -95,6 +96,28 @@ function childSummary(category: CategoryTreeItem): string {
   }
 
   return `${count} дочерних категорий`
+}
+
+function isCategoryExpanded(category: CategoryTreeItem): boolean {
+  if (searchQuery.value.trim()) {
+    return true
+  }
+
+  return expandedRootIds.value.has(category.id)
+}
+
+function toggleCategory(category: CategoryTreeItem): void {
+  if (category.children.length === 0) {
+    return
+  }
+
+  const next = new Set(expandedRootIds.value)
+  if (next.has(category.id)) {
+    next.delete(category.id)
+  } else {
+    next.add(category.id)
+  }
+  expandedRootIds.value = next
 }
 
 async function loadCategories(): Promise<void> {
@@ -195,15 +218,6 @@ onMounted(() => {
     </div>
 
     <div class="rounded-lg border border-neutral-800 bg-neutral-900/40">
-      <div
-        class="grid gap-3 border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 md:grid-cols-[minmax(280px,1fr)_160px_160px_160px]"
-      >
-        <span>Раздел и категории</span>
-        <span>Slug</span>
-        <span>Товары</span>
-        <span>Дочерние</span>
-      </div>
-
       <div v-if="isLoading" class="px-4 py-14 text-center text-sm text-neutral-500">
         <Icon :icon="icons.category" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         Загружаем категории...
@@ -221,36 +235,72 @@ onMounted(() => {
         <section
           v-for="category in filteredCategoryGroups"
           :key="category.id"
-          class="bg-neutral-950/20"
+          class="bg-neutral-950/10"
           data-testid="category-directory-row"
         >
-          <div class="grid gap-3 px-4 py-4 text-sm md:grid-cols-[minmax(280px,1fr)_160px_160px_160px]">
-            <div class="min-w-0">
-              <p class="truncate text-base font-semibold text-white" :title="category.name">{{ category.name }}</p>
-              <p class="mt-1 text-xs text-neutral-500">Родительский раздел</p>
+          <button
+            type="button"
+            class="grid w-full gap-3 px-4 py-4 text-left text-sm transition hover:bg-neutral-900/60 md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_160px]"
+            :aria-expanded="isCategoryExpanded(category)"
+            :aria-controls="`category-children-${category.id}`"
+            @click="toggleCategory(category)"
+          >
+            <div class="flex min-w-0 items-start gap-3">
+              <span
+                class="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md border text-neutral-300"
+                :class="category.children.length > 0 ? 'border-neutral-700 bg-neutral-900' : 'border-neutral-800 bg-neutral-950 text-neutral-600'"
+              >
+                <Icon
+                  :icon="icons.chevronRight"
+                  class="size-4 transition"
+                  :class="isCategoryExpanded(category) ? 'rotate-90' : ''"
+                  aria-hidden="true"
+                />
+              </span>
+              <div class="min-w-0">
+                <p class="truncate text-base font-semibold text-white" :title="category.name">{{ category.name }}</p>
+                <p class="mt-1 truncate font-mono text-xs text-neutral-500" :title="category.slug">{{ category.slug }}</p>
+              </div>
             </div>
-            <p class="min-w-0 truncate font-mono text-xs text-neutral-400" :title="category.slug">{{ category.slug }}</p>
-            <p class="text-neutral-200">{{ groupProductCount(category) }}</p>
-            <p class="text-neutral-400">{{ childSummary(category) }}</p>
-          </div>
+            <div class="min-w-0 md:text-right">
+              <p class="text-xs uppercase tracking-wide text-neutral-600">Slug</p>
+              <p class="mt-1 truncate font-mono text-xs text-neutral-300" :title="category.slug">{{ category.slug }}</p>
+            </div>
+            <div class="md:text-right">
+              <p class="text-xs uppercase tracking-wide text-neutral-600">Товары</p>
+              <p class="mt-1 font-semibold text-neutral-100">{{ category.product_count }}</p>
+            </div>
+            <div class="md:text-right">
+              <p class="text-xs uppercase tracking-wide text-neutral-600">Дочерние</p>
+              <p class="mt-1 text-neutral-300">{{ childSummary(category) }}</p>
+              <p v-if="emptyChildCount(category) > 0" class="mt-1 text-xs text-amber-200">
+                пустых: {{ emptyChildCount(category) }}
+              </p>
+            </div>
+          </button>
 
-          <div v-if="category.children.length > 0" class="pb-3">
+          <div
+            v-if="category.children.length > 0 && isCategoryExpanded(category)"
+            :id="`category-children-${category.id}`"
+            class="pb-3"
+          >
             <div
               v-for="child in category.children"
               :key="child.id"
-              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(280px,1fr)_160px_160px_160px]"
+              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_160px]"
               data-testid="category-directory-row"
             >
-              <div class="min-w-0 md:pl-6">
-                <p class="truncate font-medium text-neutral-200" :title="child.name">
-                  <span class="mr-2 text-neutral-600">↳</span>
-                  {{ child.name }}
-                </p>
-                <p class="mt-1 text-xs text-neutral-500">Дочерняя категория</p>
+              <div class="min-w-0 pl-10 md:pl-12">
+                <p class="truncate font-medium text-neutral-200" :title="child.name">{{ child.name }}</p>
+                <p class="mt-1 truncate font-mono text-xs text-neutral-500" :title="child.slug">{{ child.slug }}</p>
               </div>
-              <p class="min-w-0 truncate font-mono text-xs text-neutral-400" :title="child.slug">{{ child.slug }}</p>
-              <p class="text-neutral-200">{{ child.product_count }}</p>
-              <p class="text-neutral-500">0</p>
+              <p class="min-w-0 truncate font-mono text-xs text-neutral-400 md:text-right" :title="child.slug">
+                {{ child.slug }}
+              </p>
+              <p class="font-medium text-neutral-200 md:text-right">{{ child.product_count }}</p>
+              <div class="text-neutral-500 md:text-right">
+                {{ child.children.length }}
+              </div>
             </div>
           </div>
         </section>

@@ -46,7 +46,13 @@ def next_failed_scrape_at(
     return failed_at + timedelta(seconds=interval * multiplier)
 
 
-def mark_shop_scrape_completion(shop: Shop, *, completed_at: datetime, scrape_status: str) -> None:
+def mark_shop_scrape_completion(
+    shop: Shop,
+    *,
+    completed_at: datetime,
+    scrape_status: str,
+    partial_is_progress: bool = False,
+) -> None:
     shop.last_scraped_at = completed_at
     if scrape_status == "success":
         shop.next_scrape_at = next_successful_scrape_at(
@@ -55,6 +61,14 @@ def mark_shop_scrape_completion(shop: Shop, *, completed_at: datetime, scrape_st
         )
         shop.scrape_status = "success"
         shop.error_count = 0
+        return
+
+    if scrape_status == "partial" and partial_is_progress:
+        shop.next_scrape_at = next_successful_scrape_at(
+            completed_at=completed_at,
+            scrape_interval=shop.scrape_interval,
+        )
+        shop.scrape_status = "partial"
         return
 
     shop.error_count += 1

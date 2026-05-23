@@ -194,6 +194,64 @@ def test_twogis_client_marks_partial_when_max_pages_is_reached() -> None:
     assert result.completeness == "partial"
 
 
+def test_twogis_client_fetches_resumable_window_from_start_page() -> None:
+    seen_pages: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        page_number = int(request.url.params["page"])
+        seen_pages.append(page_number)
+        return httpx.Response(
+            200,
+            json={
+                "result": {
+                    "total": 6,
+                    "items": [{"product": {"id": f"product-{page_number}"}}],
+                }
+            },
+        )
+
+    client = TwogisClient(client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+    result = client.fetch_branch_items_window(
+        branch_id="branch-1",
+        start_page=3,
+        page_size=1,
+        max_pages=2,
+        limit_stop_reason="large_catalog_batch_limit",
+    )
+
+    assert seen_pages == [3, 4]
+    assert [item["product"]["id"] for item in result.items] == ["product-3", "product-4"]
+    assert result.stop_reason == "large_catalog_batch_limit"
+    assert result.completeness == "partial"
+
+
+def test_twogis_client_marks_window_complete_when_source_total_is_reached() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        page_number = int(request.url.params["page"])
+        return httpx.Response(
+            200,
+            json={
+                "result": {
+                    "total": 3,
+                    "items": [{"product": {"id": f"product-{page_number}"}}],
+                }
+            },
+        )
+
+    client = TwogisClient(client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+    result = client.fetch_branch_items_window(
+        branch_id="branch-1",
+        start_page=3,
+        page_size=1,
+        max_pages=2,
+    )
+
+    assert result.stop_reason == "source_total_reached"
+    assert result.completeness == "complete"
+
+
 def test_twogis_client_rejects_invalid_pagination_options() -> None:
     client = TwogisClient(
         client=httpx.Client(transport=httpx.MockTransport(lambda _: httpx.Response(200)))
@@ -204,3 +262,6 @@ def test_twogis_client_rejects_invalid_pagination_options() -> None:
 
     with pytest.raises(ValueError, match="max_pages"):
         client.fetch_branch_items(branch_id="branch-1", max_pages=0)
+
+    with pytest.raises(ValueError, match="start_page"):
+        client.fetch_branch_items_window(branch_id="branch-1", start_page=0)

@@ -109,6 +109,7 @@ def test_shops_endpoint_lists_shops_without_raw_payload(
         "scrape_interval": 86400,
         "error_count": 3,
         "is_preferred_source": True,
+        "twogis_large_catalog": None,
     }
     assert "raw" not in item
 

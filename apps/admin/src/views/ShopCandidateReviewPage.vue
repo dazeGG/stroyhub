@@ -6,18 +6,22 @@ import { RouterLink } from 'vue-router'
 import {
   approveShopSourceCandidate,
   fetchShopSourceCandidates,
+  materializeOfficialStrategy,
   refreshShopSourceCandidates,
   type ShopSourceCandidate,
+  type ShopSourceCandidateGroup,
   type ShopSourceCandidateRefreshResponse,
   type ShopSourceCandidateStatus,
 } from '../lib/api'
 import { icons } from '../lib/icons'
 
 const candidates = ref<ShopSourceCandidate[]>([])
+const candidateGroups = ref<ShopSourceCandidateGroup[]>([])
 const selectedStatus = ref<ShopSourceCandidateStatus | ''>('')
 const isLoading = ref(false)
 const isRefreshing = ref(false)
 const approvingCandidateId = ref<number | null>(null)
+const materializingOfficialSource = ref<string | null>(null)
 const errorMessage = ref('')
 const saveMessage = ref('')
 const lastRefresh = ref<ShopSourceCandidateRefreshResponse | null>(null)
@@ -38,6 +42,14 @@ const pricedCount = computed(() => {
 
 const websiteCount = computed(() => {
   return candidates.value.filter((candidate) => candidate.has_website).length
+})
+
+const groupedCandidateIds = computed(() => {
+  return new Set(candidateGroups.value.flatMap((group) => group.candidate_ids))
+})
+
+const ungroupedCandidates = computed(() => {
+  return candidates.value.filter((candidate) => !groupedCandidateIds.value.has(candidate.id))
 })
 
 function statusLabel(status: ShopSourceCandidateStatus): string {
@@ -99,12 +111,14 @@ async function loadCandidates(): Promise<void> {
       request.signal,
     )
     candidates.value = response.items
+    candidateGroups.value = response.groups
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       return
     }
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить кандидатов'
     candidates.value = []
+    candidateGroups.value = []
   } finally {
     if (candidateRequest === request) {
       isLoading.value = false
@@ -124,12 +138,39 @@ async function refreshCandidates(): Promise<void> {
       await loadCandidates()
     } else {
       candidates.value = response.items
+      candidateGroups.value = response.groups
     }
     saveMessage.value = `Обновлено из 2GIS: проверено ${response.checked}, новых ${response.created}`
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось обновить кандидатов'
   } finally {
     isRefreshing.value = false
+  }
+}
+
+async function materializeOfficialGroup(group: ShopSourceCandidateGroup): Promise<void> {
+  const source = group.official_strategy?.source
+  if (!source) {
+    return
+  }
+  materializingOfficialSource.value = source
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    const response = await materializeOfficialStrategy(source, true)
+    const scrapeResult = response.scrape_result
+    const scrapeMessage = scrapeResult?.status === 'success'
+      ? `Товары загружены, сохранено ${scrapeResult.products_saved ?? 0}.`
+      : `Загрузка завершилась со статусом ${scrapeResult?.status || 'unknown'}.`
+    saveMessage.value = `${response.shop.name}: официальный источник ${response.shop.source} создан/обновлен. ${scrapeMessage}`
+    await loadCandidates()
+  } catch (error) {
+    errorMessage.value = error instanceof Error
+      ? error.message
+      : 'Не удалось создать официальный источник'
+  } finally {
+    materializingOfficialSource.value = null
   }
 }
 
@@ -279,7 +320,93 @@ onMounted(() => {
 
     <div v-else class="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
       <article
-        v-for="candidate in candidates"
+        v-for="group in candidateGroups"
+        :key="group.key"
+        class="flex min-h-[260px] flex-col rounded-lg border border-amber-400/20 bg-neutral-900/40 p-4"
+      >
+        <div class="min-h-[92px]">
+          <div class="flex flex-wrap items-center gap-2">
+            <h3 class="text-base font-semibold text-white">{{ group.label }}</h3>
+            <span class="rounded-full border border-neutral-700 bg-neutral-900 px-2 py-0.5 text-xs font-medium text-neutral-300">
+              {{ group.size }} источника
+            </span>
+            <span
+              v-if="group.official_strategy"
+              class="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-xs font-medium text-amber-100"
+            >
+              <Icon :icon="icons.shieldLock" class="size-3.5" aria-hidden="true" />
+              {{ group.official_strategy.label }}
+            </span>
+          </div>
+          <p class="mt-2 text-sm text-neutral-500">
+            Группа похожих 2GIS-кандидатов. Source-записи остаются отдельными до решения оператора.
+          </p>
+        </div>
+
+        <div class="mt-4 grid flex-1 gap-3 border-t border-neutral-800 pt-4">
+          <div
+            v-for="candidate in group.items"
+            :key="candidate.id"
+            class="rounded-md border border-neutral-800 bg-neutral-950/40 p-3"
+          >
+            <div class="flex flex-wrap items-center gap-2">
+              <p class="text-sm font-medium text-white">{{ candidate.display_name }}</p>
+              <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="statusClass(candidate.status)">
+                {{ statusLabel(candidate.status) }}
+              </span>
+            </div>
+            <p class="mt-1 text-xs text-neutral-500">{{ candidate.address || 'Адрес не указан' }}</p>
+            <p class="mt-1 font-mono text-xs text-neutral-600">2GIS · {{ candidate.source_id }}</p>
+            <div class="mt-3 flex flex-wrap justify-end gap-2">
+              <button
+                v-if="candidate.suggested_identity"
+                type="button"
+                class="inline-flex h-8 items-center justify-center rounded-md border border-neutral-700 px-2.5 text-xs font-semibold text-neutral-300 transition hover:border-amber-300 hover:text-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
+                @click="approveCandidate(candidate)"
+              >
+                Создать отдельно
+              </button>
+              <button
+                type="button"
+                class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-emerald-300 px-2.5 text-xs font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
+                @click="approveCandidate(candidate, candidate.suggested_identity?.id)"
+              >
+                <Icon :icon="icons.check" class="size-3.5" aria-hidden="true" />
+                {{
+                  approvingCandidateId === candidate.id
+                    ? 'Добавляем...'
+                    : candidate.suggested_identity
+                      ? 'Филиалом'
+                      : 'Утвердить'
+                }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 flex flex-wrap justify-end gap-2">
+          <button
+            v-if="group.official_strategy"
+            type="button"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-amber-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="materializingOfficialSource === group.official_strategy.source"
+            @click="materializeOfficialGroup(group)"
+          >
+            <Icon :icon="icons.databaseImport" class="size-3.5" aria-hidden="true" />
+            {{
+              materializingOfficialSource === group.official_strategy.source
+                ? 'Загружаем...'
+                : group.items.some((item) => item.official_source_shop_id)
+                  ? 'Загрузить official source'
+                  : 'Создать official source'
+            }}
+          </button>
+        </div>
+      </article>
+      <article
+        v-for="candidate in ungroupedCandidates"
         :key="candidate.id"
         class="flex min-h-[260px] flex-col rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
       >
