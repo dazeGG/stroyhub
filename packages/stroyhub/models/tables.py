@@ -66,6 +66,14 @@ class Shop(TimestampMixin, Base):
             "source_type IN ('2gis', 'official_api', 'official_html')",
             name="ck_shops_source_type_known",
         ),
+        CheckConstraint(
+            "scrape_status IN ("
+            "'new', 'ok', 'scheduled', 'running', 'success', 'partial', 'failed', 'disabled'"
+            ")",
+            name="ck_shops_scrape_status_known",
+        ),
+        CheckConstraint("scrape_interval > 0", name="ck_shops_scrape_interval_positive"),
+        CheckConstraint("error_count >= 0", name="ck_shops_error_count_nonnegative"),
         Index("ix_shops_shop_identity_id", "shop_identity_id"),
         Index("ix_shops_source_type", "source_type"),
         Index("ix_shops_next_scrape_at", "next_scrape_at"),
@@ -106,6 +114,15 @@ class ShopSourceCandidate(TimestampMixin, Base):
             "status IN ('pending', 'stale', 'hidden', 'archived', 'approved')",
             name="ck_shop_source_candidates_status_known",
         ),
+        CheckConstraint(
+            "product_count >= 0",
+            name="ck_shop_source_candidates_product_count_nonnegative",
+        ),
+        CheckConstraint(
+            "priced_product_count >= 0",
+            name="ck_shop_source_candidates_priced_product_count_nonnegative",
+        ),
+        CheckConstraint("priority >= 0", name="ck_shop_source_candidates_priority_nonnegative"),
         Index("ix_shop_source_candidates_status", "status"),
         Index("ix_shop_source_candidates_priority", "priority"),
         Index("ix_shop_source_candidates_last_seen_at", "last_seen_at"),
@@ -172,6 +189,11 @@ class Category(TimestampMixin, Base):
 class SourceProduct(TimestampMixin, Base):
     __tablename__ = "source_products"
     __table_args__: Any = (
+        CheckConstraint(
+            "(NULLIF(BTRIM(COALESCE(source_product_id, '')), '') IS NOT NULL) OR "
+            "(NULLIF(BTRIM(COALESCE(fingerprint, '')), '') IS NOT NULL)",
+            name="ck_source_products_has_stable_identity",
+        ),
         Index(
             "uq_source_products_source_shop_source_product_id",
             "source",
@@ -232,6 +254,10 @@ class SourceProduct(TimestampMixin, Base):
 class CategoryOverride(TimestampMixin, Base):
     __tablename__ = "category_overrides"
     __table_args__: Any = (
+        CheckConstraint(
+            "status IN ('active', 'replaced', 'reverted')",
+            name="ck_category_overrides_status_known",
+        ),
         Index("ix_category_overrides_category_id", "category_id"),
         Index("ix_category_overrides_status", "status"),
         Index("ix_category_overrides_created_at", "created_at"),
@@ -272,6 +298,10 @@ class CategoryOverride(TimestampMixin, Base):
 class CanonicalProduct(TimestampMixin, Base):
     __tablename__ = "canonical_products"
     __table_args__: Any = (
+        CheckConstraint(
+            "match_status IN ('active', 'inactive')",
+            name="ck_canonical_products_match_status_known",
+        ),
         Index("ix_canonical_products_category_id", "category_id"),
         Index("ix_canonical_products_normalized_title", "normalized_title"),
     )
@@ -295,6 +325,21 @@ class CanonicalProduct(TimestampMixin, Base):
 class ProductMatch(Base):
     __tablename__ = "product_matches"
     __table_args__: Any = (
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_product_matches_confidence_range",
+        ),
+        CheckConstraint(
+            "status IN ('candidate', 'accepted', 'rejected', 'superseded')",
+            name="ck_product_matches_status_known",
+        ),
+        CheckConstraint(
+            "method IN ("
+            "'exact_title', 'exact_normalized_title', 'token_similarity', "
+            "'attribute_rules', 'manual', 'embedding'"
+            ")",
+            name="ck_product_matches_method_known",
+        ),
         Index("ix_product_matches_canonical_product_id", "canonical_product_id"),
         Index("ix_product_matches_source_product_id", "source_product_id"),
         Index("ix_product_matches_status_confidence", "status", "confidence"),
@@ -332,6 +377,10 @@ class ProductMatch(Base):
 class PriceSnapshot(Base):
     __tablename__ = "price_snapshots"
     __table_args__: Any = (
+        CheckConstraint(
+            "price IS NULL OR price >= 0",
+            name="ck_price_snapshots_price_nonnegative",
+        ),
         Index("ix_price_snapshots_source_product_id_parsed_at", "source_product_id", "parsed_at"),
         Index("ix_price_snapshots_parsed_at", "parsed_at"),
     )
@@ -353,6 +402,12 @@ class PriceSnapshot(Base):
 class ScrapeRun(Base):
     __tablename__ = "scrape_runs"
     __table_args__: Any = (
+        CheckConstraint(
+            "status IN ('running', 'success', 'partial', 'failed', 'skipped')",
+            name="ck_scrape_runs_status_known",
+        ),
+        CheckConstraint("items_seen >= 0", name="ck_scrape_runs_items_seen_nonnegative"),
+        CheckConstraint("items_saved >= 0", name="ck_scrape_runs_items_saved_nonnegative"),
         Index("ix_scrape_runs_shop_id_started_at", "shop_id", "started_at"),
         Index("ix_scrape_runs_source_started_at", "source", "started_at"),
         Index("ix_scrape_runs_status", "status"),
