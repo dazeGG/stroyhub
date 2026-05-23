@@ -609,7 +609,11 @@ Implementation follow-up:
 
 Secondary JSON source.
 
-Research date: 2026-05-17.
+Research dates:
+
+- 2026-05-17: initial API shape and parser fixture research.
+- 2026-05-23: full-catalog strategy comparison between search pagination and
+  category pagination.
 
 Base URL:
 
@@ -670,8 +674,63 @@ Observed pagination behavior:
 - parent categories such as `Строительство конструкций`,
   `Сухие строительные смеси`, and `Крепежные изделия` returned no products
   directly, so the scraper should walk leaf categories where `last = "1"`;
-- `limit=100` was accepted for small sample categories, but the production
-  client should keep the limit configurable until larger categories are tested.
+- `limit=100` was validated across the live leaf-category scan on 2026-05-23
+  and is the recommended production value;
+- `limit` values above `100` are not recommended. A focused check with
+  `200`, `500`, and `1000` returned inconsistent pagination for at least one
+  category.
+
+Full-catalog strategy:
+
+- Use the catalog menu endpoint to discover leaf categories.
+- Request products only for leaf category UUIDs.
+- Use `shop=uc`, `sort=popular`, `limit=100`, and page until the category
+  reports `pages` reached.
+- Store the product-level `category` field as `category_raw`. It was present in
+  sampled category and search responses.
+- Preserve the leaf category UUID in raw metadata, and preserve the discovered
+  category path when available for debugging and future source-category alias
+  maintenance.
+- Treat `productsCount` and `pages` as the completeness contract for each
+  category. A category that reaches `max_pages` before `pages` should be marked
+  partial.
+
+Live full-catalog scan on 2026-05-23 with `limit=100`:
+
+- leaf categories: `518`;
+- category product-page requests: `585`;
+- catalog menu requests: `1`;
+- total expected requests for a complete refresh: `586`;
+- sum of category `productsCount`: `18139`;
+- category page distribution:
+  - `484` categories fit in `1` page;
+  - `25` categories need `2` pages;
+  - `5` categories need `3` pages;
+  - `2` categories need `7` pages;
+  - `1` category needs `8` pages;
+  - `1` category needs `14` pages.
+
+The public search endpoint can enumerate products without category UUIDs:
+
+```text
+GET https://unicom-ykt.ru/api/search.php?s&q=&page={page}
+```
+
+Observed search behavior on 2026-05-23:
+
+- returns `12` products per page;
+- page-size parameters such as `limit`, `per_page`, `pageSize`, `size`,
+  `take`, and `rows` were ignored;
+- `page=1510` returned `11` products and `page=1511` returned none, for about
+  `18119` products;
+- product rows include `category`, so it can provide `category_raw`;
+- the response lacks category-level `productsCount`, `pages`, `stocks`,
+  `filters`, and several richer product fields observed in the category
+  endpoint.
+
+Use the search endpoint only as a diagnostic/completeness cross-check. It is
+more expensive for full refreshes, requires about `1511` requests, and has a
+weaker pagination contract than category collection.
 
 Representative category UUIDs:
 
@@ -696,11 +755,19 @@ Notes:
   pacing should still be conservative.
 - Scheduled M13 collection uses the official API as `source=unicom` with
   `source_type=official_api`, seeded by `scripts/seed_unicom_source.py`.
-- The seeded collection config stores explicit leaf category UUIDs in
-  `shops.raw.category_uuids`; it does not yet auto-walk the full catalog menu.
+- The preferred seeded collection config should discover and store all leaf
+  category UUIDs from the catalog menu in `shops.raw.category_uuids`.
 - Worker collection processes configured categories sequentially, with no
-  concurrent requests. Default request options are `limit=50`, `sort=popular`,
-  and `max_pages=100`.
+  concurrent requests. Recommended request options are `limit=100`,
+  `sort=popular`, and `max_pages=100`.
+- Category batching is not required for the weekly full-catalog refresh. A
+  complete pass is expected to require about `586` sequential requests, which is
+  simpler operationally than spreading one refresh across many partial batch
+  runs. Keep batching available only as a fallback for local smoke checks,
+  temporary rate-limit mitigation, or deliberately smaller research runs.
+- For weekly production-style collection, set `categories_per_run` greater than
+  or equal to the discovered leaf-category count so one worker run completes the
+  catalog in a single pass.
 - A category that reaches `max_pages` records a `partial` scrape run; a source
   exception records a failed Unicom scrape run and marks the shop failed.
 - `shop=uc` did not change the sampled cement response, but the `stocks` block
@@ -722,7 +789,11 @@ Notes:
 
 Secondary HTML source.
 
-Research date: 2026-05-17.
+Research dates:
+
+- 2026-05-17: initial HTML parser and fixture research.
+- 2026-05-23: construction-material listing pagination and detail-category
+  enrichment research.
 
 Base URL:
 
@@ -735,7 +806,7 @@ Sample pages:
 | Page | URL | Observed notes |
 | --- | --- | --- |
 | Catalog root | `https://metalltorg.biz/catalog/` | Category navigation page. |
-| Construction materials category | `https://metalltorg.biz/catalog/stroitelnye_materialy_1/` | Product listing page, 20 product cards on page 1, `data-all_count="1185"`, pagination to `?PAGEN_1=60`. |
+| Construction materials category | `https://metalltorg.biz/catalog/stroitelnye_materialy_1/` | Product listing page, 20 product cards on page 1, `data-all_count="1163"` on 2026-05-23, pagination to about `?PAGEN_1=59`. |
 | Gypsum board category | `https://metalltorg.biz/catalog/stroitelnye_materialy_1/gipsokarton_i_komplektuyushchie/` | Product listing page with 20 product cards and pagination. |
 | Brick category | `https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/` | Product listing page with 1 product card and no multi-page pagination. |
 | Brick product | `https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/120420/` | Product detail page for article `24407`. |
@@ -745,16 +816,59 @@ Scheduled M13 collection:
 - Source identity: `source=metalltorg`, `source_type=official_html`,
   `source_id=metalltorg-yakutsk`.
 - Seed command: `uv run python scripts/seed_metalltorg_source.py`.
-- Default category URL config is intentionally small:
-  `https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/`.
+- Preferred MVP category URL config is the parent construction-materials
+  section only:
+  `https://metalltorg.biz/catalog/stroitelnye_materialy_1/`.
+- Do not scrape other Metalltorg sections yet. Sections such as paint,
+  fasteners, tools, heating/plumbing, electrical goods, interiors, and doors
+  should be researched and added deliberately later.
 - Default pacing is sequential pages/categories, no concurrent requests,
-  `timeout=20.0`, and `max_pages=3`.
+  `timeout=20.0`.
 - A scrape reaching `max_pages` or page-level fetch failures records a
   `partial` scrape run; an orchestration exception records a failed scrape run
   and marks the shop failed.
 - Treat selectors as brittle HTML contracts. Parser fixtures under
   `tests/fixtures/metalltorg/` are the characterization baseline and should be
   updated deliberately when source markup changes.
+
+Current parsing strategy:
+
+1. Scrape only the `Строительные материалы` listing:
+   `https://metalltorg.biz/catalog/stroitelnye_materialy_1/`.
+2. Treat the parent listing as the product feed for that section. Do not also
+   scrape child categories under `stroitelnye_materialy_1` in the same run,
+   because the parent listing already aggregates products from child sections
+   and duplicate source products would be revisited.
+3. Use the listing page's `.bottom_nav[data-all_count]` as the total-count hint.
+   With 20 product cards per page, generate/follow `?PAGEN_1=N` until the
+   expected page count is reached. On 2026-05-23, `1163` products implied about
+   `59` listing pages.
+4. Keep page-size fixed at `20`. Live checks showed common parameters such as
+   `PAGE_ELEMENT_COUNT=50`, `SIZEN_1=50`, `SHOWALL_1=1`, `limit=50`,
+   `page_size=50`, `per_page=50`, and `nPageSize=50` did not change the page
+   size.
+5. Parse listing cards for the cheap product observation: source product id,
+   title, price, currency, unit, image, stock text, article, and product URL.
+6. Use product detail pages as an enrichment source only for products that are
+   new or missing high-quality `category_raw`. The detail page exposes
+   `meta[itemprop="category"]`, for example
+   `Строительные материалы/Изделия из дерева/Погонаж`, and matching breadcrumb
+   positions. Fetching detail pages for every product in every run would add
+   about one request per product, so avoid doing that during ordinary price
+   refreshes.
+7. Store the detail `meta[itemprop="category"]` value as `category_raw` when
+   available. Until detail enrichment is implemented for a product, preserve
+   the listing/product URL path in raw payloads so the category can be
+   backfilled later.
+
+Expected request profile for the current MVP scope:
+
+- ordinary weekly price refresh for `Строительные материалы`: about `59`
+  listing-page requests;
+- first-time category enrichment for all current construction-material
+  products: about `59` listing requests plus `1163` product-detail requests;
+- later enrichment should be incremental: fetch details only for new products
+  or products with missing/weak category metadata.
 
 Observed listing selectors:
 
@@ -780,7 +894,7 @@ Observed product detail selectors:
 | Canonical URL | `link[rel="canonical"]` |
 | Title | `h1`, with `<title>` as fallback |
 | Description | `meta[name="description"]` |
-| Breadcrumb/category path | `.breadcrumbs a` |
+| Category path | `meta[itemprop="category"]`, with focused `#navigation .breadcrumbs` positions as fallback |
 | Article/vendor code | `.product-info-headnote__article .article__value` |
 | Price/currency/unit | same `.price[data-currency][data-value]` and `.price_measure` pattern as listing pages |
 | Availability | `link[itemprop="availability"]` or `.item-stock .value` |

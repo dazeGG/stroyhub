@@ -120,6 +120,7 @@ def test_seed_metalltorg_source_preserves_existing_scrape_metadata(
             "category_urls": ["https://example.test/catalog/kirpich/"],
             "max_pages": 2,
             "timeout": 3.5,
+            "detail_enrichment": True,
             "pacing": "sequential pages and categories; no concurrent requests",
             "selector_health": "brittle_html",
             "last_scrape_error": "timeout",

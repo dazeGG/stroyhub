@@ -5,7 +5,9 @@ from stroyhub.parsers.metalltorg.parser import (
     METALLTORG_SHOP_SOURCE_ID,
     METALLTORG_SOURCE,
     MetalltorgListingPage,
+    MetalltorgProductDetail,
     parse_listing_page,
+    parse_product_detail_page,
 )
 
 __all__ = [
@@ -13,5 +15,7 @@ __all__ = [
     "METALLTORG_SHOP_SOURCE_ID",
     "METALLTORG_SOURCE",
     "MetalltorgListingPage",
+    "MetalltorgProductDetail",
     "parse_listing_page",
+    "parse_product_detail_page",
 ]

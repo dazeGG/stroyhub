@@ -21,10 +21,12 @@ from stroyhub.scraping.metalltorg import (
     METALLTORG_DEFAULT_TIMEOUT,
 )
 
+METALLTORG_DEFAULT_SCRAPE_INTERVAL = 7 * 24 * 60 * 60
+
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Seed the official Metalltorg HTML source.")
-    parser.add_argument("--scrape-interval", type=int, default=86400)
+    parser.add_argument("--scrape-interval", type=int, default=METALLTORG_DEFAULT_SCRAPE_INTERVAL)
     parser.add_argument("--category-url", action="append", dest="category_urls")
     parser.add_argument("--max-pages", type=int, default=METALLTORG_DEFAULT_MAX_PAGES)
     parser.add_argument("--timeout", type=float, default=METALLTORG_DEFAULT_TIMEOUT)
@@ -64,6 +66,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "category_urls": list(category_urls),
                 "max_pages": args.max_pages,
                 "timeout": args.timeout,
+                "detail_enrichment": True,
                 "pacing": "sequential pages and categories; no concurrent requests",
                 "selector_health": "brittle_html",
             }

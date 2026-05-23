@@ -78,6 +78,24 @@ The Unicom seed writes one `shops` row with `source=unicom` and
 `source_type=official_api`. Its `raw` config stores the category UUID list,
 `limit`, `max_pages`, and sort order used by scheduled collection.
 
+For the full official Unicom catalog, prefer discovering all leaf categories
+and running them in one weekly sequential pass:
+
+```bash
+uv run python scripts/seed_unicom_source.py \
+  --discover-categories \
+  --limit 100 \
+  --categories-per-run 1000 \
+  --scrape-interval 604800
+```
+
+As of the 2026-05-23 live scan, Unicom had `518` leaf categories and the full
+category pass required about `586` requests including the catalog menu. That is
+large but acceptable for a weekly official-source refresh, and simpler than
+splitting the catalog across many partial batch runs. Keep smaller
+`categories-per-run` values for local smoke checks or temporary rate-limit
+mitigation.
+
 To configure only the official Metalltorg HTML source:
 
 ```bash
@@ -85,10 +103,19 @@ uv run python scripts/seed_metalltorg_source.py
 ```
 
 The Metalltorg seed writes one `shops` row with `source=metalltorg` and
-`source_type=official_html`. Its default config is intentionally conservative:
-one known construction-material category URL, sequential requests only, and
-`max_pages=3`. Add more category URLs only after selector health is checked
-against fixtures.
+`source_type=official_html`. The accepted MVP scope is only the parent
+`Строительные материалы` section:
+
+```text
+https://metalltorg.biz/catalog/stroitelnye_materialy_1/
+```
+
+That parent listing aggregates products from its child construction-material
+sections, so do not seed both the parent and child URLs in the same run.
+Additional Metalltorg sections should be researched separately before they are
+added. Collection should stay sequential; product-detail pages are reserved for
+incremental category enrichment when products are new or missing high-quality
+`category_raw`.
 
 ## 4. Run an Explicit Live Smoke Check
 
@@ -157,7 +184,7 @@ Beat dispatches due shops every day at `00:00 Asia/Yakutsk`.
 The due-shop dispatcher currently supports:
 
 - `2gis` branch scrapes;
-- `unicom` official API scrapes from the seeded category UUID config.
+- `unicom` official API scrapes from the seeded category UUID config;
 - `metalltorg` official HTML scrapes from the seeded category URL config.
 
 For a one-off worker dispatch from Python/Celery internals, use the existing

@@ -24,10 +24,12 @@ from stroyhub.scraping.unicom import (
     build_unicom_category_batch_raw,
 )
 
+UNICOM_DEFAULT_SCRAPE_INTERVAL = 7 * 24 * 60 * 60
+
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Seed the official Unicom catalog source.")
-    parser.add_argument("--scrape-interval", type=int, default=86400)
+    parser.add_argument("--scrape-interval", type=int, default=UNICOM_DEFAULT_SCRAPE_INTERVAL)
     parser.add_argument("--category-uuid", action="append", dest="category_uuids")
     parser.add_argument(
         "--discover-categories",

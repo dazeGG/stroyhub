@@ -202,12 +202,20 @@ def test_scrape_source_controls_cli_enqueues_due_source_type(
         "delay",
         scheduled_shop_ids.append,
     )
+    observed_filters: dict[str, object] = {}
+
+    def fake_list_due_shops(*args: object, **kwargs: object) -> list[Shop]:
+        observed_filters.update(kwargs)
+        return [unicom_shop]
+
+    monkeypatch.setattr(scrape_shop_sources, "list_due_shops", fake_list_due_shops)
 
     try:
         exit_code = scrape_shop_sources.main(["due", "--source-type", "official_api"])
 
         output = capsys.readouterr().out
         assert exit_code == 0
+        assert observed_filters["source_type"] == "official_api"
         assert scheduled_shop_ids == [unicom_shop.id]
         assert "source_type=official_api" in output
         assert "shops_scheduled=1" in output

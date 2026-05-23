@@ -28,10 +28,10 @@ from stroyhub.parsers.unicom import (
 
 UNICOM_DEFAULT_SHOP_NAME = "Юником"
 UNICOM_DEFAULT_SHOP_URL = "https://unicom-ykt.ru/"
-UNICOM_DEFAULT_LIMIT = 50
+UNICOM_DEFAULT_LIMIT = 100
 UNICOM_DEFAULT_MAX_PAGES = 100
 UNICOM_DEFAULT_SORT = "popular"
-UNICOM_DEFAULT_CATEGORIES_PER_RUN = 50
+UNICOM_DEFAULT_CATEGORIES_PER_RUN = 1000
 UNICOM_CATEGORY_BATCH_RAW_KEY = "unicom_category_batch"
 UNICOM_DEFAULT_CATEGORY_UUIDS = (
     "fac247f1ae6111eca255000c29d1f857",
@@ -106,7 +106,7 @@ def scrape_unicom_category(
     category_uuid: str,
     client: UnicomClient | None = None,
     shop_source_id: str = UNICOM_DEFAULT_SHOP_SOURCE_ID,
-    limit: int = 50,
+    limit: int = UNICOM_DEFAULT_LIMIT,
     sort: str = "popular",
     max_pages: int = 100,
     parsed_at: datetime | None = None,
