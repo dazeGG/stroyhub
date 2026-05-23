@@ -216,6 +216,120 @@ def test_normalization_queue_endpoint_returns_all_review_states(
     ]
 
 
+@pytest.mark.parametrize(
+    ("state", "source_product_id"),
+    [
+        ("ineligible", "normalization-state-ineligible"),
+        ("needs_review", "normalization-state-needs-review"),
+        ("eligible_unmatched", "normalization-state-unmatched"),
+        ("candidate_match", "normalization-state-candidate"),
+        ("accepted", "normalization-state-accepted"),
+    ],
+)
+def test_normalization_queue_endpoint_filters_each_state_before_pagination(
+    client: TestClient,
+    db_session: Session,
+    state: str,
+    source_product_id: str,
+) -> None:
+    category = Category(slug="normalization-states", name="Normalization States")
+    db_session.add(category)
+    db_session.flush()
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="normalization-states-shop", name="States Shop")
+    )
+    products = SourceProductRepository(db_session)
+    base_time = datetime(2026, 5, 23, 10, 0, tzinfo=UTC)
+    created_products = {
+        "ineligible": products.upsert(
+            _product(
+                shop_id=shop.id,
+                source_product_id="normalization-state-ineligible",
+                title="Гвозди",
+                category_id=category.id,
+                observed_at=base_time,
+                raw={"catalog_eligibility": {"status": "ineligible"}},
+                is_not_product=True,
+            )
+        ),
+        "needs_review": products.upsert(
+            _product(
+                shop_id=shop.id,
+                source_product_id="normalization-state-needs-review",
+                title="Смесь",
+                category_id=category.id,
+                observed_at=base_time + timedelta(minutes=1),
+                raw={"catalog_eligibility": {"status": "needs_review"}},
+            )
+        ),
+        "eligible_unmatched": products.upsert(
+            _product(
+                shop_id=shop.id,
+                source_product_id="normalization-state-unmatched",
+                title="Цемент М500",
+                category_id=category.id,
+                observed_at=base_time + timedelta(minutes=2),
+            )
+        ),
+        "candidate_match": products.upsert(
+            _product(
+                shop_id=shop.id,
+                source_product_id="normalization-state-candidate",
+                title="Цемент М400",
+                category_id=category.id,
+                observed_at=base_time + timedelta(minutes=3),
+            )
+        ),
+        "accepted": products.upsert(
+            _product(
+                shop_id=shop.id,
+                source_product_id="normalization-state-accepted",
+                title="Клей плиточный",
+                category_id=category.id,
+                observed_at=base_time + timedelta(minutes=4),
+            )
+        ),
+    }
+
+    canonical_repository = CanonicalProductRepository(db_session)
+    candidate_canonical = canonical_repository.create(
+        CanonicalProductCreate(title="Цемент М400", normalized_title="цемент м400")
+    )
+    accepted_canonical = canonical_repository.create(
+        CanonicalProductCreate(title="Клей плиточный", normalized_title="клей плиточный")
+    )
+    matches = ProductMatchRepository(db_session)
+    matches.create(
+        ProductMatchCreate(
+            canonical_product_id=candidate_canonical.id,
+            source_product_id=created_products["candidate_match"].id,
+            confidence=Decimal("0.850"),
+            method="token_similarity",
+            status="candidate",
+        )
+    )
+    matches.create(
+        ProductMatchCreate(
+            canonical_product_id=accepted_canonical.id,
+            source_product_id=created_products["accepted"].id,
+            confidence=Decimal("1.000"),
+            method="manual",
+            status="accepted",
+        )
+    )
+
+    response = client.get(
+        "/product-normalization/queue",
+        params={"state": state, "limit": 1, "offset": 0},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["source_product_id"] == source_product_id
+
+
 def test_normalization_queue_endpoint_filters_state_search_and_paginates(
     client: TestClient,
     db_session: Session,
@@ -227,22 +341,31 @@ def test_normalization_queue_endpoint_filters_state_search_and_paginates(
         ShopUpsert(source="2gis", source_id="normalization-filter-shop", name="Filter Shop")
     )
     products = SourceProductRepository(db_session)
-    first = products.upsert(
+    matching_older = products.upsert(
         _product(
             shop_id=shop.id,
             source_product_id="normalization-filter-first",
-            title="QueueUnique Cement M500 50kg",
+            title="QueueUnique Cement M500 50kg Old",
             category_id=category.id,
             observed_at=datetime(2026, 5, 23, 9, 0, tzinfo=UTC),
+        )
+    )
+    matching_newer = products.upsert(
+        _product(
+            shop_id=shop.id,
+            source_product_id="normalization-filter-second",
+            title="QueueUnique Cement M500 50kg New",
+            category_id=category.id,
+            observed_at=datetime(2026, 5, 23, 9, 1, tzinfo=UTC),
         )
     )
     products.upsert(
         _product(
             shop_id=shop.id,
-            source_product_id="normalization-filter-second",
+            source_product_id="normalization-filter-third",
             title="Клей плиточный 25кг",
             category_id=category.id,
-            observed_at=datetime(2026, 5, 23, 9, 1, tzinfo=UTC),
+            observed_at=datetime(2026, 5, 23, 9, 2, tzinfo=UTC),
         )
     )
     products.upsert(
@@ -253,7 +376,7 @@ def test_normalization_queue_endpoint_filters_state_search_and_paginates(
             category_id=category.id,
             raw={"catalog_eligibility": {"status": "ineligible"}},
             is_not_product=True,
-            observed_at=datetime(2026, 5, 23, 9, 2, tzinfo=UTC),
+            observed_at=datetime(2026, 5, 23, 9, 3, tzinfo=UTC),
         )
     )
 
@@ -263,16 +386,17 @@ def test_normalization_queue_endpoint_filters_state_search_and_paginates(
             "state": "eligible_unmatched",
             "q": "QueueUnique",
             "limit": 1,
-            "offset": 0,
+            "offset": 1,
         },
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["total"] == 1
+    assert payload["total"] == 2
     assert payload["limit"] == 1
-    assert payload["offset"] == 0
-    assert [item["id"] for item in payload["items"]] == [first.id]
+    assert payload["offset"] == 1
+    assert [item["id"] for item in payload["items"]] == [matching_older.id]
+    assert matching_newer.id != matching_older.id
 
 
 def _product(
