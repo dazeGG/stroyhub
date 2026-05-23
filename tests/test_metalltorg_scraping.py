@@ -126,6 +126,14 @@ def test_scrape_metalltorg_shop_preserves_seeded_config(db_session: Session) -> 
     assert result.products_seen == 1
     assert result.scrape_status == "success"
     assert result.details_fetched == 1
+    persisted_product = db_session.scalar(
+        select(SourceProduct).where(SourceProduct.shop_id == shop.id)
+    )
+    assert persisted_product is not None
+    assert persisted_product.category_raw == "Строительные материалы/Кирпич"
+    assert persisted_product.description is not None
+    assert "Кирпич огнеупорный полнотелый ШБ-5" in persisted_product.description
+    assert persisted_product.fingerprint is not None
     assert shop.raw["category_urls"] == [
         "https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/"
     ]

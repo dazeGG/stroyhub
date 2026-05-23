@@ -20,7 +20,7 @@ from stroyhub.db.repositories import (
     SourceProductUpsert,
 )
 from stroyhub.models import Shop, SourceProduct
-from stroyhub.parsers.common import JsonObject, ParsedProduct
+from stroyhub.parsers.common import JsonObject, ParsedProduct, build_fingerprint
 from stroyhub.parsers.metalltorg import (
     METALLTORG_BASE_URL,
     METALLTORG_SHOP_SOURCE_ID,
@@ -238,6 +238,7 @@ def enrich_metalltorg_category_details(
 
         detail = parse_product_detail_page(detail_html, page_url=product_url)
         details_fetched += 1
+        category_raw = detail.category_raw or product.category_raw
         detail_raw = {
             **product.raw,
             "detail": detail.raw,
@@ -246,8 +247,13 @@ def enrich_metalltorg_category_details(
         enriched_products.append(
             replace(
                 product,
-                category_raw=detail.category_raw or product.category_raw,
+                category_raw=category_raw,
                 description=detail.description or product.description,
+                fingerprint=build_fingerprint(
+                    product.normalized_title,
+                    product.unit_raw,
+                    category_raw,
+                ),
                 raw=detail_raw,
             )
         )
