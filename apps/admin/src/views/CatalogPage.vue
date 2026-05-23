@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
@@ -241,10 +241,11 @@ async function loadFilters(): Promise<void> {
   }
 }
 
-async function loadProducts(): Promise<void> {
+async function loadProducts(options: { preserveScroll?: boolean } = {}): Promise<void> {
   productRequest?.abort()
   const request = new AbortController()
   productRequest = request
+  const scrollY = options.preserveScroll ? window.scrollY : null
   isLoadingProducts.value = true
   errorMessage.value = ''
 
@@ -273,6 +274,12 @@ async function loadProducts(): Promise<void> {
   } finally {
     if (productRequest === request) {
       isLoadingProducts.value = false
+      if (scrollY !== null) {
+        await nextTick()
+        window.requestAnimationFrame(() => {
+          window.scrollTo({ top: scrollY })
+        })
+      }
     }
   }
 }
@@ -324,7 +331,7 @@ watch(offset, () => {
     })
   }
 
-  void loadProducts()
+  void loadProducts({ preserveScroll: true })
 })
 
 watch(searchQuery, () => {
@@ -439,7 +446,7 @@ onMounted(() => {
         <span>Последний раз</span>
       </div>
 
-      <div v-if="isLoadingProducts" class="min-w-[920px] px-4 py-14 text-center text-sm text-neutral-500">
+      <div v-if="isLoadingProducts && products.length === 0" class="min-w-[920px] px-4 py-14 text-center text-sm text-neutral-500">
         <Icon :icon="icons.package" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         Загружаем каталог...
       </div>
@@ -460,7 +467,11 @@ onMounted(() => {
         По этим фильтрам товаров не найдено.
       </div>
 
-      <div v-else class="min-w-[920px] divide-y divide-neutral-800">
+      <div
+        v-else
+        class="min-w-[920px] divide-y divide-neutral-800 transition-opacity"
+        :class="isLoadingProducts ? 'opacity-60' : 'opacity-100'"
+      >
         <div
           v-for="product in products"
           :key="product.id"
