@@ -18,7 +18,9 @@ docker-compose up -d
 ```
 
 This starts PostgreSQL, Redis, the FastAPI API, the admin Vite dev server, and
-the Celery worker with beat. To start only PostgreSQL and Redis:
+the Celery worker with beat. API and admin reload automatically in development;
+the worker restarts when Python files under `apps/` or `packages/` change. To
+start only PostgreSQL and Redis:
 
 ```bash
 docker compose up -d postgres redis

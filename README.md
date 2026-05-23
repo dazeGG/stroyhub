@@ -48,7 +48,9 @@ docker-compose up -d
 ```
 
 This starts PostgreSQL, Redis, the FastAPI app, the Celery worker with beat, and
-the admin Vite dev server.
+the admin Vite dev server. In this mode, the API reloads through Uvicorn,
+the admin UI reloads through Vite, and the Celery worker restarts when Python
+files under `apps/` or `packages/` change.
 
 Useful local URLs:
 

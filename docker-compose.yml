@@ -49,8 +49,12 @@ services:
       - -c
       - >
         uv sync --all-extras &&
-        uv run celery -A apps.worker.celery_app:celery_app worker --beat
-        --loglevel=INFO --schedule=/tmp/celerybeat-schedule
+        uv run watchfiles --filter python
+        --ignore-paths .venv,.uv-cache,.pnpm-store,apps/admin/node_modules,apps/admin/dist
+        --sigint-timeout 10 --sigkill-timeout 5
+        'uv run celery -A apps.worker.celery_app:celery_app worker --beat
+        --loglevel=INFO --schedule=/tmp/celerybeat-schedule'
+        apps packages
     volumes:
       - .:/app
       - stroyhub_uv_cache:/root/.cache/uv

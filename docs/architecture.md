@@ -62,7 +62,9 @@ Development is managed with `uv`:
 
 The full local development stack can be run with `docker compose up -d`. This
 starts PostgreSQL, Redis, the API, the admin Vite dev server, and the Celery
-worker with beat.
+worker with beat. Compose runs the API with Uvicorn reload, the admin UI with
+Vite hot reload, and the worker through `watchfiles` so Python changes under
+`apps/` or `packages/` restart Celery.
 
 The API can also be run manually with
 `uv run uvicorn apps.api.main:app --reload`.
