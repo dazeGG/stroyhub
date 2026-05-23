@@ -163,6 +163,59 @@ export interface CanonicalProductListResponse {
   total: number
 }
 
+export interface CanonicalSourceLatestPrice {
+  price: string | null
+  currency: string
+  unit_raw: string | null
+  source_updated_at: string | null
+  parsed_at: string
+}
+
+export interface CanonicalLinkedSourceProduct {
+  id: number
+  match_id: number
+  source: string
+  source_product_id: string | null
+  title: string
+  normalized_title: string
+  shop_id: number
+  shop_name: string
+  shop_source_id: string
+  category_raw: string | null
+  unit_raw: string | null
+  source_url: string | null
+  image_url: string | null
+  last_seen_at: string
+  latest_price: CanonicalSourceLatestPrice | null
+  confidence: string
+}
+
+export interface CanonicalOfferGroup {
+  source: string
+  shop_id: number
+  shop_source_id: string
+  shop_name: string
+  items: CanonicalLinkedSourceProduct[]
+}
+
+export interface CanonicalProductDetail extends CanonicalProductListItem {
+  accepted_source_products: CanonicalLinkedSourceProduct[]
+  accepted_offer_groups: CanonicalOfferGroup[]
+  candidate_source_products: CanonicalLinkedSourceProduct[]
+  rejected_source_products: CanonicalLinkedSourceProduct[]
+}
+
+export interface CanonicalProductUpdatePayload {
+  title?: string
+  normalized_title?: string
+  category_id?: number | null
+  brand?: string | null
+  model?: string | null
+  unit_raw?: string | null
+  attributes?: Record<string, unknown> | null
+  match_status?: string
+}
+
 export interface ProductMatchDecision {
   id: number
   canonical_product_id: number
@@ -633,6 +686,28 @@ export function fetchCanonicalProducts(
 
   return fetchJson<CanonicalProductListResponse>(
     query ? `/canonical-products?${query}` : '/canonical-products',
+    signal,
+  )
+}
+
+export function fetchCanonicalProduct(
+  canonicalProductId: number,
+  signal?: AbortSignal,
+): Promise<CanonicalProductDetail> {
+  return fetchJson<CanonicalProductDetail>(`/canonical-products/${canonicalProductId}`, signal)
+}
+
+export function updateCanonicalProduct(
+  canonicalProductId: number,
+  payload: CanonicalProductUpdatePayload,
+  signal?: AbortSignal,
+): Promise<CanonicalProductDetail> {
+  return writeJson<CanonicalProductDetail>(
+    `/canonical-products/${canonicalProductId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
     signal,
   )
 }

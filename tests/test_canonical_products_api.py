@@ -241,6 +241,25 @@ def test_canonical_product_detail_and_update_show_linked_source_products(
             status="candidate",
         )
     )
+    rejected_source = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="canonical-detail-rejected",
+            title="Detail Cement Rejected",
+            normalized_title="detail cement rejected",
+            category_id=category.id,
+        )
+    )
+    rejected_match = matches.create(
+        ProductMatchCreate(
+            canonical_product_id=canonical.id,
+            source_product_id=rejected_source.id,
+            confidence=Decimal("0.750"),
+            method="token_similarity",
+            status="rejected",
+        )
+    )
 
     update_response = client.patch(
         f"/canonical-products/{canonical.id}",
@@ -252,7 +271,7 @@ def test_canonical_product_detail_and_update_show_linked_source_products(
     assert payload["title"] == "Detail Cement Updated"
     assert payload["normalized_title"] == "detail cement updated"
     assert payload["match_status"] == "inactive"
-    assert payload["match_counts"] == {"accepted": 2, "candidate": 1, "rejected": 0}
+    assert payload["match_counts"] == {"accepted": 2, "candidate": 1, "rejected": 1}
     assert payload["accepted_source_products"] == [
         {
             "id": accepted_source.id,
@@ -286,3 +305,5 @@ def test_canonical_product_detail_and_update_show_linked_source_products(
     ]
     assert payload["candidate_source_products"][0]["id"] == candidate_source.id
     assert payload["candidate_source_products"][0]["match_id"] == candidate_match.id
+    assert payload["rejected_source_products"][0]["id"] == rejected_source.id
+    assert payload["rejected_source_products"][0]["match_id"] == rejected_match.id

@@ -101,6 +101,7 @@ class CanonicalProductDetail(CanonicalProductItem):
     accepted_source_products: list[CanonicalLinkedSourceProduct]
     accepted_offer_groups: list[CanonicalOfferGroup]
     candidate_source_products: list[CanonicalLinkedSourceProduct]
+    rejected_source_products: list[CanonicalLinkedSourceProduct]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -161,6 +162,10 @@ class CanonicalProductCatalog:
             candidate_source_products=self._source_products_for_status(
                 product.id,
                 status="candidate",
+            ),
+            rejected_source_products=self._source_products_for_status(
+                product.id,
+                status="rejected",
             ),
         )
 
