@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -54,18 +55,47 @@ class CanonicalLinkedSourceProductResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    match_id: int
     source: str
     source_product_id: str | None
     title: str
     normalized_title: str
     shop_id: int
     shop_name: str
+    shop_source_id: str
     category_raw: str | None
     unit_raw: str | None
+    source_url: str | None
+    image_url: str | None
+    last_seen_at: datetime
+    latest_price: "CanonicalSourceLatestPriceResponse | None"
+    confidence: Decimal
+
+
+class CanonicalSourceLatestPriceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    price: Decimal | None
+    currency: str
+    unit_raw: str | None
+    source_updated_at: datetime | None
+    parsed_at: datetime
+
+
+class CanonicalOfferGroupResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    source: str
+    shop_id: int
+    shop_source_id: str
+    shop_name: str
+    items: list[CanonicalLinkedSourceProductResponse]
 
 
 class CanonicalProductDetailResponse(CanonicalProductResponse):
     accepted_source_products: list[CanonicalLinkedSourceProductResponse]
+    accepted_offer_groups: list[CanonicalOfferGroupResponse]
+    candidate_source_products: list[CanonicalLinkedSourceProductResponse]
 
 
 class CanonicalProductListResponse(BaseModel):

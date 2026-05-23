@@ -167,7 +167,20 @@ is not modified or linked by this endpoint.
 
 ### `GET /canonical-products/{canonical_product_id}`
 
-Returns one canonical product with match counts and accepted source products.
+Returns one canonical product with match counts, accepted offer context, and
+pending candidate source cards for review.
+
+`accepted_source_products` is the flat list of accepted source cards linked to
+the canonical product. `accepted_offer_groups` groups the same accepted cards by
+`source` and shop so the admin UI can show store offers directly. Each linked
+source card includes its latest observed price snapshot when available, raw unit
+and category text, source URL/image when available, `last_seen_at`, and match
+confidence.
+
+`candidate_source_products` lists candidate matches for the same canonical
+product separately from accepted offers. Source cards marked ineligible by the
+2GIS/source-product eligibility gate are excluded from offer and candidate
+context.
 
 ### `PATCH /canonical-products/{canonical_product_id}`
 

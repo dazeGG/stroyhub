@@ -10,6 +10,8 @@ from stroyhub.core.config import settings
 from stroyhub.db import (
     CanonicalProductCreate,
     CanonicalProductRepository,
+    PriceSnapshotCreate,
+    PriceSnapshotRepository,
     ProductMatchCreate,
     ProductMatchRepository,
     ShopRepository,
@@ -179,6 +181,20 @@ def test_canonical_product_detail_and_update_show_linked_source_products(
             normalized_title="detail cement source",
             category_id=category.id,
             unit_raw="bag",
+            image_url="https://example.test/detail.jpg",
+            raw={"product_url": "https://example.test/source-product"},
+        )
+    )
+    ineligible_source = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="canonical-detail-ineligible",
+            title="Detail Cement Ineligible",
+            normalized_title="detail cement ineligible",
+            category_id=category.id,
+            raw={"catalog_eligibility": {"status": "ineligible"}},
+            is_not_product=True,
         )
     )
     candidate_source = SourceProductRepository(db_session).upsert(
@@ -192,7 +208,13 @@ def test_canonical_product_detail_and_update_show_linked_source_products(
         )
     )
     matches = ProductMatchRepository(db_session)
-    matches.create(
+    PriceSnapshotRepository(db_session).add(
+        PriceSnapshotCreate(
+            source_product_id=accepted_source.id,
+            price=Decimal("777.00"),
+        )
+    )
+    accepted_match = matches.create(
         ProductMatchCreate(
             canonical_product_id=canonical.id,
             source_product_id=accepted_source.id,
@@ -202,6 +224,15 @@ def test_canonical_product_detail_and_update_show_linked_source_products(
         )
     )
     matches.create(
+        ProductMatchCreate(
+            canonical_product_id=canonical.id,
+            source_product_id=ineligible_source.id,
+            confidence=Decimal("1.000"),
+            method="manual",
+            status="accepted",
+        )
+    )
+    candidate_match = matches.create(
         ProductMatchCreate(
             canonical_product_id=canonical.id,
             source_product_id=candidate_source.id,
@@ -221,17 +252,37 @@ def test_canonical_product_detail_and_update_show_linked_source_products(
     assert payload["title"] == "Detail Cement Updated"
     assert payload["normalized_title"] == "detail cement updated"
     assert payload["match_status"] == "inactive"
-    assert payload["match_counts"] == {"accepted": 1, "candidate": 1, "rejected": 0}
+    assert payload["match_counts"] == {"accepted": 2, "candidate": 1, "rejected": 0}
     assert payload["accepted_source_products"] == [
         {
             "id": accepted_source.id,
+            "match_id": accepted_match.id,
             "source": "2gis",
             "source_product_id": "canonical-detail-accepted",
             "title": "Detail Cement Source",
             "normalized_title": "detail cement source",
             "shop_id": shop.id,
             "shop_name": "Detail Shop",
+            "shop_source_id": "canonical-detail-shop",
             "category_raw": None,
             "unit_raw": "bag",
+            "source_url": "https://example.test/source-product",
+            "image_url": "https://example.test/detail.jpg",
+            "last_seen_at": accepted_source.last_seen_at.isoformat().replace("+00:00", "Z"),
+            "latest_price": {
+                "price": "777.00",
+                "currency": "RUB",
+                "unit_raw": None,
+                "source_updated_at": None,
+                "parsed_at": payload["accepted_source_products"][0]["latest_price"]["parsed_at"],
+            },
+            "confidence": "1.000",
         }
     ]
+    assert payload["accepted_offer_groups"][0]["shop_id"] == shop.id
+    assert payload["accepted_offer_groups"][0]["source"] == "2gis"
+    assert [item["id"] for item in payload["accepted_offer_groups"][0]["items"]] == [
+        accepted_source.id
+    ]
+    assert payload["candidate_source_products"][0]["id"] == candidate_source.id
+    assert payload["candidate_source_products"][0]["match_id"] == candidate_match.id

@@ -1,11 +1,20 @@
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import false, func, or_, select
+from sqlalchemy import and_, false, func, or_, select
 from sqlalchemy.orm import Session
 
-from stroyhub.models.tables import CanonicalProduct, Category, ProductMatch, Shop, SourceProduct
+from stroyhub.catalog.eligibility import is_matchable_source_product
+from stroyhub.models.tables import (
+    CanonicalProduct,
+    Category,
+    PriceSnapshot,
+    ProductMatch,
+    Shop,
+    SourceProduct,
+)
 from stroyhub.parsers.common import JsonObject
 
 
@@ -52,19 +61,46 @@ class CanonicalProductItem:
 @dataclass(frozen=True, kw_only=True)
 class CanonicalLinkedSourceProduct:
     id: int
+    match_id: int
     source: str
     source_product_id: str | None
     title: str
     normalized_title: str
     shop_id: int
     shop_name: str
+    shop_source_id: str
     category_raw: str | None
     unit_raw: str | None
+    source_url: str | None
+    image_url: str | None
+    last_seen_at: datetime
+    latest_price: "CanonicalSourceLatestPrice | None"
+    confidence: Decimal
+
+
+@dataclass(frozen=True, kw_only=True)
+class CanonicalSourceLatestPrice:
+    price: Decimal | None
+    currency: str
+    unit_raw: str | None
+    source_updated_at: datetime | None
+    parsed_at: datetime
+
+
+@dataclass(frozen=True, kw_only=True)
+class CanonicalOfferGroup:
+    source: str
+    shop_id: int
+    shop_source_id: str
+    shop_name: str
+    items: list[CanonicalLinkedSourceProduct]
 
 
 @dataclass(frozen=True, kw_only=True)
 class CanonicalProductDetail(CanonicalProductItem):
     accepted_source_products: list[CanonicalLinkedSourceProduct]
+    accepted_offer_groups: list[CanonicalOfferGroup]
+    candidate_source_products: list[CanonicalLinkedSourceProduct]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -117,9 +153,15 @@ class CanonicalProductCatalog:
         product, category = row
         counts = self._match_counts_by_canonical_id([product.id]).get(product.id)
         item = self._item(product, category, counts)
+        accepted_products = self._source_products_for_status(product.id, status="accepted")
         return CanonicalProductDetail(
             **item.__dict__,
-            accepted_source_products=self._accepted_source_products(product.id),
+            accepted_source_products=accepted_products,
+            accepted_offer_groups=_offer_groups(accepted_products),
+            candidate_source_products=self._source_products_for_status(
+                product.id,
+                status="candidate",
+            ),
         )
 
     def _base_statement(self) -> Any:
@@ -181,33 +223,96 @@ class CanonicalProductCatalog:
             for canonical_id, values in count_values.items()
         }
 
-    def _accepted_source_products(
+    def _source_products_for_status(
         self,
         canonical_product_id: int,
+        *,
+        status: str,
     ) -> list[CanonicalLinkedSourceProduct]:
+        latest_prices = (
+            select(
+                PriceSnapshot.source_product_id.label("source_product_id"),
+                PriceSnapshot.price.label("latest_price"),
+                PriceSnapshot.currency.label("latest_currency"),
+                PriceSnapshot.unit_raw.label("latest_unit_raw"),
+                PriceSnapshot.source_updated_at.label("latest_source_updated_at"),
+                PriceSnapshot.parsed_at.label("latest_parsed_at"),
+            )
+            .distinct(PriceSnapshot.source_product_id)
+            .order_by(
+                PriceSnapshot.source_product_id,
+                PriceSnapshot.parsed_at.desc(),
+                PriceSnapshot.id.desc(),
+            )
+            .subquery()
+        )
         statement = (
-            select(SourceProduct, Shop)
+            select(
+                ProductMatch,
+                SourceProduct,
+                Shop,
+                latest_prices.c.latest_price,
+                latest_prices.c.latest_currency,
+                latest_prices.c.latest_unit_raw,
+                latest_prices.c.latest_source_updated_at,
+                latest_prices.c.latest_parsed_at,
+            )
             .join(ProductMatch, ProductMatch.source_product_id == SourceProduct.id)
             .join(Shop, SourceProduct.shop_id == Shop.id)
+            .outerjoin(
+                latest_prices,
+                and_(latest_prices.c.source_product_id == SourceProduct.id),
+            )
             .where(
                 ProductMatch.canonical_product_id == canonical_product_id,
-                ProductMatch.status == "accepted",
+                ProductMatch.status == status,
+                SourceProduct.is_active.is_(True),
             )
             .order_by(Shop.name.asc(), SourceProduct.normalized_title.asc(), SourceProduct.id.asc())
         )
         return [
             CanonicalLinkedSourceProduct(
                 id=product.id,
+                match_id=match.id,
                 source=product.source,
                 source_product_id=product.source_product_id,
                 title=product.title,
                 normalized_title=product.normalized_title,
                 shop_id=shop.id,
                 shop_name=shop.name,
+                shop_source_id=shop.source_id,
                 category_raw=product.category_raw,
                 unit_raw=product.unit_raw,
+                source_url=_source_url(product.raw),
+                image_url=product.image_url,
+                last_seen_at=product.last_seen_at,
+                latest_price=(
+                    CanonicalSourceLatestPrice(
+                        price=latest_price,
+                        currency=latest_currency or "RUB",
+                        unit_raw=latest_unit_raw,
+                        source_updated_at=latest_source_updated_at,
+                        parsed_at=latest_parsed_at,
+                    )
+                    if latest_parsed_at is not None
+                    else None
+                ),
+                confidence=match.confidence,
             )
-            for product, shop in self._session.execute(statement)
+            for (
+                match,
+                product,
+                shop,
+                latest_price,
+                latest_currency,
+                latest_unit_raw,
+                latest_source_updated_at,
+                latest_parsed_at,
+            ) in self._session.execute(statement)
+            if is_matchable_source_product(
+                product.raw,
+                is_not_product=product.is_not_product,
+            )
         ]
 
     def _item(
@@ -270,3 +375,36 @@ class CanonicalProductCatalog:
 
 def _escape_like_pattern(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _offer_groups(
+    products: list[CanonicalLinkedSourceProduct],
+) -> list[CanonicalOfferGroup]:
+    groups: dict[tuple[str, int], CanonicalOfferGroup] = {}
+    for product in products:
+        key = (product.source, product.shop_id)
+        group = groups.get(key)
+        if group is None:
+            group = CanonicalOfferGroup(
+                source=product.source,
+                shop_id=product.shop_id,
+                shop_source_id=product.shop_source_id,
+                shop_name=product.shop_name,
+                items=[],
+            )
+            groups[key] = group
+        group.items.append(product)
+
+    return list(groups.values())
+
+
+def _source_url(raw: JsonObject | None) -> str | None:
+    if raw is None:
+        return None
+
+    for key in ("product_url", "url", "canonical_url"):
+        value = raw.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+
+    return None
