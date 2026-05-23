@@ -153,13 +153,14 @@ def test_normalization_queue_endpoint_returns_all_review_states(
         CanonicalProductCreate(title="Клей плиточный 25кг", normalized_title="клей плиточный 25кг")
     )
     matches = ProductMatchRepository(db_session)
-    matches.create(
+    candidate_match = matches.create(
         ProductMatchCreate(
             canonical_product_id=candidate_canonical.id,
             source_product_id=candidate.id,
             confidence=Decimal("0.850"),
             method="token_similarity",
             status="candidate",
+            reason={"token_overlap": ["цемент", "м400"]},
         )
     )
     accepted_match = matches.create(
@@ -189,6 +190,7 @@ def test_normalization_queue_endpoint_returns_all_review_states(
         accepted.id: "accepted",
     }
     unmatched_item = next(item for item in payload["items"] if item["id"] == unmatched.id)
+    candidate_item = next(item for item in payload["items"] if item["id"] == candidate.id)
     accepted_item = next(item for item in payload["items"] if item["id"] == accepted.id)
     assert unmatched_item["latest_price"]["price"] == "650.00"
     assert unmatched_item["shop"]["name"] == "Queue Shop"
@@ -200,6 +202,18 @@ def test_normalization_queue_endpoint_returns_all_review_states(
         "candidate_count": 0,
         "rejected_count": 0,
     }
+    assert candidate_item["candidate_matches"] == [
+        {
+            "id": candidate_match.id,
+            "canonical_product_id": candidate_canonical.id,
+            "canonical_title": "Цемент М400 50кг",
+            "canonical_normalized_title": "цемент м400 50кг",
+            "canonical_category_id": None,
+            "confidence": "0.850",
+            "method": "token_similarity",
+            "reason": {"token_overlap": ["цемент", "м400"]},
+        }
+    ]
 
 
 def test_normalization_queue_endpoint_filters_state_search_and_paginates(

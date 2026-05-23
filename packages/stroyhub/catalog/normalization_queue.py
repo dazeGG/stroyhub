@@ -55,6 +55,18 @@ class NormalizationMatchSummary:
 
 
 @dataclass(frozen=True, kw_only=True)
+class NormalizationCandidateMatch:
+    id: int
+    canonical_product_id: int
+    canonical_title: str
+    canonical_normalized_title: str
+    canonical_category_id: int | None
+    confidence: Decimal
+    method: str
+    reason: JsonObject | None
+
+
+@dataclass(frozen=True, kw_only=True)
 class NormalizationQueueItem:
     id: int
     state: NormalizationQueueState
@@ -74,6 +86,7 @@ class NormalizationQueueItem:
     latest_price: ProductLatestPrice | None
     catalog_eligibility: CatalogEligibilityInfo | None
     match_summary: NormalizationMatchSummary
+    candidate_matches: tuple[NormalizationCandidateMatch, ...]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -91,6 +104,7 @@ class _MatchInfo:
     accepted_canonical_title: str | None = None
     candidate_count: int = 0
     rejected_count: int = 0
+    candidate_matches: tuple[NormalizationCandidateMatch, ...] = ()
 
 
 class ProductNormalizationQueue:
@@ -226,6 +240,19 @@ class ProductNormalizationQueue:
                     accepted_canonical_title=current.accepted_canonical_title,
                     candidate_count=current.candidate_count + 1,
                     rejected_count=current.rejected_count,
+                    candidate_matches=(
+                        *current.candidate_matches,
+                        NormalizationCandidateMatch(
+                            id=match.id,
+                            canonical_product_id=canonical.id,
+                            canonical_title=canonical.title,
+                            canonical_normalized_title=canonical.normalized_title,
+                            canonical_category_id=canonical.category_id,
+                            confidence=match.confidence,
+                            method=match.method,
+                            reason=match.reason,
+                        ),
+                    ),
                 )
             elif match.status == "rejected":
                 current = _MatchInfo(
@@ -234,6 +261,7 @@ class ProductNormalizationQueue:
                     accepted_canonical_title=current.accepted_canonical_title,
                     candidate_count=current.candidate_count,
                     rejected_count=current.rejected_count + 1,
+                    candidate_matches=current.candidate_matches,
                 )
             info_by_product_id[match.source_product_id] = current
 
@@ -293,6 +321,7 @@ class ProductNormalizationQueue:
                 candidate_count=match_info.candidate_count,
                 rejected_count=match_info.rejected_count,
             ),
+            candidate_matches=match_info.candidate_matches,
         )
 
     def _category_filter_ids(self, category_id: int | None) -> set[int] | None:

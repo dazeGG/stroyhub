@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { useToast } from '@nuxt/ui/composables'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import {
+  acceptProductMatch,
+  createCanonicalFromSourceAndAccept,
+  fetchCanonicalProducts,
   fetchCategories,
   fetchProductNormalizationQueue,
   fetchShops,
+  rejectProductMatch,
+  type CanonicalProductListItem,
   type CategoryTreeItem,
+  type ProductMatchDecision,
+  type ProductNormalizationCandidateMatch,
   type ProductNormalizationQueueItem,
   type ProductNormalizationState,
   type ShopListItem,
@@ -45,8 +52,14 @@ const total = ref(0)
 const shops = ref<ShopListItem[]>([])
 const categories = ref<CategoryTreeItem[]>([])
 const isLoading = ref(false)
+const busyAction = ref('')
 const errorMessage = ref('')
+const saveMessage = ref('')
 const toast = useToast()
+const reasonByProductId = reactive<Record<number, string>>({})
+const canonicalSearchByProductId = reactive<Record<number, string>>({})
+const canonicalResultsByProductId = reactive<Record<number, CanonicalProductListItem[]>>({})
+const selectedCanonicalByProductId = reactive<Record<number, string>>({})
 
 let queueRequest: AbortController | null = null
 
@@ -142,6 +155,31 @@ function formatDateTime(value: string): string {
   }).format(new Date(value))
 }
 
+function confidencePercent(value: string): string {
+  return `${Math.round(Number(value) * 100)}%`
+}
+
+function actionKey(item: ProductNormalizationQueueItem, action: string): string {
+  return `${item.id}:${action}`
+}
+
+function isBusy(item: ProductNormalizationQueueItem, action: string): boolean {
+  return busyAction.value === actionKey(item, action)
+}
+
+function decisionMessage(decision: ProductMatchDecision): string {
+  const action = typeof decision.reason?.action === 'string' ? decision.reason.action : decision.status
+  const actionLabels: Record<string, string> = {
+    accept: 'принято',
+    reject: 'отклонено',
+    supersede: 'заменено',
+    accepted: 'принято',
+    rejected: 'отклонено',
+  }
+  const note = typeof decision.reason?.note === 'string' ? ` · ${decision.reason.note}` : ''
+  return `Решение сохранено: ${actionLabels[action] ?? action}${note}`
+}
+
 function flattenCategories(itemsToFlatten: CategoryTreeItem[], level = 0): CategoryOption[] {
   return itemsToFlatten.flatMap((category) => [
     { id: category.id, label: `${'— '.repeat(level)}${category.name}` },
@@ -194,6 +232,133 @@ async function loadQueue(): Promise<void> {
     if (queueRequest === request) {
       isLoading.value = false
     }
+  }
+}
+
+async function createCanonicalFromItem(item: ProductNormalizationQueueItem): Promise<void> {
+  busyAction.value = actionKey(item, 'create')
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    const decision = await createCanonicalFromSourceAndAccept(
+      item.id,
+      reasonByProductId[item.id],
+    )
+    saveMessage.value = decisionMessage(decision)
+    await loadQueue()
+  } catch (error) {
+    errorMessage.value = messageFromError(error, 'Не удалось создать нормализованный товар')
+    toastError(
+      toast,
+      'Не удалось создать нормализованный товар',
+      error,
+      'Не удалось создать нормализованный товар',
+    )
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function searchCanonicalProductsForItem(item: ProductNormalizationQueueItem): Promise<void> {
+  busyAction.value = actionKey(item, 'search')
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    const response = await fetchCanonicalProducts({
+      q: canonicalSearchByProductId[item.id] || item.normalized_title,
+      matchStatus: 'active',
+      limit: 10,
+    })
+    canonicalResultsByProductId[item.id] = response.items
+    if (response.items.length === 1) {
+      selectedCanonicalByProductId[item.id] = String(response.items[0].id)
+    }
+  } catch (error) {
+    errorMessage.value = messageFromError(error, 'Не удалось найти нормализованные товары')
+    toastError(
+      toast,
+      'Не удалось найти нормализованные товары',
+      error,
+      'Не удалось найти нормализованные товары',
+    )
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function linkCanonicalProduct(item: ProductNormalizationQueueItem): Promise<void> {
+  const canonicalProductId = Number(selectedCanonicalByProductId[item.id])
+  if (!canonicalProductId) {
+    errorMessage.value = 'Выберите нормализованный товар для связи'
+    return
+  }
+
+  busyAction.value = actionKey(item, 'link')
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    const decision = await acceptProductMatch(
+      canonicalProductId,
+      item.id,
+      reasonByProductId[item.id],
+    )
+    saveMessage.value = decisionMessage(decision)
+    await loadQueue()
+  } catch (error) {
+    errorMessage.value = messageFromError(error, 'Не удалось связать товар')
+    toastError(toast, 'Не удалось связать товар', error, 'Не удалось связать товар')
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function acceptCandidateMatch(
+  item: ProductNormalizationQueueItem,
+  match: ProductNormalizationCandidateMatch,
+): Promise<void> {
+  busyAction.value = actionKey(item, `accept:${match.id}`)
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    const decision = await acceptProductMatch(
+      match.canonical_product_id,
+      item.id,
+      reasonByProductId[item.id],
+    )
+    saveMessage.value = decisionMessage(decision)
+    await loadQueue()
+  } catch (error) {
+    errorMessage.value = messageFromError(error, 'Не удалось принять кандидата')
+    toastError(toast, 'Не удалось принять кандидата', error, 'Не удалось принять кандидата')
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function rejectCandidateMatch(
+  item: ProductNormalizationQueueItem,
+  match: ProductNormalizationCandidateMatch,
+): Promise<void> {
+  busyAction.value = actionKey(item, `reject:${match.id}`)
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    const decision = await rejectProductMatch(
+      match.id,
+      reasonByProductId[item.id] || 'Не тот товар',
+    )
+    saveMessage.value = decisionMessage(decision)
+    await loadQueue()
+  } catch (error) {
+    errorMessage.value = messageFromError(error, 'Не удалось отклонить кандидата')
+    toastError(toast, 'Не удалось отклонить кандидата', error, 'Не удалось отклонить кандидата')
+  } finally {
+    busyAction.value = ''
   }
 }
 
@@ -341,6 +506,10 @@ onMounted(() => {
       {{ errorMessage }}
     </div>
 
+    <div v-if="saveMessage" class="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100">
+      {{ saveMessage }}
+    </div>
+
     <div v-if="isLoading" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">
       <Icon :icon="icons.listCheck" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
       Загружаем очередь нормализации...
@@ -439,9 +608,111 @@ onMounted(() => {
             <p v-else-if="item.state === 'ineligible'" class="mt-4 text-sm text-red-100/80">
               Эта карточка не попадает в основной поток нормализации.
             </p>
-            <p v-else class="mt-4 text-sm text-neutral-500">
-              Ожидает решения администратора.
-            </p>
+
+            <div v-if="item.state !== 'ineligible' && item.state !== 'accepted'" class="mt-4 space-y-3">
+              <textarea
+                v-model="reasonByProductId[item.id]"
+                class="min-h-20 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+                placeholder="Причина решения"
+                aria-label="Причина решения по нормализации"
+              />
+
+              <button
+                v-if="item.state === 'eligible_unmatched'"
+                type="button"
+                class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-300 px-3 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60"
+                :disabled="Boolean(busyAction)"
+                @click="createCanonicalFromItem(item)"
+              >
+                <Icon :icon="icons.plus" class="size-4" aria-hidden="true" />
+                {{ isBusy(item, 'create') ? 'Создаем...' : 'Создать товар' }}
+              </button>
+
+              <div v-if="item.candidate_matches.length" class="space-y-3 border-t border-neutral-800 pt-3">
+                <div
+                  v-for="match in item.candidate_matches"
+                  :key="match.id"
+                  class="space-y-2"
+                >
+                  <p class="text-sm font-semibold text-white">{{ match.canonical_title }}</p>
+                  <p class="text-xs text-neutral-500">
+                    {{ match.canonical_normalized_title }} · {{ confidencePercent(match.confidence) }} · {{ match.method }}
+                  </p>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-300 px-3 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-wait disabled:opacity-60"
+                      :disabled="Boolean(busyAction)"
+                      @click="acceptCandidateMatch(item, match)"
+                    >
+                      <Icon :icon="icons.check" class="size-4" aria-hidden="true" />
+                      {{ isBusy(item, `accept:${match.id}`) ? 'Принимаем...' : 'Принять' }}
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 py-2 text-sm font-semibold text-neutral-300 transition hover:border-red-300 hover:text-red-100 disabled:cursor-wait disabled:opacity-60"
+                      :disabled="Boolean(busyAction)"
+                      @click="rejectCandidateMatch(item, match)"
+                    >
+                      <Icon :icon="icons.x" class="size-4" aria-hidden="true" />
+                      {{ isBusy(item, `reject:${match.id}`) ? 'Отклоняем...' : 'Отклонить' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-2 border-t border-neutral-800 pt-3">
+                <label class="block text-xs uppercase tracking-wide text-neutral-600">
+                  Связать с существующим
+                </label>
+                <div class="grid gap-2 sm:grid-cols-[1fr_auto] xl:grid-cols-1">
+                  <input
+                    v-model="canonicalSearchByProductId[item.id]"
+                    type="search"
+                    class="h-10 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+                    :placeholder="item.normalized_title"
+                    aria-label="Поиск нормализованного товара"
+                    @keyup.enter="searchCanonicalProductsForItem(item)"
+                  >
+                  <button
+                    type="button"
+                    class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 text-sm font-semibold text-neutral-300 transition hover:border-amber-300 hover:text-white disabled:cursor-wait disabled:opacity-60"
+                    :disabled="Boolean(busyAction)"
+                    @click="searchCanonicalProductsForItem(item)"
+                  >
+                    <Icon :icon="icons.search" class="size-4" aria-hidden="true" />
+                    {{ isBusy(item, 'search') ? 'Ищем...' : 'Найти' }}
+                  </button>
+                </div>
+
+                <select
+                  v-if="canonicalResultsByProductId[item.id]?.length"
+                  v-model="selectedCanonicalByProductId[item.id]"
+                  class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                  aria-label="Выбор нормализованного товара"
+                >
+                  <option value="">Выберите товар</option>
+                  <option
+                    v-for="canonical in canonicalResultsByProductId[item.id]"
+                    :key="canonical.id"
+                    :value="String(canonical.id)"
+                  >
+                    {{ canonical.title }}
+                  </option>
+                </select>
+
+                <button
+                  v-if="canonicalResultsByProductId[item.id]?.length"
+                  type="button"
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-300 px-3 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60"
+                  :disabled="Boolean(busyAction) || !selectedCanonicalByProductId[item.id]"
+                  @click="linkCanonicalProduct(item)"
+                >
+                  <Icon :icon="icons.link" class="size-4" aria-hidden="true" />
+                  {{ isBusy(item, 'link') ? 'Связываем...' : 'Связать' }}
+                </button>
+              </div>
+            </div>
           </aside>
         </div>
       </article>

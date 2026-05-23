@@ -92,6 +92,17 @@ export interface ProductNormalizationMatchSummary {
   rejected_count: number
 }
 
+export interface ProductNormalizationCandidateMatch {
+  id: number
+  canonical_product_id: number
+  canonical_title: string
+  canonical_normalized_title: string
+  canonical_category_id: number | null
+  confidence: string
+  method: string
+  reason: Record<string, unknown> | null
+}
+
 export interface ProductNormalizationQueueItem {
   id: number
   state: ProductNormalizationState
@@ -111,6 +122,7 @@ export interface ProductNormalizationQueueItem {
   latest_price: ProductLatestPrice | null
   catalog_eligibility: ProductNormalizationEligibility | null
   match_summary: ProductNormalizationMatchSummary
+  candidate_matches: ProductNormalizationCandidateMatch[]
 }
 
 export interface ProductNormalizationQueueResponse {
@@ -118,6 +130,50 @@ export interface ProductNormalizationQueueResponse {
   limit: number
   offset: number
   total: number
+}
+
+export interface CanonicalProductListItem {
+  id: number
+  title: string
+  normalized_title: string
+  category_id: number | null
+  category: {
+    id: number
+    slug: string
+    name: string
+  } | null
+  brand: string | null
+  model: string | null
+  unit_raw: string | null
+  attributes: Record<string, unknown> | null
+  match_status: string
+  created_at: string
+  updated_at: string
+  match_counts: {
+    accepted: number
+    candidate: number
+    rejected: number
+  }
+}
+
+export interface CanonicalProductListResponse {
+  items: CanonicalProductListItem[]
+  limit: number
+  offset: number
+  total: number
+}
+
+export interface ProductMatchDecision {
+  id: number
+  canonical_product_id: number
+  source_product_id: number
+  confidence: string
+  status: string
+  method: string
+  matched_at: string
+  reviewed_at: string | null
+  reviewed_by: string | null
+  reason: Record<string, unknown> | null
 }
 
 export interface ProductPriceSnapshot {
@@ -356,6 +412,14 @@ export interface ProductNormalizationQueueParams {
   offset?: number
 }
 
+export interface CanonicalProductListParams {
+  q?: string
+  categoryId?: number
+  matchStatus?: string
+  limit?: number
+  offset?: number
+}
+
 export interface ScrapeStatusCount {
   status: string
   count: number
@@ -551,6 +615,75 @@ export function fetchProductNormalizationQueue(
 
   return fetchJson<ProductNormalizationQueueResponse>(
     `/product-normalization/queue?${params.toString()}`,
+    signal,
+  )
+}
+
+export function fetchCanonicalProducts(
+  filters: CanonicalProductListParams = {},
+  signal?: AbortSignal,
+): Promise<CanonicalProductListResponse> {
+  const params = new URLSearchParams()
+  appendOptionalParam(params, 'q', filters.q?.trim())
+  appendOptionalParam(params, 'category_id', filters.categoryId)
+  appendOptionalParam(params, 'match_status', filters.matchStatus)
+  appendOptionalParam(params, 'limit', filters.limit)
+  appendOptionalParam(params, 'offset', filters.offset)
+  const query = params.toString()
+
+  return fetchJson<CanonicalProductListResponse>(
+    query ? `/canonical-products?${query}` : '/canonical-products',
+    signal,
+  )
+}
+
+export function createCanonicalFromSourceAndAccept(
+  sourceProductId: number,
+  reason?: string,
+  signal?: AbortSignal,
+): Promise<ProductMatchDecision> {
+  return writeJson<ProductMatchDecision>(
+    `/product-matches/from-source/${sourceProductId}/accept`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ actor: 'admin', reason: reason || null }),
+    },
+    signal,
+  )
+}
+
+export function acceptProductMatch(
+  canonicalProductId: number,
+  sourceProductId: number,
+  reason?: string,
+  signal?: AbortSignal,
+): Promise<ProductMatchDecision> {
+  return writeJson<ProductMatchDecision>(
+    '/product-matches/accept',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        canonical_product_id: canonicalProductId,
+        source_product_id: sourceProductId,
+        actor: 'admin',
+        reason: reason || null,
+      }),
+    },
+    signal,
+  )
+}
+
+export function rejectProductMatch(
+  matchId: number,
+  reason?: string,
+  signal?: AbortSignal,
+): Promise<ProductMatchDecision> {
+  return writeJson<ProductMatchDecision>(
+    `/product-matches/${matchId}/reject`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ actor: 'admin', reason: reason || null }),
+    },
     signal,
   )
 }
