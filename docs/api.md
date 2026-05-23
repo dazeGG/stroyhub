@@ -108,6 +108,72 @@ Example response:
 
 Missing products return `404`.
 
+## Canonical Products
+
+Canonical products are normalized admin-managed product identities. Creating or
+editing a canonical product does not mutate source product cards or create
+source-to-canonical matches; decision endpoints are tracked separately.
+
+### `GET /canonical-products`
+
+Lists canonical products.
+
+Query params:
+
+- `q`: optional text search against title and normalized title.
+- `category_id`: optional normalized category filter; parent categories include
+  descendants.
+- `match_status`: optional canonical product status filter.
+- `limit`: 1-100, default `50`.
+- `offset`: default `0`.
+
+Example response:
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "title": "Цемент М500 50кг",
+      "normalized_title": "цемент м500 50кг",
+      "category_id": 7,
+      "category": {"id": 7, "slug": "cement", "name": "Цемент"},
+      "brand": null,
+      "model": null,
+      "unit_raw": "50кг",
+      "attributes": {"weight": {"value": "50", "unit": "kg"}},
+      "match_status": "active",
+      "created_at": "2026-05-23T09:00:00Z",
+      "updated_at": "2026-05-23T09:00:00Z",
+      "match_counts": {"accepted": 1, "candidate": 2, "rejected": 0}
+    }
+  ],
+  "limit": 50,
+  "offset": 0,
+  "total": 1
+}
+```
+
+### `POST /canonical-products`
+
+Creates a canonical product from explicit admin fields. `normalized_title` is
+optional and defaults to normalized `title`.
+
+### `POST /canonical-products/from-source/{source_product_id}`
+
+Creates a canonical product seeded from one source product. Defaults are copied
+from the source card: `title`, `category_id`, and `unit_raw`. The source product
+is not modified or linked by this endpoint.
+
+### `GET /canonical-products/{canonical_product_id}`
+
+Returns one canonical product with match counts and accepted source products.
+
+### `PATCH /canonical-products/{canonical_product_id}`
+
+Updates editable canonical fields: `title`, `normalized_title`, `category_id`,
+`brand`, `model`, `unit_raw`, `attributes`, and `match_status`.
+
 ## Categories
 
 ### `GET /categories`
