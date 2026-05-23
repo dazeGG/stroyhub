@@ -11,6 +11,8 @@ from stroyhub.core.config import settings
 from stroyhub.db import (
     PriceSnapshotCreate,
     PriceSnapshotRepository,
+    ShopIdentityCreate,
+    ShopIdentityRepository,
     ShopRepository,
     ShopUpsert,
     SourceProductRepository,
@@ -775,3 +777,147 @@ def test_product_price_history_endpoint_returns_404_for_missing_product(
         "message": "Source product not found",
         "details": {},
     }
+
+
+def test_public_products_prefer_healthy_identity_preferred_source(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    identity = ShopIdentityRepository(db_session).create(
+        ShopIdentityCreate(display_name="Preferred Shop", preferred_source="unicom")
+    )
+    fallback_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="public-priority-fallback",
+            name="Fallback Shop",
+            shop_identity_id=identity.id,
+            scrape_status="success",
+        )
+    )
+    preferred_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="public-priority-preferred",
+            name="Preferred Shop",
+            shop_identity_id=identity.id,
+            scrape_status="success",
+        )
+    )
+    fallback_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=fallback_shop.id,
+            source="2gis",
+            source_product_id="public-priority-fallback-product",
+            title="Priority Cement M500",
+            normalized_title="priority cement m500",
+        )
+    )
+    preferred_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=preferred_shop.id,
+            source="unicom",
+            source_product_id="public-priority-preferred-product",
+            title="Priority Cement M500",
+            normalized_title="priority cement m500",
+        )
+    )
+
+    response = client.get("/products", params={"q": "Priority Cement M500"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert [item["id"] for item in payload["items"]] == [preferred_product.id]
+    assert payload["items"][0]["shop"]["source"] == "unicom"
+
+    assert client.get(f"/products/{fallback_product.id}").status_code == 404
+    assert client.get(f"/products/{fallback_product.id}/prices").status_code == 404
+
+
+def test_public_products_fall_back_when_preferred_source_is_unhealthy(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    identity = ShopIdentityRepository(db_session).create(
+        ShopIdentityCreate(display_name="Fallback Identity", preferred_source="unicom")
+    )
+    fallback_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="public-fallback-visible",
+            name="Fallback Visible Shop",
+            shop_identity_id=identity.id,
+            scrape_status="success",
+        )
+    )
+    preferred_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="public-fallback-hidden",
+            name="Preferred Hidden Shop",
+            shop_identity_id=identity.id,
+            scrape_status="disabled",
+        )
+    )
+    visible_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=fallback_shop.id,
+            source="2gis",
+            source_product_id="public-fallback-visible-product",
+            title="Fallback Cement M400",
+            normalized_title="fallback cement m400",
+        )
+    )
+    SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=preferred_shop.id,
+            source="unicom",
+            source_product_id="public-fallback-hidden-product",
+            title="Fallback Cement M400",
+            normalized_title="fallback cement m400",
+        )
+    )
+
+    response = client.get("/products", params={"q": "Fallback Cement M400"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert [item["id"] for item in payload["items"]] == [visible_product.id]
+    assert payload["items"][0]["shop"]["source"] == "2gis"
+
+
+@pytest.mark.parametrize("identity_status", ["hold", "disabled", "out_of_scope"])
+def test_public_products_hide_non_active_shop_identity_statuses(
+    client: TestClient,
+    db_session: Session,
+    identity_status: str,
+) -> None:
+    identity = ShopIdentityRepository(db_session).create(
+        ShopIdentityCreate(display_name=f"Hidden {identity_status}", status=identity_status)
+    )
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id=f"public-hidden-{identity_status}",
+            name="Hidden Shop",
+            shop_identity_id=identity.id,
+            scrape_status="success",
+        )
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id=f"public-hidden-{identity_status}-product",
+            title=f"Hidden Product {identity_status}",
+            normalized_title=f"hidden product {identity_status}",
+        )
+    )
+
+    response = client.get("/products", params={"q": f"Hidden Product {identity_status}"})
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+    assert client.get(f"/products/{product.id}").status_code == 404

@@ -3,15 +3,22 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from sqlalchemy import and_, false, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, exists, false, func, not_, or_, select
+from sqlalchemy.orm import Session, aliased
 
 from stroyhub.catalog.query_helpers import (
     category_descendant_ids,
     escape_like_pattern,
     latest_price_subquery,
 )
-from stroyhub.models.tables import Category, CategoryOverride, PriceSnapshot, Shop, SourceProduct
+from stroyhub.models.tables import (
+    Category,
+    CategoryOverride,
+    PriceSnapshot,
+    Shop,
+    ShopIdentity,
+    SourceProduct,
+)
 
 ProductSort = Literal[
     "latest_price",
@@ -23,6 +30,8 @@ ProductSort = Literal[
     "last_seen_at",
     "-last_seen_at",
 ]
+
+_PUBLIC_HEALTHY_SCRAPE_STATUSES = ("ok", "success", "partial")
 
 @dataclass(frozen=True, kw_only=True)
 class ProductSearchFilters:
@@ -117,7 +126,9 @@ class ProductCatalog:
         statement = (
             select(func.count(SourceProduct.id))
             .join(Shop, SourceProduct.shop_id == Shop.id)
+            .outerjoin(ShopIdentity, Shop.shop_identity_id == ShopIdentity.id)
             .where(SourceProduct.is_active.is_(True))
+            .where(self._public_visibility_predicate())
         )
         statement = self._apply_product_filters(statement, filters)
         return int(self._session.scalar(statement) or 0)
@@ -133,7 +144,14 @@ class ProductCatalog:
         return self._product_search_item(*row)
 
     def source_product_exists(self, product_id: int) -> bool:
-        statement = select(SourceProduct.id).where(SourceProduct.id == product_id)
+        statement = (
+            select(SourceProduct.id)
+            .join(Shop, SourceProduct.shop_id == Shop.id)
+            .outerjoin(ShopIdentity, Shop.shop_identity_id == ShopIdentity.id)
+            .where(SourceProduct.id == product_id)
+            .where(SourceProduct.is_active.is_(True))
+            .where(self._public_visibility_predicate())
+        )
         return self._session.scalar(statement) is not None
 
     def list_price_history(self, product_id: int) -> list[ProductPriceSnapshot]:
@@ -170,6 +188,7 @@ class ProductCatalog:
                 CategoryOverride,
             )
             .join(Shop, SourceProduct.shop_id == Shop.id)
+            .outerjoin(ShopIdentity, Shop.shop_identity_id == ShopIdentity.id)
             .outerjoin(
                 latest_prices,
                 and_(
@@ -185,6 +204,7 @@ class ProductCatalog:
                 ),
             )
             .where(SourceProduct.is_active.is_(True))
+            .where(self._public_visibility_predicate())
         )
 
         return statement, latest_prices
@@ -310,3 +330,36 @@ class ProductCatalog:
         if sort == "last_seen_at":
             return (SourceProduct.last_seen_at.asc(), SourceProduct.id.asc())
         return (SourceProduct.last_seen_at.desc(), SourceProduct.id.asc())
+
+    def _public_visibility_predicate(self) -> Any:
+        preferred_shop = aliased(Shop)
+        preferred_product = aliased(SourceProduct)
+        preferred_source_has_products = exists(
+            select(preferred_shop.id)
+            .join(
+                preferred_product,
+                and_(
+                    preferred_product.shop_id == preferred_shop.id,
+                    preferred_product.is_active.is_(True),
+                ),
+            )
+            .where(
+                preferred_shop.shop_identity_id == Shop.shop_identity_id,
+                preferred_shop.source == ShopIdentity.preferred_source,
+                preferred_shop.scrape_status.in_(_PUBLIC_HEALTHY_SCRAPE_STATUSES),
+            )
+        )
+        return and_(
+            Shop.scrape_status != "disabled",
+            or_(
+                Shop.shop_identity_id.is_(None),
+                and_(
+                    ShopIdentity.status == "active",
+                    or_(
+                        ShopIdentity.preferred_source.is_(None),
+                        not_(preferred_source_has_products),
+                        Shop.source == ShopIdentity.preferred_source,
+                    ),
+                ),
+            ),
+        )
