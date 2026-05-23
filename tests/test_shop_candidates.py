@@ -344,9 +344,52 @@ def test_candidate_approval_creates_unlinked_tracked_shop(
     assert shop.source == "2gis"
     assert shop.source_type == "2gis"
     assert shop.name == "Approve Me"
+    assert shop.address == "Yakutsk"
     assert shop.url == "https://approve-me.example.test/"
     assert shop.shop_identity_id is None
     assert shop.shop_identity is None
+
+
+def test_candidate_approval_uses_verified_website_without_resolving_again(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    catalog = ShopCandidateCatalog(db_session)
+    catalog.refresh_from_twogis(
+        seeds=[
+            CandidateDiscoverySeed(
+                source_id="verified-approve",
+                display_name="Verified Approve",
+                address="Yakutsk, Verified 1",
+                rubrics="Стройматериалы",
+                has_prices_signal=True,
+                has_website_signal=True,
+            )
+        ],
+    )
+    candidate = catalog.list_candidates(CandidateListFilters())[0]
+    catalog.verify_twogis_data(
+        candidate.id,
+        website_resolver=lambda source_id: "https://verified.example.test/",
+        product_probe=lambda source_id: SimpleNamespace(
+            total=0,
+            items_seen=0,
+            products=[],
+            completeness="empty",
+            stop_reason="source_total_reached",
+        ),
+    )
+    monkeypatch.setattr(
+        "stroyhub.catalog.shop_candidates._resolve_candidate_website",
+        lambda source_id: pytest.fail("verified website should already be stored"),
+    )
+
+    catalog.approve(candidate.id)
+    shop = db_session.scalar(select(Shop).where(Shop.source_id == "verified-approve"))
+
+    assert shop is not None
+    assert shop.address == "Yakutsk, Verified 1"
+    assert shop.url == "https://verified.example.test/"
 
 
 def test_candidate_suggests_existing_identity_by_name(db_session: Session) -> None:

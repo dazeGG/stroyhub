@@ -95,10 +95,42 @@ def test_shop_repository_upserts_and_preserves_raw_payload(db_session: Session) 
 
     assert updated.id == first_id
     assert updated.name == "Updated Shop"
+    assert updated.address == "Yakutsk, Lenina 1"
     assert updated.raw == {"source": {"id": "branch-test-1", "updated": True}}
     assert updated.scrape_status == "success"
     assert updated.error_count == 2
     assert count == 1
+
+
+def test_shop_repository_keeps_existing_optional_fields_when_upsert_omits_them(
+    db_session: Session,
+) -> None:
+    repository = ShopRepository(db_session)
+    shop = repository.upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="branch-preserve-fields",
+            name="Preserve Fields",
+            address="Yakutsk, Address 1",
+            url="https://shop.example.test/",
+            raw={"candidate_id": 1},
+        )
+    )
+
+    updated = repository.upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="branch-preserve-fields",
+            name="Preserve Fields",
+            scrape_status="success",
+        )
+    )
+
+    assert updated.id == shop.id
+    assert updated.address == "Yakutsk, Address 1"
+    assert updated.url == "https://shop.example.test/"
+    assert updated.raw == {"candidate_id": 1}
+    assert updated.scrape_status == "success"
 
 
 def test_shop_identity_repository_links_source_specific_shops(

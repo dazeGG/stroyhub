@@ -183,11 +183,16 @@ class ShopRepository:
 
         shop.source_type = source_type
         shop.name = data.name
-        shop.address = data.address
-        shop.url = data.url
-        shop.raw = data.raw
-        shop.last_scraped_at = data.last_scraped_at
-        shop.next_scrape_at = data.next_scrape_at
+        if data.address is not None or shop.id is None:
+            shop.address = data.address
+        if data.url is not None or shop.id is None:
+            shop.url = data.url
+        if data.raw is not None or shop.id is None:
+            shop.raw = data.raw
+        if data.last_scraped_at is not None:
+            shop.last_scraped_at = data.last_scraped_at
+        if data.next_scrape_at is not None:
+            shop.next_scrape_at = data.next_scrape_at
 
         if data.scrape_interval is not None:
             shop.scrape_interval = data.scrape_interval
