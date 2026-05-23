@@ -1,30 +1,14 @@
 from fastapi import FastAPI
 from stroyhub import __version__
 
-from apps.api.canonical_products import router as canonical_products_router
-from apps.api.categories import router as categories_router
-from apps.api.matches import router as matches_router
-from apps.api.product_matches import router as product_matches_router
-from apps.api.product_normalization import router as product_normalization_router
-from apps.api.products import router as products_router
-from apps.api.scrapes import router as scrapes_router
-from apps.api.shop_candidates import router as shop_candidates_router
-from apps.api.shops import identity_router
-from apps.api.shops import router as shops_router
+from apps.api.public_categories import router as public_categories_router
+from apps.api.public_products import router as public_products_router
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="StroyHub API", version=__version__)
-    app.include_router(canonical_products_router)
-    app.include_router(categories_router)
-    app.include_router(matches_router)
-    app.include_router(product_normalization_router)
-    app.include_router(product_matches_router)
-    app.include_router(products_router)
-    app.include_router(scrapes_router)
-    app.include_router(shop_candidates_router)
-    app.include_router(shops_router)
-    app.include_router(identity_router)
+    app = FastAPI(title="StroyHub Public API", version=__version__)
+    app.include_router(public_categories_router)
+    app.include_router(public_products_router)
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:

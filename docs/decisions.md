@@ -20,7 +20,8 @@ Decision:
 Keep runnable entrypoints in `apps/` and reusable logic in `packages/stroyhub`.
 
 Consequences:
-`apps/api` and `apps/worker` should stay thin. They may import `stroyhub`, but `stroyhub` should not import app modules.
+`apps/api`, `apps/admin_api`, and `apps/worker` should stay thin. They may
+import `stroyhub`, but `stroyhub` should not import app modules.
 
 ## 2026-05-16: Do Not Create Separate App Packages Yet
 
@@ -28,7 +29,8 @@ Context:
 An earlier layout used `stroyhub_api` and `stroyhub_worker` as installable app packages. That was technically tidy, but heavier than needed for the current project.
 
 Decision:
-Use direct modules: `apps/api/main.py` and `apps/worker/celery_app.py`.
+Use direct modules such as `apps/api/main.py`, `apps/admin_api/main.py`, and
+`apps/worker/celery_app.py`.
 
 Consequences:
 The project is easier to scan. If the API or worker grows into a separately distributed package later, it can be split deliberately.
@@ -60,7 +62,7 @@ CSS, Nuxt UI components, Vue Router, and pnpm with the active Node.js LTS line.
 Use Nuxt UI as a Vue component library through its Vite plugin; do not adopt
 Nuxt as the application framework for M12.
 
-The admin app should consume JSON endpoints from `apps/api` over HTTP. Shared
+The admin app should consume JSON endpoints from the backend over HTTP. Shared
 business logic remains in `packages/stroyhub` and is exposed to the admin via
 API endpoints, not direct frontend imports. Add Pinia, a charting package, or a
 generated API client only when the first implemented screens make the need
@@ -278,6 +280,27 @@ canonical matching or destructive source merging. The detailed policy is tracked
 in `docs/sources.md`.
 
 ## 2026-05-18: Accept Conservative Product Matching Schema
+
+## 2026-05-23: Split Public and Admin HTTP APIs
+
+Context:
+The previous FastAPI entrypoint mixed public catalog reads with admin/operator
+workflows (match review, normalization queue, candidate management, and scrape
+operations). This increased API contract churn risk before starting the public
+MVP frontend.
+
+Decision:
+Split HTTP entrypoints into:
+
+- `apps/api/main.py` for public read-only catalog routes.
+- `apps/admin_api/main.py` for admin/operator routes.
+
+Keep shared business logic in `packages/stroyhub`. The admin frontend proxy now
+targets the admin API service.
+
+Consequences:
+Public OpenAPI becomes stable and safer for frontend consumption. Admin APIs
+can evolve without exposing operator endpoints in the public surface.
 
 Context:
 M10 implemented a pure in-memory product matching prototype before adding

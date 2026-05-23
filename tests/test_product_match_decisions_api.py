@@ -20,8 +20,8 @@ from stroyhub.db import (
 from stroyhub.models import CanonicalProduct, SourceProduct
 from stroyhub.models.tables import Category, ProductMatch
 
-from apps.api.main import create_app
-from apps.api.product_matches import get_session
+from apps.admin_api.main import create_app
+from apps.admin_api.product_matches import get_session
 
 
 @pytest.fixture

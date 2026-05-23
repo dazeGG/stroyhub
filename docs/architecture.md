@@ -4,7 +4,8 @@ StroyHub starts as a Python monorepo with thin applications and one reusable dom
 
 ## Boundaries
 
-- `apps/api` owns the HTTP entrypoint and API composition.
+- `apps/api` owns the public read-only HTTP API.
+- `apps/admin_api` owns admin/operator HTTP routes.
 - `apps/admin` owns the Vue-based admin/review UI.
 - `apps/ml` owns experimental/offline dataset labeling, dataset snapshots,
   training, evaluation, and model artifact management commands. ML is deferred
@@ -17,7 +18,7 @@ StroyHub starts as a Python monorepo with thin applications and one reusable dom
 The API and worker are intentionally thin Python modules, not separate
 installable packages. They should depend on `stroyhub`, while `stroyhub` should
 not depend on any application module. The admin UI is a separate frontend app
-under `apps/admin`; it should talk to `apps/api` over HTTP instead of importing
+under `apps/admin`; it should talk to `apps/admin_api` over HTTP instead of importing
 Python domain code directly.
 
 The ML workspace is also an application boundary, not a separate package. It
@@ -68,6 +69,9 @@ Vite hot reload, and the worker through `watchfiles` so Python changes under
 
 The API can also be run manually with
 `uv run uvicorn apps.api.main:app --reload`.
+
+The admin API can also be run manually with
+`uv run uvicorn apps.admin_api.main:app --reload --port 8001`.
 
 The admin UI can also be run from `apps/admin` with its Vite development server.
 

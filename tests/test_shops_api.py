@@ -14,8 +14,8 @@ from stroyhub.db import (
     ShopUpsert,
 )
 
-from apps.api.main import create_app
-from apps.api.products import get_session
+from apps.admin_api.main import create_app
+from apps.admin_api.products import get_session
 
 
 @pytest.fixture
@@ -308,7 +308,7 @@ def test_retry_shop_scrape_marks_source_scheduled_and_enqueues_task(
         enqueued_shop_ids.append(shop_id)
         return {"shop_id": shop_id, "status": "queued", "task_id": "retry-task"}
 
-    monkeypatch.setattr("apps.api.shops.enqueue_shop_scrape", fake_enqueue_shop_scrape)
+    monkeypatch.setattr("apps.admin_api.shops.enqueue_shop_scrape", fake_enqueue_shop_scrape)
 
     response = client.post(f"/shops/{shop.id}/scrape/retry")
 
@@ -341,7 +341,7 @@ def test_retry_shop_scrape_rejects_running_source(
         )
     )
     monkeypatch.setattr(
-        "apps.api.shops.enqueue_shop_scrape",
+        "apps.admin_api.shops.enqueue_shop_scrape",
         lambda shop_id: pytest.fail(f"unexpected enqueue for shop {shop_id}"),
     )
 

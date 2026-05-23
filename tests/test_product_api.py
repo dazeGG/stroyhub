@@ -18,8 +18,8 @@ from stroyhub.db import (
 )
 from stroyhub.models import Category
 
-from apps.api.main import create_app
-from apps.api.products import get_session
+from apps.admin_api.main import create_app
+from apps.admin_api.products import get_session
 
 
 @pytest.fixture
