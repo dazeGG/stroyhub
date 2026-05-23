@@ -10,6 +10,7 @@ const navItems = [
   { label: 'Магазины', to: '/shops', icon: icons.buildingStore },
   { label: 'Категории', to: '/categories', icon: icons.category },
   { label: 'Исходные товары', to: '/products', icon: icons.package },
+  { label: 'Нормализация', to: '/products/normalization', icon: icons.listCheck },
   { label: 'Скрейпы', to: '/scrapes', icon: icons.activity },
   { label: 'Матчинг', to: '/matches', icon: icons.gitCompare },
 ]
