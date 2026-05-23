@@ -1,5 +1,4 @@
 from collections.abc import Iterator
-from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -7,7 +6,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
-from stroyhub.catalog import shop_candidates as candidate_module
 from stroyhub.catalog.shop_candidates import CandidateDiscoverySeed, ShopCandidateCatalog
 from stroyhub.core.config import settings
 from stroyhub.db import ShopIdentityCreate, ShopIdentityRepository
@@ -144,27 +142,20 @@ def test_shop_source_candidate_api_refresh_uses_twogis_discovery(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    discovered = [
-        CandidateDiscoverySeed(
-            source_id="discovered-api",
-            display_name="Discovered API",
-            address="Yakutsk",
-            rubrics="Стройматериалы",
-            has_prices_signal=True,
-            has_website_signal=True,
-        )
-    ]
-
-    monkeypatch.setattr(candidate_module, "discover_twogis_candidates", lambda: discovered)
+    monkeypatch.setattr(
+        "apps.worker.tasks.refresh_shop_source_candidates_task.delay",
+        lambda: SimpleNamespace(id="refresh-task-id"),
+    )
     response = client.post("/shop-source-candidates/refresh")
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     payload = response.json()
-    assert payload["checked"] == len(discovered)
-    assert payload["created"] == len(discovered)
-    assert payload["skipped_approved"] == 0
-    assert payload["items"][0]["priority"] == 100
-    assert payload["items"][0]["has_prices"] is True
+    assert payload == {
+        "operation": "refresh_shop_source_candidates",
+        "status": "queued",
+        "task_id": "refresh-task-id",
+        "candidate_id": None,
+    }
 
 
 def test_shop_source_candidate_api_approves_candidate(
@@ -303,32 +294,19 @@ def test_shop_source_candidate_api_verifies_twogis_data(
     )
     candidate_id = client.get("/shop-source-candidates").json()["items"][0]["id"]
     monkeypatch.setattr(
-        "stroyhub.catalog.shop_candidates._resolve_candidate_website",
-        lambda source_id: "https://verify-api.example.test/",
-    )
-    monkeypatch.setattr(
-        "stroyhub.catalog.shop_candidates._probe_twogis_candidate_products",
-        lambda source_id: SimpleNamespace(
-            total=3,
-            items_seen=1,
-            products=[SimpleNamespace(price=Decimal("42.00"))],
-            completeness="partial",
-            stop_reason="max_pages_reached",
-        ),
+        "apps.worker.tasks.verify_shop_source_candidate_twogis_data_task.delay",
+        lambda cid: SimpleNamespace(id=f"verify-{cid}"),
     )
 
     response = client.post(f"/shop-source-candidates/{candidate_id}/verify-twogis-data")
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["website_found"] is True
-    assert payload["products_found"] is True
-    assert payload["website_url"] == "https://verify-api.example.test/"
-    assert payload["product_count"] == 3
-    assert payload["priced_product_count"] == 1
-    assert payload["candidate"]["has_website"] is True
-    assert payload["candidate"]["has_prices"] is True
-    assert payload["candidate"]["website_url"] == "https://verify-api.example.test/"
+    assert response.status_code == 202
+    assert response.json() == {
+        "operation": "verify_shop_source_candidate_twogis_data",
+        "status": "queued",
+        "task_id": f"verify-{candidate_id}",
+        "candidate_id": candidate_id,
+    }
 
 
 def test_shop_source_candidate_api_suggests_identity_and_approves_branch(

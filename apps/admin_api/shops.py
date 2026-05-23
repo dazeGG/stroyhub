@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from stroyhub.catalog.shops import (
@@ -16,17 +16,12 @@ from stroyhub.db.repositories import (
     ShopIdentityUpdate,
 )
 from stroyhub.models import Shop
-from stroyhub.parsers.twogis import TwogisClient
 from stroyhub.scraping.enqueue import (
     clear_enqueue_failed,
     enqueue_failure_state,
     mark_enqueue_failed,
 )
-from stroyhub.scraping.twogis import (
-    TWOGIS_LARGE_CATALOG_PAGE_SIZE,
-    build_twogis_large_catalog_raw,
-    twogis_large_catalog_state,
-)
+from stroyhub.scraping.twogis import build_twogis_large_catalog_raw, twogis_large_catalog_state
 
 from apps.admin_api.scrape_queue import enqueue_shop_scrape
 
@@ -98,6 +93,12 @@ class ShopScrapeRetryResponse(BaseModel):
     status: str
     task_id: str | None = None
     reason: str | None = None
+
+class AsyncOperationAcceptedResponse(BaseModel):
+    operation: str
+    status: str
+    task_id: str
+    shop_id: int
 
 
 class ShopIdentityResponse(BaseModel):
@@ -327,42 +328,28 @@ def retry_shop_scrape(
     )
 
 
-@router.post("/{shop_id}/twogis-large-catalog/enable", response_model=ShopListItemResponse)
+@router.post(
+    "/{shop_id}/twogis-large-catalog/enable",
+    response_model=AsyncOperationAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 def enable_twogis_large_catalog(
     shop_id: int,
     session: Annotated[Session, Depends(get_session)],
-) -> ShopListItemResponse:
+) -> AsyncOperationAcceptedResponse:
     shop = _get_twogis_shop(shop_id, session)
-    page = TwogisClient().fetch_branch_page(
-        branch_id=shop.source_id,
-        page=1,
-        page_size=TWOGIS_LARGE_CATALOG_PAGE_SIZE,
+    from apps.worker.tasks import enable_twogis_large_catalog_task
+
+    try:
+        task = enable_twogis_large_catalog_task.delay(shop.id)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return AsyncOperationAcceptedResponse(
+        operation="enable_twogis_large_catalog",
+        status="queued",
+        task_id=task.id,
+        shop_id=shop.id,
     )
-    existing_state = twogis_large_catalog_state(shop.raw)
-    raw = dict(shop.raw or {})
-    prior_items_seen = raw.get("items_seen")
-    inferred_next_page = (
-        int(prior_items_seen) // TWOGIS_LARGE_CATALOG_PAGE_SIZE + 1
-        if isinstance(prior_items_seen, int) and prior_items_seen > 0
-        else 1
-    )
-    raw["twogis_large_catalog"] = build_twogis_large_catalog_raw(
-        enabled=True,
-        total=page.total,
-        next_page=existing_state.next_page if existing_state is not None else inferred_next_page,
-        items_loaded=(
-            existing_state.items_loaded
-            if existing_state is not None
-            else max(inferred_next_page - 1, 0) * TWOGIS_LARGE_CATALOG_PAGE_SIZE
-        ),
-        completed=False,
-        last_stop_reason="operator_enabled",
-    )
-    shop.raw = raw
-    shop.scrape_status = "scheduled"
-    session.commit()
-    session.expire_all()
-    return _shop_response(shop_id, session)
 
 
 @router.post("/{shop_id}/twogis-large-catalog/disable", response_model=ShopListItemResponse)
