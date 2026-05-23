@@ -12,7 +12,12 @@ from stroyhub.db.repositories import (
 )
 from stroyhub.models import Shop, ShopIdentity, ShopSourceCandidate
 from stroyhub.parsers.metalltorg import METALLTORG_SHOP_SOURCE_ID, METALLTORG_SOURCE
-from stroyhub.parsers.unicom import UNICOM_DEFAULT_SHOP_SOURCE_ID, UNICOM_SOURCE, UnicomClient
+from stroyhub.parsers.unicom import (
+    UNICOM_DEFAULT_SHOP_SOURCE_ID,
+    UNICOM_SOURCE,
+    UnicomClient,
+    UnicomClientError,
+)
 from stroyhub.scraping.metalltorg import (
     METALLTORG_DEFAULT_CATEGORY_URLS,
     METALLTORG_DEFAULT_MAX_PAGES,
@@ -205,7 +210,10 @@ def _get_or_create_identity(
 
 
 def _discover_unicom_category_uuids() -> tuple[str, ...]:
-    discovered = UnicomClient().fetch_leaf_category_uuids()
+    try:
+        discovered = UnicomClient().fetch_leaf_category_uuids()
+    except UnicomClientError:
+        return UNICOM_DEFAULT_CATEGORY_UUIDS
     return discovered or UNICOM_DEFAULT_CATEGORY_UUIDS
 
 

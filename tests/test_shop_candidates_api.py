@@ -299,6 +299,10 @@ def test_shop_source_candidate_api_materializes_official_strategy(
         }
 
     monkeypatch.setattr("apps.api.shop_candidates.run_shop_scrape", fake_run_shop_scrape)
+    monkeypatch.setattr(
+        "stroyhub.catalog.official_sources._discover_unicom_category_uuids",
+        lambda: ("category-a", "category-b", "category-c"),
+    )
 
     response = client.post(
         "/shop-source-candidates/official-strategies/unicom/materialize",
