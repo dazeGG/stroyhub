@@ -200,16 +200,7 @@ def materialize_official_strategy(
     session.commit()
     scrape_result: dict[str, object] | None = None
     if payload is None or payload.run_scrape:
-        try:
-            scrape_result = run_shop_scrape(session, shop_id)
-        except Exception as exc:
-            session.rollback()
-            scrape_result = {
-                "shop_id": shop_id,
-                "source": source,
-                "status": "failed",
-                "error": str(exc),
-            }
+        scrape_result = enqueue_shop_scrape(shop_id)
 
     session.expire_all()
     shop = session.get(Shop, shop_id)
@@ -367,6 +358,17 @@ def _official_shop_for_strategy(session: Session, strategy: dict[str, object]) -
             )
         )
     return None
+
+
+def enqueue_shop_scrape(shop_id: int) -> dict[str, object]:
+    from apps.worker.tasks import scrape_shop
+
+    task = scrape_shop.delay(shop_id)
+    return {
+        "shop_id": shop_id,
+        "status": "queued",
+        "task_id": task.id,
+    }
 
 
 def _http_error(error: ValueError) -> HTTPException:

@@ -160,9 +160,7 @@ async function materializeOfficialGroup(group: ShopSourceCandidateGroup): Promis
   try {
     const response = await materializeOfficialStrategy(source, true)
     const scrapeResult = response.scrape_result
-    const scrapeMessage = scrapeResult?.status === 'success'
-      ? `Товары загружены, сохранено ${scrapeResult.products_saved ?? 0}.`
-      : `Загрузка завершилась со статусом ${scrapeResult?.status || 'unknown'}.`
+    const scrapeMessage = formatScrapeMessage(scrapeResult)
     saveMessage.value = `${response.shop.name}: официальный источник ${response.shop.source} создан/обновлен. ${scrapeMessage}`
     await loadCandidates()
   } catch (error) {
@@ -198,6 +196,16 @@ async function approveCandidate(
   } finally {
     approvingCandidateId.value = null
   }
+}
+
+function formatScrapeMessage(scrapeResult: ShopSourceCandidate['scrape_result']): string {
+  if (scrapeResult?.status === 'queued') {
+    return 'Загрузка поставлена в очередь.'
+  }
+  if (scrapeResult?.status === 'success') {
+    return `Товары загружены, сохранено ${scrapeResult.products_saved ?? 0}.`
+  }
+  return `Загрузка завершилась со статусом ${scrapeResult?.status || 'unknown'}.`
 }
 
 onMounted(() => {

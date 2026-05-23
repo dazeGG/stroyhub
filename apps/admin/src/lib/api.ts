@@ -207,6 +207,7 @@ export interface ShopSourceCandidate {
     products_seen?: number
     products_saved?: number
     price_snapshots_saved?: number
+    task_id?: string
     reason?: string
     error?: string
   } | null

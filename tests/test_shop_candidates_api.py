@@ -288,17 +288,15 @@ def test_shop_source_candidate_api_materializes_official_strategy(
     )
     observed_shop_ids: list[int] = []
 
-    def fake_run_shop_scrape(session: Session, shop_id: int) -> dict[str, object]:
+    def fake_enqueue_shop_scrape(shop_id: int) -> dict[str, object]:
         observed_shop_ids.append(shop_id)
         return {
             "shop_id": shop_id,
-            "source": "unicom",
-            "source_type": "official_api",
-            "status": "success",
-            "products_saved": 7,
+            "status": "queued",
+            "task_id": "task-unicom",
         }
 
-    monkeypatch.setattr("apps.api.shop_candidates.run_shop_scrape", fake_run_shop_scrape)
+    monkeypatch.setattr("apps.api.shop_candidates.enqueue_shop_scrape", fake_enqueue_shop_scrape)
     monkeypatch.setattr(
         "stroyhub.catalog.official_sources._discover_unicom_category_uuids",
         lambda: ("category-a", "category-b", "category-c"),
@@ -317,5 +315,9 @@ def test_shop_source_candidate_api_materializes_official_strategy(
     assert payload["identity"]["preferred_source"] == "unicom"
     assert payload["related_candidate_ids"]
     assert observed_shop_ids == [payload["shop"]["id"]]
-    assert payload["scrape_result"]["source"] == "unicom"
+    assert payload["scrape_result"] == {
+        "shop_id": payload["shop"]["id"],
+        "status": "queued",
+        "task_id": "task-unicom",
+    }
     assert client.get("/shop-source-candidates").json()["items"][0]["status"] == "pending"
