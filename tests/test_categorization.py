@@ -100,6 +100,11 @@ def test_rule_based_categorizer_aliases_cover_known_sources() -> None:
     examples = [
         ("2gis", "Гипсокартон и комплектующие", "drywall"),
         ("unicom", "Сухие клеевые смеси", "tile_adhesives"),
+        ("unicom", "Проходные переключатели", "wiring_devices"),
+        ("unicom", "Дифференциальные автоматы", "electrical_panels"),
+        ("unicom", "Муфты полипропиленовые", "water_pipes_fittings"),
+        ("unicom", "Комплектующие для вентиляционных систем", "ventilation"),
+        ("unicom", "Лента светодиодная", "lighting"),
         ("metalltorg", "Кирпич", "bricks_blocks"),
     ]
 

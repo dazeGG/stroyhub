@@ -173,6 +173,111 @@ DEFAULT_SOURCE_CATEGORY_ALIASES: tuple[SourceCategoryAlias, ...] = (
         raw_category="Трубы металлические",
         category_slug="metal_pipes",
     ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Проходные переключатели",
+        category_slug="wiring_devices",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Материалы для изоляции, крепления и маркировки",
+        category_slug="cable_routing",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Дифференциальные автоматы",
+        category_slug="electrical_panels",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Прочий столярно-слесарный инструмент",
+        category_slug="hand_tools",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Муфты полипропиленовые",
+        category_slug="water_pipes_fittings",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Аксессуары для розеток и выключателей",
+        category_slug="wiring_devices",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Наконечники и гильзы силовые",
+        category_slug="cables_wires",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Ленты",
+        category_slug="abrasives_tapes_consumables",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Комплектующие для вентиляционных систем",
+        category_slug="ventilation",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Силовые шины",
+        category_slug="electrical_panels",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Клеммы монтажные соединительные",
+        category_slug="cables_wires",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Аксессуары для лотков",
+        category_slug="cable_routing",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Шарнирно-губцевый инструмент",
+        category_slug="hand_tools",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Лента светодиодная",
+        category_slug="lighting",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Контакторы",
+        category_slug="electrical_panels",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Насадки",
+        category_slug="power_tool_accessories",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Аксессуары для сантехники",
+        category_slug="sanitary_ware",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Прочие фитинги",
+        category_slug="water_pipes_fittings",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Комплектующие для светодиодных лент",
+        category_slug="lighting",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Наконечники и гильзы",
+        category_slug="cables_wires",
+    ),
+    SourceCategoryAlias(
+        source="unicom",
+        raw_category="Аксессуары и комплектующие для металлорукавов",
+        category_slug="cable_routing",
+    ),
     SourceCategoryAlias(source="metalltorg", raw_category="Кирпич", category_slug="bricks_blocks"),
     SourceCategoryAlias(
         source="metalltorg",
