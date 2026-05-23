@@ -268,6 +268,21 @@ def test_shop_source_candidate_api_approve_returns_503_when_enqueue_fails(
     assert enqueue_failed["operation"] == "candidate_approve"
     assert enqueue_failed["reason"] == "broker down"
 
+    monkeypatch.setattr(
+        "apps.admin_api.shop_candidates.enqueue_shop_scrape",
+        lambda retry_shop_id: {
+            "shop_id": retry_shop_id,
+            "status": "queued",
+            "task_id": "retry-task",
+        },
+    )
+
+    retry_response = client.post(f"/shop-source-candidates/{candidate_id}/approve")
+
+    assert retry_response.status_code == 200
+    db_session.expire(shop)
+    assert shop.raw is None or "enqueue_failed" not in shop.raw
+
 
 def test_shop_source_candidate_api_verifies_twogis_data(
     client: TestClient,
@@ -463,3 +478,21 @@ def test_shop_source_candidate_api_materialize_returns_503_when_enqueue_fails(
     assert isinstance(enqueue_failed, dict)
     assert enqueue_failed["operation"] == "official_materialize"
     assert enqueue_failed["reason"] == "redis timeout"
+
+    monkeypatch.setattr(
+        "apps.admin_api.shop_candidates.enqueue_shop_scrape",
+        lambda retry_shop_id: {
+            "shop_id": retry_shop_id,
+            "status": "queued",
+            "task_id": "retry-task",
+        },
+    )
+
+    retry_response = client.post(
+        "/shop-source-candidates/official-strategies/unicom/materialize",
+        json={"run_scrape": True},
+    )
+
+    assert retry_response.status_code == 200
+    db_session.expire(shop)
+    assert shop.raw is None or "enqueue_failed" not in shop.raw

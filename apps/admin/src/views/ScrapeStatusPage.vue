@@ -122,7 +122,15 @@ function statusClass(status: string): string {
 }
 
 function canRetryShop(shop: ShopListItem): boolean {
-  return ['failed', 'partial'].includes(shop.scrape_status)
+  return ['failed', 'partial'].includes(shop.scrape_status) || shop.enqueue_failed !== null
+}
+
+function enqueueFailureTitle(shop: ShopListItem): string {
+  if (!shop.enqueue_failed) {
+    return ''
+  }
+
+  return `${shop.enqueue_failed.operation}: ${shop.enqueue_failed.reason}`
 }
 
 async function loadDashboard(): Promise<void> {
@@ -320,6 +328,13 @@ onMounted(() => {
               <span class="rounded-full border px-2 py-1 text-xs" :class="statusClass(shop.scrape_status)">
                 {{ statusLabel(shop.scrape_status) }}
               </span>
+              <p
+                v-if="shop.enqueue_failed"
+                class="mt-2 truncate text-xs text-red-300"
+                :title="enqueueFailureTitle(shop)"
+              >
+                enqueue: {{ shop.enqueue_failed.reason }}
+              </p>
             </div>
             <div class="text-neutral-400">{{ formatDateTime(shop.last_scraped_at) }}</div>
             <div class="text-neutral-400">{{ formatDateTime(shop.next_scrape_at) }}</div>

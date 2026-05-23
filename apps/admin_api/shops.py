@@ -17,7 +17,11 @@ from stroyhub.db.repositories import (
 )
 from stroyhub.models import Shop
 from stroyhub.parsers.twogis import TwogisClient
-from stroyhub.scraping.enqueue import mark_enqueue_failed
+from stroyhub.scraping.enqueue import (
+    clear_enqueue_failed,
+    enqueue_failure_state,
+    mark_enqueue_failed,
+)
 from stroyhub.scraping.twogis import (
     TWOGIS_LARGE_CATALOG_PAGE_SIZE,
     build_twogis_large_catalog_raw,
@@ -53,6 +57,14 @@ class TwogisLargeCatalogStateResponse(BaseModel):
     last_stop_reason: str | None = None
 
 
+class EnqueueFailureResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    operation: str
+    failed_at: str
+    reason: str
+
+
 class ShopListItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -72,6 +84,7 @@ class ShopListItemResponse(BaseModel):
     error_count: int
     is_preferred_source: bool
     twogis_large_catalog: TwogisLargeCatalogStateResponse | None = None
+    enqueue_failed: EnqueueFailureResponse | None = None
 
 
 class ShopListResponse(BaseModel):
@@ -278,8 +291,14 @@ def retry_shop_scrape(
         raise HTTPException(status_code=400, detail="disabled shop source cannot be retried")
     if shop.scrape_status == "running":
         raise HTTPException(status_code=409, detail="shop scrape is already running")
-    if shop.scrape_status not in {"failed", "partial"}:
-        raise HTTPException(status_code=400, detail="only failed or partial scrapes can be retried")
+    has_failed_enqueue = enqueue_failure_state(shop.raw) is not None
+    if shop.scrape_status not in {"failed", "partial"} and not (
+        shop.scrape_status == "scheduled" and has_failed_enqueue
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="only failed, partial, or enqueue-failed scheduled scrapes can be retried",
+        )
 
     shop.scrape_status = "scheduled"
     shop.next_scrape_at = datetime.now(UTC)
@@ -294,6 +313,8 @@ def retry_shop_scrape(
         )
         session.commit()
         raise HTTPException(status_code=503, detail=str(result.get("reason") or "enqueue failed"))
+    clear_enqueue_failed(shop)
+    session.commit()
     task_id = result.get("task_id")
     reason = result.get("reason")
     return ShopScrapeRetryResponse(

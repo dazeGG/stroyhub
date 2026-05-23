@@ -273,6 +273,7 @@ export interface ShopListItem {
   error_count: number
   is_preferred_source: boolean
   twogis_large_catalog: TwogisLargeCatalogState | null
+  enqueue_failed: EnqueueFailure | null
 }
 
 export interface ShopListResponse {
@@ -325,6 +326,12 @@ export interface TwogisLargeCatalogState {
   items_loaded: number
   completed: boolean
   last_stop_reason: string | null
+}
+
+export interface EnqueueFailure {
+  operation: string
+  failed_at: string
+  reason: string
 }
 
 export type ShopSourceCandidateStatus = 'pending' | 'stale' | 'hidden' | 'archived' | 'approved'

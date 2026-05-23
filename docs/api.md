@@ -406,7 +406,8 @@ Example response:
       "next_scrape_at": "2026-05-18T00:00:00Z",
       "scrape_interval": 86400,
       "error_count": 0,
-      "is_preferred_source": false
+      "is_preferred_source": false,
+      "enqueue_failed": null
     }
   ]
 }
@@ -414,6 +415,10 @@ Example response:
 
 Shop records are source-specific scrape targets. A linked `identity` groups
 multiple source records that describe the same real-world shop/location.
+
+When an immediate scrape enqueue fails after an admin action commits state,
+`enqueue_failed` contains `operation`, `failed_at`, and `reason` until the next
+successful enqueue clears it.
 
 ### `GET /shop-identities`
 
@@ -505,8 +510,9 @@ Success response includes enqueue metadata:
 }
 ```
 
-If enqueue fails after the status commit, the endpoint returns `503` and stores
-failure metadata in `shops.raw.enqueue_failed` for operator retry/repair.
+If enqueue fails after the status commit, the endpoint returns `503` and exposes
+failure metadata through `GET /shops` as `enqueue_failed`. A later successful
+retry clears that field.
 
 ## Shop Source Candidates
 
