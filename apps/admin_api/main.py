@@ -4,6 +4,7 @@ from stroyhub import __version__
 from apps.admin_api.canonical_products import router as canonical_products_router
 from apps.admin_api.categories import router as categories_router
 from apps.admin_api.matches import router as matches_router
+from apps.admin_api.operations import router as operations_router
 from apps.admin_api.product_matches import router as product_matches_router
 from apps.admin_api.product_normalization import router as product_normalization_router
 from apps.admin_api.products import router as products_router
@@ -21,6 +22,7 @@ def create_app() -> FastAPI:
     app.include_router(product_normalization_router)
     app.include_router(product_matches_router)
     app.include_router(products_router)
+    app.include_router(operations_router)
     app.include_router(scrapes_router)
     app.include_router(shop_candidates_router)
     app.include_router(shops_router)
@@ -34,4 +36,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

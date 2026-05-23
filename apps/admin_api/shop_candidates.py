@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -89,6 +89,12 @@ class ShopSourceCandidateRefreshResponse(BaseModel):
     items: list[ShopSourceCandidateResponse]
     groups: list[ShopSourceCandidateGroupResponse] = []
 
+class AsyncOperationAcceptedResponse(BaseModel):
+    operation: str
+    status: str
+    task_id: str
+    candidate_id: int | None = None
+
 
 class ShopSourceCandidateVerificationResponse(BaseModel):
     candidate: ShopSourceCandidateResponse
@@ -150,16 +156,26 @@ def list_shop_source_candidates(
     )
 
 
-@router.post("/refresh", response_model=ShopSourceCandidateRefreshResponse)
+@router.post(
+    "/refresh",
+    response_model=AsyncOperationAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 def refresh_shop_source_candidates(
     session: Annotated[Session, Depends(get_session)],
-) -> ShopSourceCandidateRefreshResponse:
-    catalog = ShopCandidateCatalog(session)
-    summary = catalog.refresh_from_twogis()
-    session.commit()
-    session.expire_all()
-    items = catalog.list_candidates(CandidateListFilters())
-    return _refresh_response(summary, items, catalog, session=session)
+) -> AsyncOperationAcceptedResponse:
+    del session
+    from apps.worker.tasks import refresh_shop_source_candidates_task
+
+    try:
+        task = refresh_shop_source_candidates_task.delay()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return AsyncOperationAcceptedResponse(
+        operation="refresh_shop_source_candidates",
+        status="queued",
+        task_id=task.id,
+    )
 
 
 @router.post("/{candidate_id}/approve", response_model=ShopSourceCandidateResponse)
@@ -205,22 +221,26 @@ def approve_shop_source_candidate(
 
 @router.post(
     "/{candidate_id}/verify-twogis-data",
-    response_model=ShopSourceCandidateVerificationResponse,
+    response_model=AsyncOperationAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 def verify_shop_source_candidate_twogis_data(
     candidate_id: int,
     session: Annotated[Session, Depends(get_session)],
-) -> ShopSourceCandidateVerificationResponse:
-    catalog = ShopCandidateCatalog(session)
-    try:
-        candidate, verification = catalog.verify_twogis_data(candidate_id)
-    except ValueError as exc:
-        raise _http_error(exc) from exc
+) -> AsyncOperationAcceptedResponse:
+    del session
+    from apps.worker.tasks import verify_shop_source_candidate_twogis_data_task
 
-    candidate_id = candidate.id
-    session.commit()
-    session.expire_all()
-    return _verification_response(candidate_id, verification, session)
+    try:
+        task = verify_shop_source_candidate_twogis_data_task.delay(candidate_id)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return AsyncOperationAcceptedResponse(
+        operation="verify_shop_source_candidate_twogis_data",
+        status="queued",
+        task_id=task.id,
+        candidate_id=candidate_id,
+    )
 
 
 @router.post(
