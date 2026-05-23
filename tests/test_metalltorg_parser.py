@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
-from stroyhub.parsers.metalltorg import parse_listing_page
+from stroyhub.parsers.metalltorg import parse_listing_page, parse_product_detail_page
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "metalltorg"
 
@@ -101,10 +101,12 @@ def test_parse_listing_page_collects_pagination_links_and_total_count() -> None:
     )
 
     assert page.total_count == 1185
-    assert page.next_page_urls == [
+    assert len(page.next_page_urls) == 59
+    assert page.next_page_urls[:2] == [
         "https://metalltorg.biz/catalog/stroitelnye_materialy_1/?PAGEN_1=2",
-        "https://metalltorg.biz/catalog/stroitelnye_materialy_1/?PAGEN_1=60",
+        "https://metalltorg.biz/catalog/stroitelnye_materialy_1/?PAGEN_1=3",
     ]
+    assert page.next_page_urls[-1] == "https://metalltorg.biz/catalog/stroitelnye_materialy_1/?PAGEN_1=60"
     assert page.raw["category_raw"] == "Строительные материалы"
 
 
@@ -113,3 +115,37 @@ def test_parse_listing_page_skips_cards_without_title() -> None:
 
     assert page.products == []
     assert page.raw["product_cards_seen"] == 1
+
+
+def test_parse_product_detail_page_extracts_category_metadata() -> None:
+    detail = parse_product_detail_page(
+        """
+        <html>
+          <head>
+            <link rel="canonical" href="/catalog/stroitelnye_materialy_1/kirpich/120420/" />
+            <meta name="description" content="Описание товара" />
+          </head>
+          <body>
+            <div class="product-info" itemscope itemtype="http://schema.org/Product">
+              <meta itemprop="category" content="Строительные материалы/Кирпич" />
+              <span class="article__value">24407</span>
+            </div>
+          </body>
+        </html>
+        """,
+        page_url="https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/120420/",
+    )
+
+    assert detail.category_raw == "Строительные материалы/Кирпич"
+    assert detail.description == "Описание товара"
+    assert detail.canonical_url == "https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/120420/"
+    assert detail.article == "24407"
+
+
+def test_parse_product_detail_page_falls_back_to_breadcrumb_category() -> None:
+    detail = parse_product_detail_page(
+        _load_fixture("product-kirpich-120420.html"),
+        page_url="https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/120420/",
+    )
+
+    assert detail.category_raw == "Строительные материалы/Кирпич"

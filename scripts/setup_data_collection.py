@@ -5,6 +5,8 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+DEFAULT_SETUP_SCRAPE_INTERVAL = 7 * 24 * 60 * 60
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
@@ -21,7 +23,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "then official shop sources and the initial 2GIS scrape whitelist."
         )
     )
-    parser.add_argument("--scrape-interval", type=int, default=86400)
+    parser.add_argument("--scrape-interval", type=int, default=DEFAULT_SETUP_SCRAPE_INTERVAL)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
@@ -31,6 +33,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.dry_run:
         metalltorg_args.append("--dry-run")
         unicom_args.append("--dry-run")
+    else:
+        unicom_args.append("--discover-categories")
 
     print("== Seed normalized categories ==")
     category_result = seed_categories(category_args)

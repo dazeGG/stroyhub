@@ -2,8 +2,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from html import unescape
 from html.parser import HTMLParser
+from math import ceil
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 from stroyhub.parsers.common import (
     JsonObject,
@@ -26,6 +27,7 @@ IMAGE_ATTR = "data-src"
 ARTICLE_ATTR = "data-value"
 PAGINATION_QUERY = "PAGEN_1="
 TOTAL_COUNT_ATTR = "data-all_count"
+LISTING_PAGE_SIZE = 20
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -33,6 +35,15 @@ class MetalltorgListingPage:
     products: list[ParsedProduct]
     next_page_urls: list[str]
     total_count: int | None
+    raw: JsonObject
+
+
+@dataclass(frozen=True, kw_only=True)
+class MetalltorgProductDetail:
+    category_raw: str | None
+    description: str | None
+    canonical_url: str | None
+    article: str | None
     raw: JsonObject
 
 
@@ -115,12 +126,44 @@ def parse_listing_page(
 
     return MetalltorgListingPage(
         products=products,
-        next_page_urls=_next_page_urls(root, page_url=page_url),
+        next_page_urls=_next_page_urls(
+            root,
+            page_url=page_url,
+            total_count=_total_count(root),
+        ),
         total_count=_total_count(root),
         raw={
             "page_url": page_url,
             "category_raw": resolved_category,
             "product_cards_seen": len(card_nodes),
+        },
+    )
+
+
+def parse_product_detail_page(
+    html: str,
+    *,
+    page_url: str = METALLTORG_BASE_URL,
+) -> MetalltorgProductDetail:
+    root = _parse_tree(html)
+    canonical_url = _canonical_url(root, page_url=page_url)
+    category_raw = _meta_content(root, "category")
+    description = _meta_by_name(root, "description")
+    article_node = _first_descendant(root, lambda node: _has_class(node, "article__value"))
+    article = _clean_text(article_node.text if article_node else None)
+    breadcrumb_path = _breadcrumb_category_path(root)
+
+    return MetalltorgProductDetail(
+        category_raw=category_raw or breadcrumb_path,
+        description=description,
+        canonical_url=canonical_url,
+        article=article,
+        raw={
+            "page_url": page_url,
+            "canonical_url": canonical_url,
+            "category_raw": category_raw,
+            "breadcrumb_category_path": breadcrumb_path,
+            "article": article,
         },
     )
 
@@ -169,6 +212,8 @@ def _parse_card(
         raw={
             "source_product_id": source_product_id,
             "product_url": product_url,
+            "product_url_category_path": _category_path_from_product_url(product_url),
+            "listing_category_raw": category_raw,
             "article": _attr(article_node, ARTICLE_ATTR),
             "stock_text": _stock_text(card),
             "card_text": card.text,
@@ -262,13 +307,45 @@ def _page_heading(root: _Node) -> str | None:
     return _clean_text(heading.text if heading else None)
 
 
-def _next_page_urls(root: _Node, *, page_url: str) -> list[str]:
+def _next_page_urls(root: _Node, *, page_url: str, total_count: int | None) -> list[str]:
     urls: list[str] = []
     for link in _find_all(root, lambda node: node.tag == "a"):
         href = _attr(link, "href")
         if href is not None and PAGINATION_QUERY in href:
             urls.append(urljoin(page_url, href))
-    return sorted(set(urls))
+    if total_count is not None:
+        urls.extend(_generated_page_urls(page_url=page_url, total_count=total_count))
+    return sorted(set(urls), key=_pagination_sort_key)
+
+
+def _generated_page_urls(*, page_url: str, total_count: int) -> list[str]:
+    if total_count <= LISTING_PAGE_SIZE:
+        return []
+    page_count = ceil(total_count / LISTING_PAGE_SIZE)
+    return [
+        _page_url(page_url=page_url, page_number=page_number)
+        for page_number in range(2, page_count + 1)
+    ]
+
+
+def _page_url(*, page_url: str, page_number: int) -> str:
+    parts = urlsplit(page_url)
+    query = [
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if key != "PAGEN_1"
+    ]
+    query.append(("PAGEN_1", str(page_number)))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def _pagination_sort_key(url: str) -> tuple[int, str]:
+    page_number = 1
+    for key, value in parse_qsl(urlsplit(url).query, keep_blank_values=True):
+        if key == "PAGEN_1" and value.isdecimal():
+            page_number = int(value)
+            break
+    return page_number, url
 
 
 def _total_count(root: _Node) -> int | None:
@@ -316,3 +393,73 @@ def _source_id_from_html(html: str) -> str | None:
         return None
     value = html[start:end].strip()
     return value or None
+
+
+def _meta_content(root: _Node, itemprop: str) -> str | None:
+    node = _first_descendant(
+        root,
+        lambda item: item.tag == "meta" and item.attrs.get("itemprop") == itemprop,
+    )
+    return _clean_text(_attr(node, "content"))
+
+
+def _meta_by_name(root: _Node, name: str) -> str | None:
+    node = _first_descendant(
+        root,
+        lambda item: item.tag == "meta" and item.attrs.get("name") == name,
+    )
+    return _clean_text(_attr(node, "content"))
+
+
+def _canonical_url(root: _Node, *, page_url: str) -> str | None:
+    node = _first_descendant(
+        root,
+        lambda item: item.tag == "link" and item.attrs.get("rel") == "canonical",
+    )
+    return _absolute_url(_attr(node, "href"), page_url=page_url)
+
+
+def _breadcrumb_category_path(root: _Node) -> str | None:
+    breadcrumbs_root = _first_descendant(root, lambda node: node.attrs.get("id") == "navigation")
+    if breadcrumbs_root is None:
+        breadcrumbs_root = _first_descendant(root, lambda node: _has_class(node, "breadcrumbs"))
+    if breadcrumbs_root is None:
+        return None
+
+    items: list[tuple[int, str]] = []
+    for item in _find_all(
+        breadcrumbs_root,
+        lambda node: node.attrs.get("itemprop") == "itemListElement",
+    ):
+        position_node = _first_descendant(
+            item,
+            lambda node: node.tag == "meta" and node.attrs.get("itemprop") == "position",
+        )
+        name_node = _first_descendant(item, lambda node: node.attrs.get("itemprop") == "name")
+        position_raw = _attr(position_node, "content")
+        name = _clean_text(name_node.text if name_node else None)
+        if position_raw is None or not position_raw.isdecimal() or name is None:
+            continue
+        items.append((int(position_raw), name))
+
+    names = [name for _, name in sorted(items) if name not in {"Металл Торг", "Каталог"}]
+    if names:
+        if len(names) > 1:
+            names = names[:-1]
+    else:
+        names = []
+        for link in _find_all(breadcrumbs_root, lambda node: node.tag == "a"):
+            link_name = _clean_text(link.text)
+            if link_name is not None and link_name not in {"Металл Торг", "Каталог"}:
+                names.append(link_name)
+    return "/".join(names) or None
+
+
+def _category_path_from_product_url(product_url: str | None) -> str | None:
+    if product_url is None:
+        return None
+    parts = [part for part in urlsplit(product_url).path.split("/") if part]
+    if len(parts) < 3 or parts[0] != "catalog":
+        return None
+    category_parts = parts[1:-1]
+    return "/".join(category_parts) or None

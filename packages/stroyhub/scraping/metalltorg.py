@@ -1,8 +1,9 @@
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from stroyhub.catalog.categorization import RuleBasedCategorizer
@@ -18,21 +19,22 @@ from stroyhub.db.repositories import (
     SourceProductRepository,
     SourceProductUpsert,
 )
-from stroyhub.models import Shop
+from stroyhub.models import Shop, SourceProduct
 from stroyhub.parsers.common import JsonObject, ParsedProduct
 from stroyhub.parsers.metalltorg import (
     METALLTORG_BASE_URL,
     METALLTORG_SHOP_SOURCE_ID,
     METALLTORG_SOURCE,
     parse_listing_page,
+    parse_product_detail_page,
 )
 
 METALLTORG_DEFAULT_SHOP_NAME = "Металл Торг"
 METALLTORG_DEFAULT_SHOP_URL = METALLTORG_BASE_URL
 METALLTORG_DEFAULT_TIMEOUT = 20.0
-METALLTORG_DEFAULT_MAX_PAGES = 3
+METALLTORG_DEFAULT_MAX_PAGES = 60
 METALLTORG_DEFAULT_CATEGORY_URLS = (
-    f"{METALLTORG_BASE_URL}/catalog/stroitelnye_materialy_1/kirpich/",
+    f"{METALLTORG_BASE_URL}/catalog/stroitelnye_materialy_1/",
 )
 
 
@@ -64,6 +66,7 @@ class MetalltorgShopScrapeConfig:
     category_urls: tuple[str, ...]
     max_pages: int = METALLTORG_DEFAULT_MAX_PAGES
     timeout: float = METALLTORG_DEFAULT_TIMEOUT
+    detail_enrichment: bool = True
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -75,6 +78,7 @@ class MetalltorgShopScrapeResult:
     source_products_saved: int
     price_snapshots_saved: int
     scrape_status: str
+    details_fetched: int = 0
 
 
 def scrape_metalltorg_category(
@@ -155,6 +159,7 @@ def scrape_metalltorg_shop(
     products_seen = 0
     source_products_saved = 0
     price_snapshots_saved = 0
+    details_fetched = 0
 
     for category_url in config.category_urls:
         result = scrape_metalltorg_category(
@@ -163,6 +168,14 @@ def scrape_metalltorg_shop(
             timeout=config.timeout,
             fetch=fetch,
             parsed_at=completed_at,
+        )
+        result, category_details_fetched = enrich_metalltorg_category_details(
+            session,
+            shop,
+            result,
+            enabled=config.detail_enrichment,
+            fetch=fetch,
+            timeout=config.timeout,
         )
         persisted = persist_metalltorg_scrape_result(
             session,
@@ -174,6 +187,7 @@ def scrape_metalltorg_shop(
         products_seen += result.products_seen
         source_products_saved += persisted.source_products_saved
         price_snapshots_saved += persisted.price_snapshots_saved
+        details_fetched += category_details_fetched
         if persisted.scrape_status != "success":
             categories_partial += 1
 
@@ -186,7 +200,59 @@ def scrape_metalltorg_shop(
         source_products_saved=source_products_saved,
         price_snapshots_saved=price_snapshots_saved,
         scrape_status=scrape_status,
+        details_fetched=details_fetched,
     )
+
+
+def enrich_metalltorg_category_details(
+    session: Session,
+    shop: Shop,
+    result: MetalltorgScrapeResult,
+    *,
+    enabled: bool = True,
+    fetch: Callable[[str, float], str] | None = None,
+    timeout: float = METALLTORG_DEFAULT_TIMEOUT,
+) -> tuple[MetalltorgScrapeResult, int]:
+    if not enabled or not result.products:
+        return result, 0
+
+    fetch_html = fetch or _fetch_html
+    enriched_products: list[ParsedProduct] = []
+    details_fetched = 0
+
+    for product in result.products:
+        if not _needs_detail_enrichment(session, shop_id=shop.id, product=product):
+            enriched_products.append(product)
+            continue
+
+        product_url = product.raw.get("product_url")
+        if not isinstance(product_url, str) or not product_url.strip():
+            enriched_products.append(product)
+            continue
+
+        try:
+            detail_html = fetch_html(product_url, timeout)
+        except httpx.HTTPError:
+            enriched_products.append(product)
+            continue
+
+        detail = parse_product_detail_page(detail_html, page_url=product_url)
+        details_fetched += 1
+        detail_raw = {
+            **product.raw,
+            "detail": detail.raw,
+            "detail_enriched": bool(detail.category_raw),
+        }
+        enriched_products.append(
+            replace(
+                product,
+                category_raw=detail.category_raw or product.category_raw,
+                description=detail.description or product.description,
+                raw=detail_raw,
+            )
+        )
+
+    return replace(result, products=enriched_products), details_fetched
 
 
 def persist_metalltorg_scrape_result(
@@ -338,7 +404,33 @@ def metalltorg_shop_scrape_config(raw: JsonObject | None) -> MetalltorgShopScrap
         category_urls=category_urls,
         max_pages=_positive_int(config.get("max_pages"), default=METALLTORG_DEFAULT_MAX_PAGES),
         timeout=_positive_float(config.get("timeout"), default=METALLTORG_DEFAULT_TIMEOUT),
+        detail_enrichment=bool(config.get("detail_enrichment", True)),
     )
+
+
+def _needs_detail_enrichment(
+    session: Session,
+    *,
+    shop_id: int,
+    product: ParsedProduct,
+) -> bool:
+    if product.source_product_id is None:
+        return not _has_detail_category(product.category_raw)
+
+    existing = session.scalar(
+        select(SourceProduct).where(
+            SourceProduct.source == product.source,
+            SourceProduct.shop_id == shop_id,
+            SourceProduct.source_product_id == product.source_product_id,
+        )
+    )
+    if existing is None:
+        return True
+    return not _has_detail_category(existing.category_raw)
+
+
+def _has_detail_category(category_raw: str | None) -> bool:
+    return bool(category_raw and "/" in category_raw)
 
 
 def _category_id(

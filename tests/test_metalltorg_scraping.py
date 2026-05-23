@@ -125,6 +125,7 @@ def test_scrape_metalltorg_shop_preserves_seeded_config(db_session: Session) -> 
     assert result.categories_partial == 0
     assert result.products_seen == 1
     assert result.scrape_status == "success"
+    assert result.details_fetched == 1
     assert shop.raw["category_urls"] == [
         "https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/"
     ]
@@ -175,5 +176,8 @@ def test_persist_metalltorg_scrape_failure_records_failed_run(db_session: Sessio
 
 def _fixture_fetch(url: str, timeout: float) -> str:
     assert timeout > 0
-    assert url == "https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/"
-    return (FIXTURES_DIR / "category-kirpich-page1.html").read_text()
+    if url == "https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/":
+        return (FIXTURES_DIR / "category-kirpich-page1.html").read_text()
+    if url == "https://metalltorg.biz/catalog/stroitelnye_materialy_1/kirpich/120420/":
+        return (FIXTURES_DIR / "product-kirpich-120420.html").read_text()
+    raise AssertionError(f"unexpected fixture URL: {url}")
