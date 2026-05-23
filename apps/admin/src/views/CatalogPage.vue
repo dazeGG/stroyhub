@@ -110,7 +110,7 @@ function formatPrice(product: ProductSearchItem): string {
 
 function categoryLabel(product: ProductSearchItem): string {
   if (!product.category_id) {
-    return 'Не нормализовано'
+    return 'Без категории'
   }
 
   return categoryNameById.value.get(product.category_id) || `ID ${product.category_id}`
@@ -253,7 +253,11 @@ async function loadProducts(options: { preserveScroll?: boolean } = {}): Promise
     const response = await fetchProducts(
       {
         q: searchQuery.value,
-        categoryId: selectedCategoryId.value ? Number(selectedCategoryId.value) : undefined,
+        categoryId:
+          selectedCategoryId.value && selectedCategoryId.value !== 'uncategorized'
+            ? Number(selectedCategoryId.value)
+            : undefined,
+        uncategorized: selectedCategoryId.value === 'uncategorized',
         shopId: selectedShopId.value ? Number(selectedShopId.value) : undefined,
         sort: sort.value,
         limit: pageSize,
@@ -396,6 +400,7 @@ onMounted(() => {
           :disabled="isLoadingFilters"
         >
           <option value="">Все категории</option>
+          <option value="uncategorized">Без категории</option>
           <option v-for="category in categoryOptions" :key="category.id" :value="String(category.id)">
             {{ category.label }}
           </option>

@@ -29,6 +29,7 @@ class ProductSearchFilters:
     q: str | None = None
     category_id: int | None = None
     category_slug: str | None = None
+    uncategorized: bool = False
     shop_id: int | None = None
     sort: ProductSort = "-last_seen_at"
     limit: int = 50
@@ -216,8 +217,9 @@ class ProductCatalog:
                     )
                 )
 
-        category_ids = self._category_filter_ids(filters)
-        if category_ids is not None:
+        if filters.uncategorized:
+            statement = statement.where(SourceProduct.category_id.is_(None))
+        elif (category_ids := self._category_filter_ids(filters)) is not None:
             if category_ids:
                 statement = statement.where(SourceProduct.category_id.in_(category_ids))
             else:

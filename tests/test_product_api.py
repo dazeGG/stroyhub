@@ -171,6 +171,49 @@ def test_products_endpoint_filters_by_search_shop_and_category(
     assert payload["total"] == 1
 
 
+def test_products_endpoint_filters_uncategorized_products(
+    client: TestClient, db_session: Session
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-api-uncategorized", name="Category Shop")
+    )
+    category = Category(slug="categorized-filter", name="Categorized")
+    db_session.add(category)
+    db_session.flush()
+
+    uncategorized_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="uncategorized-filter-product",
+            title="Uncategorized Filter Product",
+            normalized_title="uncategorized filter product",
+            category_raw="Raw category",
+        )
+    )
+    SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="categorized-filter-product",
+            title="Categorized Filter Product",
+            normalized_title="categorized filter product",
+            category_id=category.id,
+        )
+    )
+
+    response = client.get(
+        "/products",
+        params={"q": "Uncategorized Filter Product", "uncategorized": "true"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert [item["id"] for item in payload["items"]] == [uncategorized_product.id]
+    assert payload["items"][0]["category_id"] is None
+
+
 def test_products_endpoint_filters_parent_category_by_descendants(
     client: TestClient, db_session: Session
 ) -> None:
