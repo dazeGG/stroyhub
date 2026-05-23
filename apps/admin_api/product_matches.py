@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from stroyhub.catalog.product_match_decisions import (
@@ -17,6 +17,7 @@ from stroyhub.catalog.product_match_generation import (
 )
 from stroyhub.db import get_session
 
+from apps.admin_api.errors import ApiError, api_error_responses
 from apps.admin_api.validation import ActorName, ReasonText
 
 router = APIRouter(prefix="/product-matches", tags=["product-matches"])
@@ -85,7 +86,11 @@ def generate_product_match_candidates(
     return ProductMatchGenerateCandidatesResponse.model_validate(result)
 
 
-@router.post("/accept", response_model=ProductMatchDecisionResponse)
+@router.post(
+    "/accept",
+    response_model=ProductMatchDecisionResponse,
+    responses=api_error_responses(404, 409),
+)
 def accept_product_match(
     payload: ProductMatchDecisionRequest,
     session: Annotated[Session, Depends(get_session)],
@@ -102,7 +107,11 @@ def accept_product_match(
     return ProductMatchDecisionResponse.model_validate(decision)
 
 
-@router.post("/supersede", response_model=ProductMatchDecisionResponse)
+@router.post(
+    "/supersede",
+    response_model=ProductMatchDecisionResponse,
+    responses=api_error_responses(404, 409),
+)
 def supersede_product_match(
     payload: ProductMatchDecisionRequest,
     session: Annotated[Session, Depends(get_session)],
@@ -123,6 +132,7 @@ def supersede_product_match(
     "/from-source/{source_product_id}/accept",
     response_model=ProductMatchDecisionResponse,
     status_code=201,
+    responses=api_error_responses(404, 409),
 )
 def create_canonical_from_source_and_accept(
     source_product_id: Annotated[int, Path(gt=0)],
@@ -140,7 +150,11 @@ def create_canonical_from_source_and_accept(
     return ProductMatchDecisionResponse.model_validate(decision)
 
 
-@router.post("/{match_id}/reject", response_model=ProductMatchDecisionResponse)
+@router.post(
+    "/{match_id}/reject",
+    response_model=ProductMatchDecisionResponse,
+    responses=api_error_responses(404, 409),
+)
 def reject_product_match(
     match_id: Annotated[int, Path(gt=0)],
     payload: ProductMatchReviewRequest,
@@ -165,5 +179,13 @@ def _handle_decision_error(
     exc: ProductMatchDecisionNotFound | ProductMatchDecisionConflict,
 ) -> NoReturn:
     if isinstance(exc, ProductMatchDecisionNotFound):
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise ApiError(
+            status_code=404,
+            code="product_match_not_found",
+            message=str(exc),
+        ) from exc
+    raise ApiError(
+        status_code=409,
+        code="product_match_conflict",
+        message=str(exc),
+    ) from exc

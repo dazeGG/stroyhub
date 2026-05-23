@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, Path, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from stroyhub.catalog.products import ProductCatalog, ProductSearchFilters, ProductSort
@@ -14,6 +14,7 @@ from stroyhub.db.repositories import (
     CategoryRepository,
 )
 
+from apps.admin_api.errors import ApiError, api_error_responses
 from apps.admin_api.validation import ActorName, ReasonText
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -139,19 +140,31 @@ def search_products(
     )
 
 
-@router.get("/{product_id}", response_model=ProductSearchItemResponse)
+@router.get(
+    "/{product_id}",
+    response_model=ProductSearchItemResponse,
+    responses=api_error_responses(404),
+)
 def get_product(
     product_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ProductSearchItemResponse:
     item = ProductCatalog(session).get_product(product_id)
     if item is None:
-        raise HTTPException(status_code=404, detail="Source product not found")
+        raise ApiError(
+            status_code=404,
+            code="source_product_not_found",
+            message="Source product not found",
+        )
 
     return ProductSearchItemResponse.model_validate(item)
 
 
-@router.put("/{product_id}/category-override", response_model=ProductSearchItemResponse)
+@router.put(
+    "/{product_id}/category-override",
+    response_model=ProductSearchItemResponse,
+    responses=api_error_responses(404, 422),
+)
 def assign_product_category_override(
     product_id: Annotated[int, Path(gt=0)],
     payload: ProductCategoryOverrideRequest,
@@ -159,13 +172,21 @@ def assign_product_category_override(
 ) -> ProductSearchItemResponse:
     catalog = ProductCatalog(session)
     if catalog.get_product(product_id) is None:
-        raise HTTPException(status_code=404, detail="Source product not found")
+        raise ApiError(
+            status_code=404,
+            code="source_product_not_found",
+            message="Source product not found",
+        )
 
     category_repository = CategoryRepository(session)
     if category_repository.get(payload.category_id) is None:
-        raise HTTPException(status_code=404, detail="Category not found")
+        raise ApiError(status_code=404, code="category_not_found", message="Category not found")
     if category_repository.has_children(payload.category_id):
-        raise HTTPException(status_code=422, detail="Category override must target a leaf category")
+        raise ApiError(
+            status_code=422,
+            code="category_override_requires_leaf",
+            message="Category override must target a leaf category",
+        )
 
     CategoryOverrideRepository(session).create_or_replace(
         CategoryOverrideCreate(
@@ -179,11 +200,19 @@ def assign_product_category_override(
 
     item = ProductCatalog(session).get_product(product_id)
     if item is None:
-        raise HTTPException(status_code=404, detail="Source product not found")
+        raise ApiError(
+            status_code=404,
+            code="source_product_not_found",
+            message="Source product not found",
+        )
     return ProductSearchItemResponse.model_validate(item)
 
 
-@router.delete("/{product_id}/category-override", response_model=ProductSearchItemResponse)
+@router.delete(
+    "/{product_id}/category-override",
+    response_model=ProductSearchItemResponse,
+    responses=api_error_responses(404),
+)
 def revert_product_category_override(
     product_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
@@ -191,30 +220,50 @@ def revert_product_category_override(
 ) -> ProductSearchItemResponse:
     catalog = ProductCatalog(session)
     if catalog.get_product(product_id) is None:
-        raise HTTPException(status_code=404, detail="Source product not found")
+        raise ApiError(
+            status_code=404,
+            code="source_product_not_found",
+            message="Source product not found",
+        )
 
     reverted = CategoryOverrideRepository(session).revert_active(
         CategoryOverrideRevert(source_product_id=product_id, actor=actor)
     )
     if reverted is None:
-        raise HTTPException(status_code=404, detail="Active category override not found")
+        raise ApiError(
+            status_code=404,
+            code="active_category_override_not_found",
+            message="Active category override not found",
+        )
 
     session.commit()
 
     item = ProductCatalog(session).get_product(product_id)
     if item is None:
-        raise HTTPException(status_code=404, detail="Source product not found")
+        raise ApiError(
+            status_code=404,
+            code="source_product_not_found",
+            message="Source product not found",
+        )
     return ProductSearchItemResponse.model_validate(item)
 
 
-@router.get("/{product_id}/prices", response_model=ProductPriceHistoryResponse)
+@router.get(
+    "/{product_id}/prices",
+    response_model=ProductPriceHistoryResponse,
+    responses=api_error_responses(404),
+)
 def list_product_prices(
     product_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ProductPriceHistoryResponse:
     catalog = ProductCatalog(session)
     if not catalog.source_product_exists(product_id):
-        raise HTTPException(status_code=404, detail="Source product not found")
+        raise ApiError(
+            status_code=404,
+            code="source_product_not_found",
+            message="Source product not found",
+        )
 
     items = [
         ProductPriceSnapshotResponse.model_validate(item)

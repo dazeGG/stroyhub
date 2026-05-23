@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, Path, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from stroyhub.catalog.canonical_products import (
@@ -14,6 +14,7 @@ from stroyhub.db.repositories import CanonicalProductCreate, CanonicalProductRep
 from stroyhub.models import Category, SourceProduct
 from stroyhub.parsers.common import JsonObject, normalize_title
 
+from apps.admin_api.errors import ApiError, api_error_responses
 from apps.admin_api.validation import (
     CanonicalProductStatus,
     NonEmptyTitle,
@@ -197,6 +198,7 @@ def create_canonical_product(
     "/from-source/{source_product_id}",
     response_model=CanonicalProductDetailResponse,
     status_code=201,
+    responses=api_error_responses(404),
 )
 def create_canonical_product_from_source(
     source_product_id: Annotated[int, Path(gt=0)],
@@ -205,7 +207,11 @@ def create_canonical_product_from_source(
 ) -> CanonicalProductDetailResponse:
     source_product = session.get(SourceProduct, source_product_id)
     if source_product is None:
-        raise HTTPException(status_code=404, detail="Source product not found")
+        raise ApiError(
+            status_code=404,
+            code="source_product_not_found",
+            message="Source product not found",
+        )
 
     category_id = (
         payload.category_id if payload.category_id is not None else source_product.category_id
@@ -228,7 +234,11 @@ def create_canonical_product_from_source(
     return _canonical_detail_response(session, product.id)
 
 
-@router.get("/{canonical_product_id}", response_model=CanonicalProductDetailResponse)
+@router.get(
+    "/{canonical_product_id}",
+    response_model=CanonicalProductDetailResponse,
+    responses=api_error_responses(404),
+)
 def get_canonical_product(
     canonical_product_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
@@ -236,7 +246,11 @@ def get_canonical_product(
     return _canonical_detail_response(session, canonical_product_id)
 
 
-@router.patch("/{canonical_product_id}", response_model=CanonicalProductDetailResponse)
+@router.patch(
+    "/{canonical_product_id}",
+    response_model=CanonicalProductDetailResponse,
+    responses=api_error_responses(404),
+)
 def update_canonical_product(
     canonical_product_id: Annotated[int, Path(gt=0)],
     payload: CanonicalProductUpdateRequest,
@@ -244,7 +258,11 @@ def update_canonical_product(
 ) -> CanonicalProductDetailResponse:
     product = CanonicalProductRepository(session).get(canonical_product_id)
     if product is None:
-        raise HTTPException(status_code=404, detail="Canonical product not found")
+        raise ApiError(
+            status_code=404,
+            code="canonical_product_not_found",
+            message="Canonical product not found",
+        )
 
     if "category_id" in payload.model_fields_set:
         _ensure_category_exists(session, payload.category_id)
@@ -276,13 +294,17 @@ def _canonical_detail_response(
 ) -> CanonicalProductDetailResponse:
     detail = CanonicalProductCatalog(session).get_detail(canonical_product_id)
     if detail is None:
-        raise HTTPException(status_code=404, detail="Canonical product not found")
+        raise ApiError(
+            status_code=404,
+            code="canonical_product_not_found",
+            message="Canonical product not found",
+        )
     return CanonicalProductDetailResponse.model_validate(detail)
 
 
 def _ensure_category_exists(session: Session, category_id: int | None) -> None:
     if category_id is not None and session.get(Category, category_id) is None:
-        raise HTTPException(status_code=404, detail="Category not found")
+        raise ApiError(status_code=404, code="category_not_found", message="Category not found")
 
 
 def _json_object(value: dict[str, Any] | None) -> JsonObject | None:
