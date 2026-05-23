@@ -318,6 +318,13 @@ fix/<issue-number>-short-name
 
 Do not add a `develop` branch or classic Git Flow unless a later explicit project decision changes this.
 
+After a PR is accepted and the remote branch is deleted, clean up the matching local branch automatically when it is safe:
+
+- confirm the branch upstream is gone;
+- confirm the branch's changes are already present in `main` or otherwise accepted, for example with `git cherry main <branch>`;
+- delete the local branch when the check is clean;
+- do not delete branches with unaccepted or unclear local-only work.
+
 ## Commit Messages
 
 Use Conventional Commits for all new commits.
