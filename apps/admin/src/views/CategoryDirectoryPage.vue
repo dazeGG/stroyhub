@@ -222,7 +222,7 @@ onMounted(() => {
           data-testid="category-directory-row"
         >
           <div
-            class="grid w-full gap-3 px-4 py-4 text-left text-sm transition hover:bg-neutral-900/60 md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_150px]"
+            class="grid w-full gap-3 px-4 py-4 text-left text-sm transition hover:bg-neutral-900/60 md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_150px] md:gap-x-6"
           >
             <button
               type="button"
@@ -276,7 +276,7 @@ onMounted(() => {
             <div
               v-for="child in category.children"
               :key="child.id"
-              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_150px]"
+              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_150px] md:gap-x-6"
               data-testid="category-directory-row"
             >
               <div class="min-w-0 pl-10 md:pl-12">
