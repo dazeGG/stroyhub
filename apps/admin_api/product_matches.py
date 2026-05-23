@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from stroyhub.catalog.product_match_decisions import (
@@ -17,14 +17,16 @@ from stroyhub.catalog.product_match_generation import (
 )
 from stroyhub.db import get_session
 
+from apps.admin_api.validation import ActorName, ReasonText
+
 router = APIRouter(prefix="/product-matches", tags=["product-matches"])
 
 
 class ProductMatchDecisionRequest(BaseModel):
-    canonical_product_id: int
-    source_product_id: int
-    actor: str | None = "admin"
-    reason: str | None = None
+    canonical_product_id: Annotated[int, Field(gt=0)]
+    source_product_id: Annotated[int, Field(gt=0)]
+    actor: ActorName | None = "admin"
+    reason: ReasonText | None = None
 
 
 class ProductMatchGenerateCandidatesRequest(BaseModel):
@@ -36,8 +38,8 @@ class ProductMatchGenerateCandidatesRequest(BaseModel):
 
 
 class ProductMatchReviewRequest(BaseModel):
-    actor: str | None = "admin"
-    reason: str | None = None
+    actor: ActorName | None = "admin"
+    reason: ReasonText | None = None
 
 
 class ProductMatchDecisionResponse(BaseModel):
@@ -123,7 +125,7 @@ def supersede_product_match(
     status_code=201,
 )
 def create_canonical_from_source_and_accept(
-    source_product_id: int,
+    source_product_id: Annotated[int, Path(gt=0)],
     payload: ProductMatchReviewRequest,
     session: Annotated[Session, Depends(get_session)],
 ) -> ProductMatchDecisionResponse:
@@ -140,7 +142,7 @@ def create_canonical_from_source_and_accept(
 
 @router.post("/{match_id}/reject", response_model=ProductMatchDecisionResponse)
 def reject_product_match(
-    match_id: int,
+    match_id: Annotated[int, Path(gt=0)],
     payload: ProductMatchReviewRequest,
     session: Annotated[Session, Depends(get_session)],
 ) -> ProductMatchDecisionResponse:

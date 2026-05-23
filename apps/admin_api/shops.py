@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from stroyhub.catalog.shops import (
@@ -24,6 +24,7 @@ from stroyhub.scraping.enqueue import (
 from stroyhub.scraping.twogis import build_twogis_large_catalog_raw, twogis_large_catalog_state
 
 from apps.admin_api.scrape_queue import enqueue_shop_scrape
+from apps.admin_api.validation import ShopIdentityStatus, ShopScrapeStatus
 
 router = APIRouter(prefix="/shops", tags=["shops"])
 identity_router = APIRouter(prefix="/shop-identities", tags=["shop-identities"])
@@ -124,7 +125,7 @@ class ShopIdentityCreateRequest(BaseModel):
     address: str | None = None
     website_url: str | None = None
     preferred_source: str | None = None
-    status: str = "active"
+    status: ShopIdentityStatus = "active"
     notes: str | None = None
     locked_fields: dict[str, object] | None = None
 
@@ -134,7 +135,7 @@ class ShopIdentityUpdateRequest(BaseModel):
     address: str | None = None
     website_url: str | None = None
     preferred_source: str | None = None
-    status: str | None = None
+    status: ShopIdentityStatus | None = None
     notes: str | None = None
     locked_fields: dict[str, object] | None = None
 
@@ -143,9 +144,9 @@ class ShopIdentityUpdateRequest(BaseModel):
 def list_shops(
     session: Annotated[Session, Depends(get_session)],
     source: str | None = None,
-    status: str | None = None,
+    status: ShopScrapeStatus | None = None,
     source_type: str | None = None,
-    identity_id: int | None = None,
+    identity_id: Annotated[int | None, Query(gt=0)] = None,
     identity: str | None = None,
 ) -> ShopListResponse:
     filters = ShopListFilters(
@@ -165,7 +166,7 @@ def list_shops(
 @identity_router.get("", response_model=ShopIdentityListResponse)
 def list_shop_identities(
     session: Annotated[Session, Depends(get_session)],
-    status: str | None = None,
+    status: ShopIdentityStatus | None = None,
 ) -> ShopIdentityListResponse:
     filters = ShopIdentityListFilters(status=status)
     items = [
@@ -203,7 +204,7 @@ def create_shop_identity(
 
 @identity_router.patch("/{identity_id}", response_model=ShopIdentityResponse)
 def update_shop_identity(
-    identity_id: int,
+    identity_id: Annotated[int, Path(gt=0)],
     payload: ShopIdentityUpdateRequest,
     session: Annotated[Session, Depends(get_session)],
 ) -> ShopIdentityResponse:
@@ -231,7 +232,7 @@ def update_shop_identity(
 
 @identity_router.delete("/{identity_id}", status_code=204)
 def delete_shop_identity(
-    identity_id: int,
+    identity_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Response:
     repository = ShopIdentityRepository(session)
@@ -250,7 +251,7 @@ def delete_shop_identity(
 )
 def link_shop_source(
     identity_id: int,
-    shop_id: int,
+    shop_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ShopListItemResponse:
     repository = ShopIdentityRepository(session)
@@ -266,7 +267,7 @@ def link_shop_source(
 
 @router.delete("/{shop_id}/identity", response_model=ShopListItemResponse)
 def unlink_shop_source(
-    shop_id: int,
+    shop_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ShopListItemResponse:
     repository = ShopIdentityRepository(session)
@@ -282,7 +283,7 @@ def unlink_shop_source(
 
 @router.post("/{shop_id}/scrape/retry", response_model=ShopScrapeRetryResponse)
 def retry_shop_scrape(
-    shop_id: int,
+    shop_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ShopScrapeRetryResponse:
     shop = session.get(Shop, shop_id)
@@ -334,7 +335,7 @@ def retry_shop_scrape(
     status_code=status.HTTP_202_ACCEPTED,
 )
 def enable_twogis_large_catalog(
-    shop_id: int,
+    shop_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> AsyncOperationAcceptedResponse:
     shop = _get_twogis_shop(shop_id, session)
@@ -354,7 +355,7 @@ def enable_twogis_large_catalog(
 
 @router.post("/{shop_id}/twogis-large-catalog/disable", response_model=ShopListItemResponse)
 def disable_twogis_large_catalog(
-    shop_id: int,
+    shop_id: Annotated[int, Path(gt=0)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ShopListItemResponse:
     shop = _get_twogis_shop(shop_id, session)
