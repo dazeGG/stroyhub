@@ -17,7 +17,7 @@ from stroyhub.models import Shop, ShopIdentity, ShopSourceCandidate
 from stroyhub.parsers.metalltorg import METALLTORG_SHOP_SOURCE_ID, METALLTORG_SOURCE
 from stroyhub.parsers.unicom import UNICOM_DEFAULT_SHOP_SOURCE_ID, UNICOM_SOURCE
 
-from apps.api.scrape_queue import enqueue_shop_scrape
+from apps.admin_api.scrape_queue import enqueue_shop_scrape
 
 router = APIRouter(prefix="/shop-source-candidates", tags=["shop-source-candidates"])
 

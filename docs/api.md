@@ -1,10 +1,11 @@
-# API v2 Endpoints
+# Admin API v2 Endpoints
 
-This document summarizes the catalog API surface used by future UI and admin
-screens. Run locally with:
+This document summarizes the admin/operator API surface. The public read-only
+API is documented separately in [public-api.md](public-api.md). Run the admin
+API locally with:
 
 ```bash
-uv run uvicorn apps.api.main:app --reload
+uv run uvicorn apps.admin_api.main:app --port 8001 --reload
 ```
 
 Interactive OpenAPI docs are available at `GET /docs`; the raw schema is

@@ -13,8 +13,8 @@ from stroyhub.core.config import settings
 from stroyhub.db import ShopIdentityCreate, ShopIdentityRepository
 from stroyhub.models import Shop
 
-from apps.api.main import create_app
-from apps.api.products import get_session
+from apps.admin_api.main import create_app
+from apps.admin_api.products import get_session
 
 
 @pytest.fixture
@@ -194,7 +194,10 @@ def test_shop_source_candidate_api_approves_candidate(
             "task_id": "task-2gis",
         }
 
-    monkeypatch.setattr("apps.api.shop_candidates.enqueue_shop_scrape", fake_enqueue_shop_scrape)
+    monkeypatch.setattr(
+        "apps.admin_api.shop_candidates.enqueue_shop_scrape",
+        fake_enqueue_shop_scrape,
+    )
     monkeypatch.setattr(
         "stroyhub.catalog.shop_candidates._resolve_candidate_website",
         lambda source_id: "https://candidate.example.test/",
@@ -298,7 +301,7 @@ def test_shop_source_candidate_api_suggests_identity_and_approves_branch(
         "reason": "name_match",
     }
     monkeypatch.setattr(
-        "apps.api.shop_candidates.enqueue_shop_scrape",
+        "apps.admin_api.shop_candidates.enqueue_shop_scrape",
         lambda shop_id: {"shop_id": shop_id, "status": "queued"},
     )
 
@@ -341,7 +344,10 @@ def test_shop_source_candidate_api_materializes_official_strategy(
             "task_id": "task-unicom",
         }
 
-    monkeypatch.setattr("apps.api.shop_candidates.enqueue_shop_scrape", fake_enqueue_shop_scrape)
+    monkeypatch.setattr(
+        "apps.admin_api.shop_candidates.enqueue_shop_scrape",
+        fake_enqueue_shop_scrape,
+    )
     monkeypatch.setattr(
         "stroyhub.catalog.official_sources._discover_unicom_category_uuids",
         lambda: ("category-a", "category-b", "category-c"),

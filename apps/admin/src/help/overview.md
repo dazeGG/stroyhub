@@ -15,7 +15,7 @@
 ## Локальный запуск
 
 ```bash
-uv run uvicorn apps.api.main:app --reload
+uv run uvicorn apps.admin_api.main:app --port 8001 --reload
 ```
 
 ```bash

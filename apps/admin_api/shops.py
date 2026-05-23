@@ -23,7 +23,7 @@ from stroyhub.scraping.twogis import (
     twogis_large_catalog_state,
 )
 
-from apps.api.scrape_queue import enqueue_shop_scrape
+from apps.admin_api.scrape_queue import enqueue_shop_scrape
 
 router = APIRouter(prefix="/shops", tags=["shops"])
 identity_router = APIRouter(prefix="/shop-identities", tags=["shop-identities"])

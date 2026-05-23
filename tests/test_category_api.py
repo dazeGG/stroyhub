@@ -19,9 +19,9 @@ from stroyhub.db import (
 )
 from stroyhub.models import Category
 
-import apps.api.categories as categories_api
-from apps.api.main import create_app
-from apps.api.products import get_session
+import apps.admin_api.categories as categories_api
+from apps.admin_api.main import create_app
+from apps.admin_api.products import get_session
 
 
 @pytest.fixture

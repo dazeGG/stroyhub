@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
 from stroyhub.db import ScrapeRunCreate, ScrapeRunRepository, ShopRepository, ShopUpsert
 
-from apps.api.main import create_app
-from apps.api.products import get_session
+from apps.admin_api.main import create_app
+from apps.admin_api.products import get_session
 
 
 @pytest.fixture

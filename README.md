@@ -6,7 +6,8 @@ StroyHub is a price aggregator for construction materials in Yakutsk. The MVP fo
 
 ```text
 apps/
-  api/                  FastAPI entrypoint: apps.api.main
+  api/                  Public FastAPI entrypoint: apps.api.main
+  admin_api/            Admin/operator FastAPI entrypoint: apps.admin_api.main
   worker/               Celery worker entrypoint: apps.worker.celery_app
 packages/
   stroyhub/             Reusable domain package
@@ -47,15 +48,17 @@ If your Docker installation uses the standalone Compose command:
 docker-compose up -d
 ```
 
-This starts PostgreSQL, Redis, the FastAPI app, the Celery worker with beat, and
-the admin Vite dev server. In this mode, the API reloads through Uvicorn,
-the admin UI reloads through Vite, and the Celery worker restarts when Python
-files under `apps/` or `packages/` change.
+This starts PostgreSQL, Redis, the public FastAPI app, the admin FastAPI app,
+the Celery worker with beat, and the admin Vite dev server. In this mode, both
+API apps reload through Uvicorn, the admin UI reloads through Vite, and the
+Celery worker restarts when Python files under `apps/` or `packages/` change.
 
 Useful local URLs:
 
-- API: `http://127.0.0.1:8000`
-- API docs: `http://127.0.0.1:8000/docs`
+- Public API: `http://127.0.0.1:8000`
+- Public API docs: `http://127.0.0.1:8000/docs`
+- Admin API: `http://127.0.0.1:8001`
+- Admin API docs: `http://127.0.0.1:8001/docs`
 - Admin: `http://127.0.0.1:5173`
 
 Docker Desktop or another Docker daemon must be running before starting the
@@ -81,6 +84,12 @@ Run the API locally:
 
 ```bash
 uv run uvicorn apps.api.main:app --reload
+```
+
+Run the admin API locally:
+
+```bash
+uv run uvicorn apps.admin_api.main:app --port 8001 --reload
 ```
 
 Run the Celery worker locally:
@@ -151,5 +160,6 @@ Project tasks are tracked in GitHub Issues and the [StroyHub MVP project](https:
 
 ## Runbooks
 
-- [API v2 endpoints](docs/api.md)
+- [Public API endpoints](docs/public-api.md)
+- [Admin API v2 endpoints](docs/api.md)
 - [Local data collection](docs/local-data-collection.md)

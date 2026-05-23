@@ -21,8 +21,8 @@ from stroyhub.db import (
 )
 from stroyhub.models import Category
 
-from apps.api.canonical_products import get_session
-from apps.api.main import create_app
+from apps.admin_api.canonical_products import get_session
+from apps.admin_api.main import create_app
 
 
 @pytest.fixture

@@ -11,7 +11,7 @@ The admin UI lives in:
 apps/admin/
 ```
 
-It is a separate frontend application. It talks to `apps/api` over HTTP and must
+It is a separate frontend application. It talks to `apps/admin_api` over HTTP and must
 not import Python modules from `packages/stroyhub` directly.
 
 ## Starter Stack
@@ -52,10 +52,16 @@ If your Docker installation uses standalone Compose:
 docker-compose up -d
 ```
 
-Run the API from the repository root:
+Run the public API from the repository root:
 
 ```bash
 uv run uvicorn apps.api.main:app --reload
+```
+
+Run the admin API from the repository root:
+
+```bash
+uv run uvicorn apps.admin_api.main:app --port 8001 --reload
 ```
 
 Run the admin dev server:
@@ -65,9 +71,9 @@ cd apps/admin
 pnpm dev
 ```
 
-The admin dev server proxies `/api/*` requests to the local FastAPI app on
-`http://127.0.0.1:8000` by default. In Docker Compose, it uses the internal
-`http://api:8000` service URL through `VITE_API_PROXY_TARGET`.
+The admin dev server proxies `/api/*` requests to the local admin FastAPI app on
+`http://127.0.0.1:8001` by default. In Docker Compose, it uses the internal
+`http://admin_api:8001` service URL through `VITE_API_PROXY_TARGET`.
 
 ## Initial M12 Jobs
 

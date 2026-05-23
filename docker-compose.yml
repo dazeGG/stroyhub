@@ -65,11 +65,44 @@ services:
       redis:
         condition: service_healthy
 
+  admin_api:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    working_dir: /app
+    environment:
+      STROYHUB_DATABASE_URL: postgresql+psycopg://stroyhub:stroyhub@postgres:5432/stroyhub
+      STROYHUB_REDIS_URL: redis://redis:6379/0
+      UV_LINK_MODE: copy
+    command:
+      - sh
+      - -c
+      - >
+        uv sync --all-extras &&
+        uv run uvicorn apps.admin_api.main:app --host 0.0.0.0 --port 8001 --reload
+    ports:
+      - "${ADMIN_API_PORT:-8001}:8001"
+    volumes:
+      - .:/app
+      - stroyhub_uv_cache:/root/.cache/uv
+      - stroyhub_venv:/app/.venv
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2).read()\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
   admin:
     image: node:22-bookworm-slim
     working_dir: /app/apps/admin
     environment:
-      VITE_API_PROXY_TARGET: http://api:8000
+      VITE_API_PROXY_TARGET: http://admin_api:8001
     command:
       - sh
       - -c
@@ -83,7 +116,7 @@ services:
       - .:/app
       - stroyhub_admin_node_modules:/app/apps/admin/node_modules
     depends_on:
-      api:
+      admin_api:
         condition: service_healthy
 
   postgres:
