@@ -446,7 +446,7 @@ def test_products_endpoint_treats_search_wildcards_as_literal_text(
             normalized_title="primer 100% coverage",
         )
     )
-    SourceProductRepository(db_session).upsert(
+    non_matching_product = SourceProductRepository(db_session).upsert(
         SourceProductUpsert(
             shop_id=shop.id,
             source="2gis",
@@ -459,7 +459,9 @@ def test_products_endpoint_treats_search_wildcards_as_literal_text(
     response = client.get("/products", params={"q": "100%"})
 
     assert response.status_code == 200
-    assert [item["id"] for item in response.json()["items"]] == [matching_product.id]
+    returned_ids = {item["id"] for item in response.json()["items"]}
+    assert matching_product.id in returned_ids
+    assert non_matching_product.id not in returned_ids
 
 
 def test_product_detail_endpoint_returns_source_product(

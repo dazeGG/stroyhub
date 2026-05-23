@@ -120,6 +120,15 @@ export interface ShopListResponse {
   items: ShopListItem[]
 }
 
+export interface ShopScrapeRetryResponse {
+  shop_id: number
+  source: string
+  source_type: SourceType
+  status: string
+  task_id: string | null
+  reason: string | null
+}
+
 export type SourceType = '2gis' | 'official_api' | 'official_html'
 
 export type IdentityStatus = 'active' | 'hold' | 'disabled' | 'out_of_scope'
@@ -608,6 +617,17 @@ export function disableTwogisLargeCatalog(
 ): Promise<ShopListItem> {
   return writeJson<ShopListItem>(
     `/shops/${shopId}/twogis-large-catalog/disable`,
+    { method: 'POST' },
+    signal,
+  )
+}
+
+export function retryShopScrape(
+  shopId: number,
+  signal?: AbortSignal,
+): Promise<ShopScrapeRetryResponse> {
+  return writeJson<ShopScrapeRetryResponse>(
+    `/shops/${shopId}/scrape/retry`,
     { method: 'POST' },
     signal,
   )

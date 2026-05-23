@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -73,6 +73,15 @@ class ShopListItemResponse(BaseModel):
 
 class ShopListResponse(BaseModel):
     items: list[ShopListItemResponse]
+
+
+class ShopScrapeRetryResponse(BaseModel):
+    shop_id: int
+    source: str
+    source_type: str
+    status: str
+    task_id: str | None = None
+    reason: str | None = None
 
 
 class ShopIdentityResponse(BaseModel):
@@ -254,6 +263,38 @@ def unlink_shop_source(
     return _shop_response(shop.id, session)
 
 
+@router.post("/{shop_id}/scrape/retry", response_model=ShopScrapeRetryResponse)
+def retry_shop_scrape(
+    shop_id: int,
+    session: Annotated[Session, Depends(get_session)],
+) -> ShopScrapeRetryResponse:
+    shop = session.get(Shop, shop_id)
+    if shop is None:
+        raise HTTPException(status_code=404, detail="shop not found")
+    if shop.scrape_status == "disabled":
+        raise HTTPException(status_code=400, detail="disabled shop source cannot be retried")
+    if shop.scrape_status == "running":
+        raise HTTPException(status_code=409, detail="shop scrape is already running")
+    if shop.scrape_status not in {"failed", "partial"}:
+        raise HTTPException(status_code=400, detail="only failed or partial scrapes can be retried")
+
+    shop.scrape_status = "scheduled"
+    shop.next_scrape_at = datetime.now(UTC)
+    session.commit()
+
+    result = enqueue_shop_scrape(shop.id)
+    task_id = result.get("task_id")
+    reason = result.get("reason")
+    return ShopScrapeRetryResponse(
+        shop_id=shop.id,
+        source=shop.source,
+        source_type=shop.source_type,
+        status=str(result.get("status", "queued")),
+        task_id=task_id if isinstance(task_id, str) else None,
+        reason=reason if isinstance(reason, str) else None,
+    )
+
+
 @router.post("/{shop_id}/twogis-large-catalog/enable", response_model=ShopListItemResponse)
 def enable_twogis_large_catalog(
     shop_id: int,
@@ -338,6 +379,17 @@ def _get_twogis_shop(shop_id: int, session: Session) -> Shop:
     if shop.source != "2gis":
         raise HTTPException(status_code=400, detail="large catalog mode is only for 2GIS shops")
     return shop
+
+
+def enqueue_shop_scrape(shop_id: int) -> dict[str, object]:
+    from apps.worker.tasks import scrape_shop
+
+    task = scrape_shop.delay(shop_id)
+    return {
+        "shop_id": shop_id,
+        "status": "queued",
+        "task_id": task.id,
+    }
 
 
 def _http_error(error: ValueError) -> HTTPException:

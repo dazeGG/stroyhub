@@ -11,6 +11,7 @@ import {
   fetchShopIdentities,
   fetchShops,
   linkShopSource,
+  retryShopScrape,
   unlinkShopSource,
   updateShopIdentity,
   type IdentityStatus,
@@ -49,6 +50,7 @@ const savingIdentityId = ref<number | null>(null)
 const deletingIdentityId = ref<number | null>(null)
 const linkingShopId = ref<number | null>(null)
 const largeCatalogActionShopId = ref<number | null>(null)
+const retryingShopId = ref<number | null>(null)
 const isCreateModalOpen = ref(false)
 const editingIdentity = ref<ShopIdentity | null>(null)
 const deletingIdentity = ref<ShopIdentity | null>(null)
@@ -151,6 +153,10 @@ function sourceTypeClass(sourceType: string): string {
   }
 
   return 'border-neutral-700 bg-neutral-900 text-neutral-300'
+}
+
+function canRetryShop(shop: ShopListItem): boolean {
+  return ['failed', 'partial'].includes(shop.scrape_status)
 }
 
 function formatDateTime(value: string | null): string {
@@ -454,6 +460,22 @@ async function disableLargeCatalog(shop: ShopListItem): Promise<void> {
   }
 }
 
+async function retryScrape(shop: ShopListItem): Promise<void> {
+  retryingShopId.value = shop.id
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    await retryShopScrape(shop.id)
+    await loadShopManagement()
+    saveMessage.value = 'Скрейп поставлен в очередь'
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось перезапустить скрейп'
+  } finally {
+    retryingShopId.value = null
+  }
+}
+
 watch(
   [selectedSource, selectedStatus, selectedSourceType, selectedRelationship, selectedIdentityId],
   () => {
@@ -721,6 +743,16 @@ onMounted(() => {
                   {{ statusLabel(shop.scrape_status) }}
                 </span>
                 <p class="mt-2 text-xs text-neutral-500">ошибок: {{ shop.error_count }}</p>
+                <button
+                  v-if="canRetryShop(shop)"
+                  type="button"
+                  class="mt-3 inline-flex h-8 items-center justify-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-xs font-medium text-amber-100 transition hover:border-amber-300 hover:bg-amber-300/15 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="retryingShopId === shop.id"
+                  @click="retryScrape(shop)"
+                >
+                  <Icon :icon="icons.refresh" class="size-3.5" aria-hidden="true" />
+                  {{ retryingShopId === shop.id ? 'Ставим...' : 'Перезапустить' }}
+                </button>
                 <div v-if="shop.twogis_large_catalog" class="mt-3 max-w-[220px] rounded-md border border-amber-300/20 bg-amber-300/10 p-2 text-xs text-amber-100">
                   <div class="flex items-center justify-between gap-2">
                     <span class="font-medium">2GIS large</span>

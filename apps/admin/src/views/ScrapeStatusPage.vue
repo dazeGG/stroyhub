@@ -5,6 +5,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import {
   fetchScrapeHealth,
   fetchShops,
+  retryShopScrape,
   type RecentScrapeRun,
   type ScrapeStatusCount,
   type ShopListItem,
@@ -19,6 +20,8 @@ const statusCounts = ref<ScrapeStatusCount[]>([])
 const recentRuns = ref<RecentScrapeRun[]>([])
 const isLoading = ref(false)
 const errorMessage = ref('')
+const saveMessage = ref('')
+const retryingShopId = ref<number | null>(null)
 
 let dashboardRequest: AbortController | null = null
 
@@ -115,6 +118,10 @@ function statusClass(status: string): string {
   return 'border-neutral-700 bg-neutral-900 text-neutral-300'
 }
 
+function canRetryShop(shop: ShopListItem): boolean {
+  return ['failed', 'partial'].includes(shop.scrape_status)
+}
+
 async function loadDashboard(): Promise<void> {
   dashboardRequest?.abort()
   const request = new AbortController()
@@ -158,6 +165,22 @@ async function loadDashboard(): Promise<void> {
     if (dashboardRequest === request) {
       isLoading.value = false
     }
+  }
+}
+
+async function retryScrape(shop: ShopListItem): Promise<void> {
+  retryingShopId.value = shop.id
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    await retryShopScrape(shop.id)
+    saveMessage.value = `${shop.name}: scrape поставлен в очередь`
+    await loadDashboard()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось перезапустить scrape'
+  } finally {
+    retryingShopId.value = null
   }
 }
 
@@ -217,6 +240,12 @@ onMounted(() => {
     >
       Не удалось загрузить статус скрейпов: {{ errorMessage }}
     </div>
+    <div
+      v-if="saveMessage"
+      class="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100"
+    >
+      {{ saveMessage }}
+    </div>
 
     <div class="grid gap-4 md:grid-cols-4">
       <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
@@ -258,7 +287,7 @@ onMounted(() => {
     <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
       <div class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
         <div
-          class="grid min-w-[880px] grid-cols-[minmax(220px,1.5fr)_110px_130px_170px_170px_minmax(150px,1fr)] border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
+          class="grid min-w-[1020px] grid-cols-[minmax(220px,1.5fr)_110px_130px_170px_170px_minmax(150px,1fr)_150px] border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
         >
           <span>Магазин</span>
           <span>Источник</span>
@@ -266,26 +295,27 @@ onMounted(() => {
           <span>Последний scrape</span>
           <span>Следующий scrape</span>
           <span>Адрес</span>
+          <span>Действие</span>
         </div>
 
-        <div v-if="isLoading" class="min-w-[880px] px-4 py-14 text-center text-sm text-neutral-500">
+        <div v-if="isLoading" class="min-w-[1020px] px-4 py-14 text-center text-sm text-neutral-500">
           <Icon :icon="icons.activity" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
           Загружаем магазины...
         </div>
 
         <div
           v-else-if="shops.length === 0"
-          class="min-w-[880px] px-4 py-14 text-center text-sm text-neutral-500"
+          class="min-w-[1020px] px-4 py-14 text-center text-sm text-neutral-500"
         >
           <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
           По этим фильтрам магазинов не найдено.
         </div>
 
-        <div v-else class="min-w-[880px] divide-y divide-neutral-800">
+        <div v-else class="min-w-[1020px] divide-y divide-neutral-800">
           <div
             v-for="shop in shops"
             :key="shop.id"
-            class="grid grid-cols-[minmax(220px,1.5fr)_110px_130px_170px_170px_minmax(150px,1fr)] px-4 py-4 text-sm"
+            class="grid grid-cols-[minmax(220px,1.5fr)_110px_130px_170px_170px_minmax(150px,1fr)_150px] px-4 py-4 text-sm"
             data-testid="scrape-shop-row"
           >
             <div class="min-w-0 pr-5">
@@ -302,6 +332,19 @@ onMounted(() => {
             <div class="text-neutral-400">{{ formatDateTime(shop.next_scrape_at) }}</div>
             <div class="min-w-0 pr-5 text-neutral-500">
               <p class="truncate" :title="shop.address || '-'">{{ shop.address || '-' }}</p>
+            </div>
+            <div>
+              <button
+                v-if="canRetryShop(shop)"
+                type="button"
+                class="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-xs font-medium text-amber-100 transition hover:border-amber-300 hover:bg-amber-300/15 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="retryingShopId === shop.id"
+                @click="retryScrape(shop)"
+              >
+                <Icon :icon="icons.refresh" class="size-3.5" aria-hidden="true" />
+                {{ retryingShopId === shop.id ? 'Ставим...' : 'Перезапуск' }}
+              </button>
+              <span v-else class="text-xs text-neutral-600">-</span>
             </div>
           </div>
         </div>

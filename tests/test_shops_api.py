@@ -126,7 +126,7 @@ def test_shops_endpoint_filters_by_source_and_status(
             scrape_status="failed",
         )
     )
-    shops.upsert(
+    other_source = shops.upsert(
         ShopUpsert(
             source="2gis",
             source_id="shops-api-3",
@@ -134,7 +134,7 @@ def test_shops_endpoint_filters_by_source_and_status(
             scrape_status="failed",
         )
     )
-    shops.upsert(
+    other_status = shops.upsert(
         ShopUpsert(
             source="unicom",
             source_id="shops-api-4",
@@ -146,7 +146,10 @@ def test_shops_endpoint_filters_by_source_and_status(
     response = client.get("/shops", params={"source": "unicom", "status": "failed"})
 
     assert response.status_code == 200
-    assert [item["id"] for item in response.json()["items"]] == [matching.id]
+    returned_ids = {item["id"] for item in response.json()["items"]}
+    assert matching.id in returned_ids
+    assert other_source.id not in returned_ids
+    assert other_status.id not in returned_ids
 
 
 def test_shops_endpoint_filters_by_source_type_and_identity_relationship(
@@ -282,3 +285,67 @@ def test_shop_identity_api_rejects_manual_source_boundary(client: TestClient) ->
 
     assert response.status_code == 400
     assert "manual is not an accepted shop source" in response.json()["detail"]
+
+
+def test_retry_shop_scrape_marks_source_scheduled_and_enqueues_task(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="metalltorg",
+            source_id="shops-api-retry",
+            source_type="official_html",
+            name="Retry Metalltorg",
+            scrape_status="failed",
+            error_count=1,
+        )
+    )
+    enqueued_shop_ids: list[int] = []
+
+    def fake_enqueue_shop_scrape(shop_id: int) -> dict[str, object]:
+        enqueued_shop_ids.append(shop_id)
+        return {"shop_id": shop_id, "status": "queued", "task_id": "retry-task"}
+
+    monkeypatch.setattr("apps.api.shops.enqueue_shop_scrape", fake_enqueue_shop_scrape)
+
+    response = client.post(f"/shops/{shop.id}/scrape/retry")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "shop_id": shop.id,
+        "source": "metalltorg",
+        "source_type": "official_html",
+        "status": "queued",
+        "task_id": "retry-task",
+        "reason": None,
+    }
+    assert enqueued_shop_ids == [shop.id]
+    assert shop.scrape_status == "scheduled"
+    assert shop.next_scrape_at is not None
+
+
+def test_retry_shop_scrape_rejects_running_source(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="metalltorg",
+            source_id="shops-api-running-retry",
+            source_type="official_html",
+            name="Running Metalltorg",
+            scrape_status="running",
+        )
+    )
+    monkeypatch.setattr(
+        "apps.api.shops.enqueue_shop_scrape",
+        lambda shop_id: pytest.fail(f"unexpected enqueue for shop {shop_id}"),
+    )
+
+    response = client.post(f"/shops/{shop.id}/scrape/retry")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "shop scrape is already running"

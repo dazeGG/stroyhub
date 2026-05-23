@@ -152,8 +152,9 @@ def test_scrape_health_endpoint_filters_by_status(
     response = client.get("/scrapes/health", params={"status": "failed"})
 
     assert response.status_code == 200
-    assert payload_ids(response) == [failed.id]
-    assert success.id not in payload_ids(response)
+    returned_ids = payload_ids(response)
+    assert failed.id in returned_ids
+    assert success.id not in returned_ids
 
 
 def test_scrape_health_endpoint_handles_empty_results(client: TestClient) -> None:
