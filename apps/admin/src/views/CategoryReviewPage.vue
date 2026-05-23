@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import {
   fetchCategoryQuality,
@@ -150,6 +151,13 @@ onMounted(() => {
   <section class="space-y-6">
     <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
       <div>
+        <RouterLink
+          to="/categories"
+          class="mb-5 mr-3 inline-flex h-9 items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 text-sm font-medium text-neutral-300 transition hover:border-amber-300/50 hover:text-white"
+        >
+          <Icon :icon="icons.arrowLeft" class="size-4" aria-hidden="true" />
+          Категории
+        </RouterLink>
         <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
           <Icon :icon="icons.category" class="size-4" aria-hidden="true" />
           Качество категорий
