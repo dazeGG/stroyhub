@@ -178,6 +178,22 @@ Create an issue when:
 - `items_seen` or `items_saved` drops unexpectedly;
 - `next_scrape_at` is missing or clearly wrong for an active shop.
 
+### Enqueue Failure Repair
+
+When an admin action commits shop state but enqueue fails, API endpoints return
+`503` and save diagnostic metadata in `shops.raw.enqueue_failed`.
+
+Repair flow:
+
+1. Open `/shops` and identify the affected source shop.
+2. Verify `scrape_status` and `next_scrape_at` reflect the intended state
+   transition from the original action.
+3. Retry the same action (shop retry, candidate approve, or strategy
+   materialize) after Redis/Celery connectivity is restored.
+4. Confirm a new response contains `status = queued` and `task_id`.
+5. Clear or overwrite stale `enqueue_failed` metadata during normal subsequent
+   successful operator actions.
+
 Use a quick fix when:
 
 - the issue is a known transient local service problem;

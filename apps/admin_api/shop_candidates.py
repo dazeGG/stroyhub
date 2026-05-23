@@ -16,6 +16,7 @@ from stroyhub.db import get_session
 from stroyhub.models import Shop, ShopIdentity, ShopSourceCandidate
 from stroyhub.parsers.metalltorg import METALLTORG_SHOP_SOURCE_ID, METALLTORG_SOURCE
 from stroyhub.parsers.unicom import UNICOM_DEFAULT_SHOP_SOURCE_ID, UNICOM_SOURCE
+from stroyhub.scraping.enqueue import mark_enqueue_failed
 
 from apps.admin_api.scrape_queue import enqueue_shop_scrape
 
@@ -182,6 +183,19 @@ def approve_shop_source_candidate(
     scrape_result: dict[str, object] | None = None
     if approved_shop_id is not None:
         scrape_result = enqueue_shop_scrape(approved_shop_id)
+        if str(scrape_result.get("status")) == "enqueue_failed":
+            shop = session.get(Shop, approved_shop_id)
+            if shop is not None:
+                mark_enqueue_failed(
+                    shop,
+                    operation="candidate_approve",
+                    reason=str(scrape_result.get("reason") or "enqueue failed"),
+                )
+                session.commit()
+            raise HTTPException(
+                status_code=503,
+                detail=str(scrape_result.get("reason") or "enqueue failed"),
+            )
     session.expire_all()
     return _candidate_response(approved_candidate_id, session, scrape_result=scrape_result)
 
@@ -225,6 +239,19 @@ def materialize_official_strategy(
     scrape_result: dict[str, object] | None = None
     if payload is None or payload.run_scrape:
         scrape_result = enqueue_shop_scrape(shop_id)
+        if str(scrape_result.get("status")) == "enqueue_failed":
+            shop = session.get(Shop, shop_id)
+            if shop is not None:
+                mark_enqueue_failed(
+                    shop,
+                    operation="official_materialize",
+                    reason=str(scrape_result.get("reason") or "enqueue failed"),
+                )
+                session.commit()
+            raise HTTPException(
+                status_code=503,
+                detail=str(scrape_result.get("reason") or "enqueue failed"),
+            )
 
     session.expire_all()
     shop = session.get(Shop, shop_id)

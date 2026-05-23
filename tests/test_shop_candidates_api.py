@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.catalog import shop_candidates as candidate_module
@@ -224,6 +224,51 @@ def test_shop_source_candidate_api_approves_candidate(
     assert approved["items"][0]["source_id"] == "candidate-api-approve"
 
 
+def test_shop_source_candidate_api_approve_returns_503_when_enqueue_fails(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ShopCandidateCatalog(db_session).refresh_from_twogis(
+        seeds=[
+            CandidateDiscoverySeed(
+                source_id="candidate-api-approve-enqueue-fail",
+                display_name="Approve Enqueue Fail",
+                address="Yakutsk",
+                rubrics="Стройматериалы",
+                has_prices_signal=True,
+            )
+        ],
+    )
+    candidate_id = client.get("/shop-source-candidates").json()["items"][0]["id"]
+    monkeypatch.setattr(
+        "apps.admin_api.shop_candidates.enqueue_shop_scrape",
+        lambda shop_id: {
+            "shop_id": shop_id,
+            "status": "enqueue_failed",
+            "reason": "broker down",
+        },
+    )
+    monkeypatch.setattr(
+        "stroyhub.catalog.shop_candidates._resolve_candidate_website",
+        lambda source_id: "https://candidate.example.test/",
+    )
+
+    response = client.post(f"/shop-source-candidates/{candidate_id}/approve")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "broker down"
+    approved = client.get("/shop-source-candidates", params={"include_approved": True}).json()
+    shop_id = approved["items"][0]["approved_shop_id"]
+    shop = db_session.get(Shop, shop_id)
+    assert shop is not None
+    assert isinstance(shop.raw, dict)
+    enqueue_failed = shop.raw.get("enqueue_failed")
+    assert isinstance(enqueue_failed, dict)
+    assert enqueue_failed["operation"] == "candidate_approve"
+    assert enqueue_failed["reason"] == "broker down"
+
+
 def test_shop_source_candidate_api_verifies_twogis_data(
     client: TestClient,
     db_session: Session,
@@ -372,3 +417,49 @@ def test_shop_source_candidate_api_materializes_official_strategy(
         "task_id": "task-unicom",
     }
     assert client.get("/shop-source-candidates").json()["items"][0]["status"] == "pending"
+
+
+def test_shop_source_candidate_api_materialize_returns_503_when_enqueue_fails(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ShopCandidateCatalog(db_session).refresh_from_twogis(
+        seeds=[
+            CandidateDiscoverySeed(
+                source_id="7037402698746785",
+                display_name="Юником",
+                address="Вилюйский тракт 3 километр, 1/4",
+                rubrics="Стройматериалы",
+                has_prices_signal=True,
+                has_website_signal=True,
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        "apps.admin_api.shop_candidates.enqueue_shop_scrape",
+        lambda shop_id: {
+            "shop_id": shop_id,
+            "status": "enqueue_failed",
+            "reason": "redis timeout",
+        },
+    )
+    monkeypatch.setattr(
+        "stroyhub.catalog.official_sources._discover_unicom_category_uuids",
+        lambda: ("category-a", "category-b", "category-c"),
+    )
+
+    response = client.post(
+        "/shop-source-candidates/official-strategies/unicom/materialize",
+        json={"run_scrape": True},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "redis timeout"
+    shop = db_session.scalar(select(Shop).where(Shop.source == "unicom"))
+    assert shop is not None
+    assert isinstance(shop.raw, dict)
+    enqueue_failed = shop.raw.get("enqueue_failed")
+    assert isinstance(enqueue_failed, dict)
+    assert enqueue_failed["operation"] == "official_materialize"
+    assert enqueue_failed["reason"] == "redis timeout"

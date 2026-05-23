@@ -17,6 +17,7 @@ from stroyhub.db.repositories import (
 )
 from stroyhub.models import Shop
 from stroyhub.parsers.twogis import TwogisClient
+from stroyhub.scraping.enqueue import mark_enqueue_failed
 from stroyhub.scraping.twogis import (
     TWOGIS_LARGE_CATALOG_PAGE_SIZE,
     build_twogis_large_catalog_raw,
@@ -285,6 +286,14 @@ def retry_shop_scrape(
     session.commit()
 
     result = enqueue_shop_scrape(shop.id)
+    if str(result.get("status")) == "enqueue_failed":
+        mark_enqueue_failed(
+            shop,
+            operation="shop_retry",
+            reason=str(result.get("reason") or "enqueue failed"),
+        )
+        session.commit()
+        raise HTTPException(status_code=503, detail=str(result.get("reason") or "enqueue failed"))
     task_id = result.get("task_id")
     reason = result.get("reason")
     return ShopScrapeRetryResponse(

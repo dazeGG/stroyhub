@@ -49,6 +49,7 @@ __all__ = [
     "persist_unicom_scrape_failure",
     "persist_twogis_scrape_result",
     "persist_unicom_scrape_result",
+    "mark_enqueue_failed",
     "scrape_metalltorg_category",
     "scrape_metalltorg_shop",
     "scrape_twogis_branch",
@@ -57,3 +58,4 @@ __all__ = [
     "unicom_category_batch_state",
     "unicom_shop_scrape_config",
 ]
+from stroyhub.scraping.enqueue import mark_enqueue_failed
