@@ -27,6 +27,12 @@ def _has_check(model: type[object], name_suffix: str) -> bool:
     return any(name.endswith(name_suffix) for name in _check_names(model))
 
 
+def _has_redundant_check_prefix(model: type[object]) -> bool:
+    table = model.__table__  # type: ignore[attr-defined]
+    duplicated_prefix = f"ck_{table.name}_ck_{table.name}_"
+    return any(name.startswith(duplicated_prefix) for name in _check_names(model))
+
+
 def test_m1_tables_are_registered_in_metadata() -> None:
     assert set(Base.metadata.tables) >= {
         "shops",
@@ -137,3 +143,18 @@ def test_db_invariant_check_constraints_are_declared() -> None:
     assert _has_check(ProductMatch, "ck_product_matches_method_known")
     assert _has_check(PriceSnapshot, "ck_price_snapshots_price_nonnegative")
     assert _has_check(ScrapeRun, "ck_scrape_runs_status_known")
+
+
+def test_check_constraint_names_do_not_duplicate_table_prefix() -> None:
+    for model in (
+        ShopIdentity,
+        Shop,
+        ShopSourceCandidate,
+        SourceProduct,
+        CategoryOverride,
+        CanonicalProduct,
+        ProductMatch,
+        PriceSnapshot,
+        ScrapeRun,
+    ):
+        assert not _has_redundant_check_prefix(model)
