@@ -464,6 +464,88 @@ Example response:
 }
 ```
 
+## Product Normalization
+
+### `GET /product-normalization/queue`
+
+Returns the admin review queue for deciding how source product cards become
+normalized canonical products. This endpoint is read-only; decision endpoints
+are tracked separately.
+
+Queue states:
+
+- `ineligible`: stored source card is blocked from canonical matching.
+- `needs_review`: source card is not safe enough for automatic matching.
+- `eligible_unmatched`: source card can become a canonical product but has no
+  accepted match.
+- `candidate_match`: source card has one or more candidate matches.
+- `accepted`: source card is linked to a canonical product.
+
+Query params:
+
+- `state`: optional queue state filter.
+- `source`: optional source filter.
+- `shop`: optional shop id filter.
+- `category_id`: optional normalized category filter; parent categories include
+  descendants.
+- `q`: optional text search against title and normalized title.
+- `limit`: 1-100, default `50`.
+- `offset`: default `0`.
+
+Example response:
+
+```json
+{
+  "items": [
+    {
+      "id": 10,
+      "state": "eligible_unmatched",
+      "source": "2gis",
+      "source_product_id": "123",
+      "title": "Цемент М500 50кг",
+      "normalized_title": "цемент м500 50кг",
+      "category_id": 7,
+      "category_slug": "cement",
+      "category_name": "Цемент",
+      "category_raw": "Сухие смеси",
+      "unit_raw": "шт.",
+      "image_url": null,
+      "last_seen_at": "2026-05-23T09:00:00Z",
+      "is_not_product": false,
+      "shop": {
+        "id": 3,
+        "source": "2gis",
+        "source_id": "70000001007229923",
+        "name": "Build Shop"
+      },
+      "latest_price": {
+        "price": "650.00",
+        "currency": "RUB",
+        "unit_raw": "шт.",
+        "source_updated_at": null,
+        "parsed_at": "2026-05-23T09:05:00Z"
+      },
+      "catalog_eligibility": {
+        "status": "eligible",
+        "confidence": "1.000",
+        "score": 100,
+        "reasons": ["exact_price_and_specific_title"]
+      },
+      "match_summary": {
+        "accepted_match_id": null,
+        "accepted_canonical_product_id": null,
+        "accepted_canonical_title": null,
+        "candidate_count": 0,
+        "rejected_count": 0
+      }
+    }
+  ],
+  "limit": 50,
+  "offset": 0,
+  "total": 1
+}
+```
+
 ## Matches
 
 ### `GET /matches/candidates`
