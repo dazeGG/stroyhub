@@ -11,6 +11,59 @@ After the M14 readiness review, local backfill coverage for the 2026-05-17 2GIS
 sample improves from `614 / 649` categorized (`94.61%`) to `642 / 649`
 categorized (`98.92%`), with `7` products intentionally or still unmatched.
 
+## 2026-05-24 M15 Unicom Coverage Update
+
+Issue [#267](https://github.com/dazeGG/stroyhub/issues/267) improved local
+coverage for the persisted `unicom` catalog by adding high-confidence source
+category aliases for the largest repeatable uncategorized groups and then
+running the category backfill against the local database.
+
+Observed local metrics for active `unicom` source products:
+
+- Before backfill: `11792 / 18113` categorized (`65.10%`), `6321`
+  uncategorized.
+- Backfill dry-run with updated rules:
+  `products_seen=18113 changed=2515 unchanged=11739 unmatched=3859`.
+- After backfill: `14254 / 18113` categorized (`78.69%`), `3859`
+  uncategorized.
+- Root-category assignments after backfill: `0`.
+
+Largest `unicom` groups covered in this update:
+
+- `Проходные переключатели` -> `wiring_devices`
+- `Материалы для изоляции, крепления и маркировки` -> `cable_routing`
+- `Дифференциальные автоматы`, `Силовые шины`, `Контакторы` ->
+  `electrical_panels`
+- `Муфты полипропиленовые`, `Прочие фитинги` -> `water_pipes_fittings`
+- `Аксессуары для розеток и выключателей` -> `wiring_devices`
+- `Наконечники и гильзы*`, `Клеммы монтажные соединительные` ->
+  `cables_wires`
+- `Ленты` -> `abrasives_tapes_consumables`
+- `Комплектующие для вентиляционных систем` -> `ventilation`
+- `Аксессуары для лотков`, `Аксессуары и комплектующие для металлорукавов` ->
+  `cable_routing`
+- `Шарнирно-губцевый инструмент` -> `hand_tools`
+- `Лента светодиодная`, `Комплектующие для светодиодных лент` -> `lighting`
+- `Насадки` -> `power_tool_accessories`
+- `Аксессуары для сантехники` -> `sanitary_ware`
+
+Large groups intentionally left uncategorized in this pass because the current
+taxonomy is too coarse or the raw source group is too mixed for a safe bulk
+alias:
+
+- `Аксессуары и комплектующие для труб`: sample titles mix pipe holders with
+  cable-mount accessories.
+- `Комплектующие к гардеробным системам`: storage/wardrobe products are not yet
+  normalized in the MVP taxonomy.
+- `Батарейки`, `Гирлянды`, `Шинопровод`, `Патроны`, `Реле`, `Радиодетали`:
+  likely need additional electrical leaf categories or a deliberate out-of-scope
+  decision before mass assignment.
+- `Системы теплого пола`: related to heating/electrical control, but the
+  current taxonomy does not yet separate floor-heating systems cleanly enough
+  for a bulk alias.
+- `Кнопки`: observed titles look like wiring controls, but the raw category is
+  broad enough that it should be reviewed before a mass alias.
+
 ## 2026-05-22 M14 Readiness Review
 
 Official source smoke results:
