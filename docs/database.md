@@ -236,6 +236,12 @@ Product validity flag:
 - `is_not_product` marks source cards that were observed in a product feed but
   should be excluded from product labeling/review workflows because they are
   not real sellable product cards for the catalog.
+- Scraping may also write `raw.catalog_eligibility` with an explainable
+  downstream matching decision: `eligible`, `needs_review`, or `ineligible`,
+  plus confidence/score/reasons.
+- For 2GIS, `raw.catalog_eligibility` is intentionally strict: cards without
+  exact prices, cards with `от ...` or range-like prices, and obvious generic
+  group cards such as `Гвозди` should not enter canonical matching.
 - Rescraping should preserve `is_not_product` unless a caller explicitly
   provides a new value.
 - The flag should not delete source data or price history; it only changes

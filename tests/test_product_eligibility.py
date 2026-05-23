@@ -1,0 +1,70 @@
+from decimal import Decimal
+
+from stroyhub.catalog.eligibility import (
+    ProductEligibilityInput,
+    evaluate_product_eligibility,
+    is_matchable_source_product,
+    with_catalog_eligibility,
+)
+
+
+def test_twogis_product_eligibility_rejects_from_price_group_listing() -> None:
+    result = evaluate_product_eligibility(
+        ProductEligibilityInput(
+            source="2gis",
+            title="Гвозди",
+            price=Decimal("2"),
+            raw={"offer": {"price": "от 2 ₽"}},
+        )
+    )
+
+    assert result.status == "ineligible"
+    assert result.is_not_product is True
+    assert result.reasons == (
+        "non_exact_price",
+        "generic_title",
+        "no_specific_product_attributes",
+    )
+
+
+def test_twogis_product_eligibility_rejects_generic_exact_price_card() -> None:
+    result = evaluate_product_eligibility(
+        ProductEligibilityInput(
+            source="2gis",
+            title="Песок мытый",
+            price=Decimal("200"),
+            raw={"offer": {"price": 200}},
+        )
+    )
+
+    assert result.status == "ineligible"
+    assert result.reasons == ("generic_title", "no_specific_product_attributes")
+
+
+def test_twogis_product_eligibility_allows_specific_exact_price_card() -> None:
+    result = evaluate_product_eligibility(
+        ProductEligibilityInput(
+            source="2gis",
+            title="Гвозди строительные 3,0х70 мм 1кг",
+            price=Decimal("180"),
+            raw={"offer": {"price": 180}},
+        )
+    )
+
+    assert result.status == "eligible"
+    assert result.is_matchable is True
+    assert result.score >= 70
+
+
+def test_matchable_source_product_requires_eligible_raw_status() -> None:
+    result = evaluate_product_eligibility(
+        ProductEligibilityInput(
+            source="2gis",
+            title="Кирпич",
+            price=Decimal("300"),
+            raw={"offer": {"price": 300}},
+        )
+    )
+    raw = with_catalog_eligibility({"offer": {"price": 300}}, result)
+
+    assert is_matchable_source_product(raw, is_not_product=False) is False

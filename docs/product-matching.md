@@ -157,14 +157,22 @@ Defer until reviewed matches exist.
 
 Use a conservative two-stage strategy:
 
-1. Generate candidates inside the same normalized category, or inside a narrow
+1. Apply the source-product eligibility gate before candidate generation.
+   Products marked `is_not_product`, `raw.catalog_eligibility.status =
+   "ineligible"`, or `raw.catalog_eligibility.status = "needs_review"` should
+   not enter automatic canonical matching.
+2. Generate candidates inside the same normalized category, or inside a narrow
    source category cluster when `category_id` is missing.
-2. Score candidates with exact-title, token overlap, and extracted attribute
+3. Score candidates with exact-title, token overlap, and extracted attribute
    agreement.
-3. Auto-link only very high-confidence exact or near-exact matches.
-4. Store medium-confidence candidates for manual review.
-5. Never delete or rewrite `source_products`; link them to canonical products
+4. Auto-link only very high-confidence exact or near-exact matches.
+5. Store medium-confidence candidates for manual review.
+6. Never delete or rewrite `source_products`; link them to canonical products
    through a separate match table.
+
+2GIS needs a stricter gate than official shop sources. Broad cards with
+non-exact prices, such as `Гвозди` with `от 2 ₽`, should remain saved as source
+observations but must not become normalized/canonical products.
 
 Suggested confidence bands:
 
