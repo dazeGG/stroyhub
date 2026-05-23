@@ -116,6 +116,21 @@ Example response:
 
 Missing products return `404`.
 
+### `PUT /products/{product_id}/category-override`
+
+Sets the active manual category override for one source product.
+
+Idempotency contract:
+
+- Repeating the same payload (`category_id`, `reason`, `actor`, with trimmed text)
+  does not create a new override row.
+- Changing `category_id` or decision metadata replaces the previous active
+  override and preserves history.
+
+### `DELETE /products/{product_id}/category-override`
+
+Reverts the active override and restores the previous category.
+
 ## Canonical Products
 
 Canonical products are normalized admin-managed product identities. Creating or

@@ -411,6 +411,54 @@ def test_category_override_repository_creates_replaces_and_reverts(
     assert product.category_id == original_category.id
 
 
+def test_category_override_repository_is_idempotent_for_same_active_payload(
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="category-override-idempotent-shop", name="Shop")
+    )
+    category_repository = CategoryRepository(db_session)
+    original_category = category_repository.upsert(
+        CategoryUpsert(slug="override-idempotent-original", name="Original")
+    )
+    manual_category = category_repository.upsert(
+        CategoryUpsert(slug="override-idempotent-manual", name="Manual")
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="category-override-idempotent-product",
+            title="Override product",
+            normalized_title="override product",
+            category_id=original_category.id,
+        )
+    )
+
+    repository = CategoryOverrideRepository(db_session)
+    first = repository.create_or_replace(
+        CategoryOverrideCreate(
+            source_product_id=product.id,
+            category_id=manual_category.id,
+            reason="same reason",
+            actor="admin",
+        )
+    )
+    second = repository.create_or_replace(
+        CategoryOverrideCreate(
+            source_product_id=product.id,
+            category_id=manual_category.id,
+            reason="  same reason  ",
+            actor="  admin  ",
+        )
+    )
+    all_rows = repository.list_for_product(product.id)
+
+    assert second.id == first.id
+    assert len(all_rows) == 1
+    assert all_rows[0].status == "active"
+
+
 def test_source_product_upsert_preserves_active_category_override(
     db_session: Session,
 ) -> None:
