@@ -1,4 +1,6 @@
 from collections.abc import Iterator
+from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -217,6 +219,53 @@ def test_shop_source_candidate_api_approves_candidate(
     assert client.get("/shop-source-candidates").json() == {"items": [], "groups": []}
     approved = client.get("/shop-source-candidates", params={"include_approved": True}).json()
     assert approved["items"][0]["source_id"] == "candidate-api-approve"
+
+
+def test_shop_source_candidate_api_verifies_twogis_data(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ShopCandidateCatalog(db_session).refresh_from_twogis(
+        seeds=[
+            CandidateDiscoverySeed(
+                source_id="candidate-api-verify",
+                display_name="Verify API",
+                address="Yakutsk",
+                rubrics="Стройматериалы",
+                has_prices_signal=True,
+                has_website_signal=True,
+            )
+        ],
+    )
+    candidate_id = client.get("/shop-source-candidates").json()["items"][0]["id"]
+    monkeypatch.setattr(
+        "stroyhub.catalog.shop_candidates._resolve_candidate_website",
+        lambda source_id: "https://verify-api.example.test/",
+    )
+    monkeypatch.setattr(
+        "stroyhub.catalog.shop_candidates._probe_twogis_candidate_products",
+        lambda source_id: SimpleNamespace(
+            total=3,
+            items_seen=1,
+            products=[SimpleNamespace(price=Decimal("42.00"))],
+            completeness="partial",
+            stop_reason="max_pages_reached",
+        ),
+    )
+
+    response = client.post(f"/shop-source-candidates/{candidate_id}/verify-twogis-data")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["website_found"] is True
+    assert payload["products_found"] is True
+    assert payload["website_url"] == "https://verify-api.example.test/"
+    assert payload["product_count"] == 3
+    assert payload["priced_product_count"] == 1
+    assert payload["candidate"]["has_website"] is True
+    assert payload["candidate"]["has_prices"] is True
+    assert payload["candidate"]["website_url"] == "https://verify-api.example.test/"
 
 
 def test_shop_source_candidate_api_suggests_identity_and_approves_branch(

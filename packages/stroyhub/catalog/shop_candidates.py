@@ -14,9 +14,12 @@ from stroyhub.db.repositories import (
     ShopUpsert,
 )
 from stroyhub.models import Shop, ShopIdentity, ShopSourceCandidate
+from stroyhub.scraping.twogis import TwogisScrapeResult, scrape_twogis_branch
 
 TWOGIS_SOURCE = "2gis"
 CandidateDiscoverer = Callable[[], Iterable["CandidateDiscoverySeed"]]
+CandidateWebsiteResolver = Callable[[str], str | None]
+CandidateProductProbe = Callable[[str], TwogisScrapeResult]
 TWOGIS_SEARCH_BASE_URL = "https://2gis.ru/yakutsk/search"
 TWOGIS_DISCOVERY_QUERY = "стройматериалы"
 TWOGIS_DISCOVERY_MAX_PAGES = 50
@@ -91,6 +94,15 @@ class CandidateIdentitySuggestion:
     status: str
     source_count: int
     reason: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class CandidateVerificationSummary:
+    website_found: bool
+    products_found: bool
+    website_url: str | None
+    product_count: int
+    priced_product_count: int
 
 
 SHOP_CANDIDATE_STATUSES = frozenset({"pending", "stale", "hidden", "archived", "approved"})
@@ -227,6 +239,87 @@ class ShopCandidateCatalog:
                 )
 
         return None
+
+    def verify_twogis_data(
+        self,
+        candidate_id: int,
+        *,
+        website_resolver: CandidateWebsiteResolver | None = None,
+        product_probe: CandidateProductProbe | None = None,
+        checked_at: datetime | None = None,
+    ) -> tuple[ShopSourceCandidate, CandidateVerificationSummary]:
+        candidate = self._session.get(ShopSourceCandidate, candidate_id)
+        if candidate is None:
+            raise ValueError("shop source candidate not found")
+        if candidate.status == "approved":
+            raise ValueError("approved candidate cannot be verified")
+
+        resolve_website = website_resolver or _resolve_candidate_website
+        probe_products = product_probe or _probe_twogis_candidate_products
+        now = checked_at or datetime.now(UTC)
+
+        website_url = resolve_website(candidate.source_id)
+        product_result = probe_products(candidate.source_id)
+        product_count = product_result.total or product_result.items_seen
+        priced_product_count = sum(
+            1 for product in product_result.products if product.price is not None
+        )
+        products_found = product_result.items_seen > 0
+        website_found = website_url is not None
+
+        candidate.website_url = website_url
+        candidate.has_website = website_found
+        candidate.has_products = products_found
+        candidate.has_prices = products_found
+        candidate.product_count = product_count
+        candidate.priced_product_count = priced_product_count
+        candidate.last_checked_at = now
+        priority, reason = _priority(
+            has_prices=products_found,
+            has_website=website_found,
+        )
+        official_strategy = _official_strategy_for_seed(
+            CandidateDiscoverySeed(
+                source_id=candidate.source_id,
+                display_name=candidate.display_name,
+                address=candidate.address or "Якутск",
+                rubrics=candidate.rubrics or TWOGIS_DISCOVERY_QUERY,
+                website_url=website_url,
+                has_prices_signal=products_found,
+                has_website_signal=website_found,
+            )
+        )
+        if official_strategy is not None:
+            priority += OFFICIAL_STRATEGY_PRIORITY_BONUS
+        candidate.priority = priority
+        candidate.priority_reason = reason
+        raw = dict(candidate.raw or {})
+        raw["verification"] = {
+            "checked_at": now.isoformat(),
+            "website_found": website_found,
+            "products_found": products_found,
+            "website_url": website_url,
+            "product_count": product_count,
+            "priced_product_count": priced_product_count,
+            "items_seen": product_result.items_seen,
+            "total": product_result.total,
+            "completeness": product_result.completeness,
+            "stop_reason": product_result.stop_reason,
+        }
+        raw["signals"] = {
+            "has_prices": products_found,
+            "has_website": website_found,
+        }
+        candidate.raw = raw
+        self._session.flush()
+
+        return candidate, CandidateVerificationSummary(
+            website_found=website_found,
+            products_found=products_found,
+            website_url=website_url,
+            product_count=product_count,
+            priced_product_count=priced_product_count,
+        )
 
     def _identity_sources_for_suggestions(self) -> list[ShopIdentity]:
         if self._identity_suggestion_sources is None:
@@ -480,6 +573,10 @@ def _resolve_candidate_website(source_id: str) -> str | None:
             return _fetch_twogis_firm_website(client, source_id)
     except httpx.HTTPError:
         return None
+
+
+def _probe_twogis_candidate_products(source_id: str) -> TwogisScrapeResult:
+    return scrape_twogis_branch(branch_id=source_id, page_size=50, max_pages=1)
 
 
 def _merge_seed(

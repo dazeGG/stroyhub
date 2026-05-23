@@ -9,6 +9,7 @@ import {
   fetchShopSourceCandidates,
   materializeOfficialStrategy,
   refreshShopSourceCandidates,
+  verifyShopSourceCandidateTwogisData,
   type ShopSourceCandidate,
   type ShopSourceCandidateGroup,
   type ShopSourceCandidateRefreshResponse,
@@ -23,6 +24,7 @@ const selectedStatus = ref<ShopSourceCandidateStatus | ''>('')
 const isLoading = ref(false)
 const isRefreshing = ref(false)
 const approvingCandidateId = ref<number | null>(null)
+const verifyingCandidateId = ref<number | null>(null)
 const materializingOfficialSource = ref<string | null>(null)
 const errorMessage = ref('')
 const saveMessage = ref('')
@@ -82,6 +84,10 @@ function statusClass(status: ShopSourceCandidateStatus): string {
 }
 
 function canApprove(candidate: ShopSourceCandidate): boolean {
+  return candidate.status === 'pending' || candidate.status === 'stale'
+}
+
+function canVerify(candidate: ShopSourceCandidate): boolean {
   return candidate.status === 'pending' || candidate.status === 'stale'
 }
 
@@ -207,6 +213,59 @@ async function approveCandidate(
   } finally {
     approvingCandidateId.value = null
   }
+}
+
+async function verifyCandidate(candidate: ShopSourceCandidate): Promise<void> {
+  verifyingCandidateId.value = candidate.id
+  errorMessage.value = ''
+  saveMessage.value = ''
+
+  try {
+    const response = await verifyShopSourceCandidateTwogisData(candidate.id)
+    updateCandidateInPlace(response.candidate)
+    const message = formatVerificationMessage(response)
+    saveMessage.value = `${candidate.display_name}: ${message}`
+    toastSuccess(toast, 'Данные 2GIS проверены', saveMessage.value)
+  } catch (error) {
+    errorMessage.value = messageFromError(error, 'Не удалось проверить данные 2GIS')
+    toastError(toast, 'Не удалось проверить данные 2GIS', error, 'Не удалось проверить данные 2GIS')
+  } finally {
+    verifyingCandidateId.value = null
+  }
+}
+
+function updateCandidateInPlace(updated: ShopSourceCandidate): void {
+  candidates.value = candidates.value.map((candidate) =>
+    candidate.id === updated.id ? updated : candidate,
+  )
+  candidateGroups.value = candidateGroups.value.map((group) => {
+    if (!group.candidate_ids.includes(updated.id)) {
+      return group
+    }
+
+    const items = group.items.map((candidate) =>
+      candidate.id === updated.id ? updated : candidate,
+    )
+    return {
+      ...group,
+      has_prices: items.some((candidate) => candidate.has_prices),
+      has_website: items.some((candidate) => candidate.has_website),
+      priority: Math.max(...items.map((candidate) => candidate.priority)),
+      items,
+    }
+  })
+}
+
+function formatVerificationMessage(
+  response: Awaited<ReturnType<typeof verifyShopSourceCandidateTwogisData>>,
+): string {
+  const website = response.website_found
+    ? `сайт подтвержден${response.website_url ? `: ${response.website_url}` : ''}`
+    : 'сайт не найден'
+  const products = response.products_found
+    ? `товары подтверждены: ${response.product_count}`
+    : 'товары не найдены'
+  return `${website}; ${products}`
 }
 
 function formatScrapeMessage(scrapeResult: ShopSourceCandidate['scrape_result']): string {
@@ -371,6 +430,15 @@ onMounted(() => {
             <p class="mt-1 font-mono text-xs text-neutral-600">2GIS · {{ candidate.source_id }}</p>
             <div class="mt-3 flex flex-wrap justify-end gap-2">
               <button
+                type="button"
+                class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-sky-400/30 bg-sky-400/10 px-2.5 text-xs font-semibold text-sky-100 transition hover:border-sky-300 hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!canVerify(candidate) || verifyingCandidateId === candidate.id"
+                @click="verifyCandidate(candidate)"
+              >
+                <Icon :icon="icons.search" class="size-3.5" aria-hidden="true" />
+                {{ verifyingCandidateId === candidate.id ? 'Проверяем...' : 'Проверить 2GIS' }}
+              </button>
+              <button
                 v-if="candidate.suggested_identity"
                 type="button"
                 class="inline-flex h-8 items-center justify-center rounded-md border border-neutral-700 px-2.5 text-xs font-semibold text-neutral-300 transition hover:border-amber-300 hover:text-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -490,6 +558,15 @@ onMounted(() => {
         </div>
 
         <div class="mt-4 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-sky-400/30 bg-sky-400/10 px-3 text-xs font-semibold text-sky-100 transition hover:border-sky-300 hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="!canVerify(candidate) || verifyingCandidateId === candidate.id"
+            @click="verifyCandidate(candidate)"
+          >
+            <Icon :icon="icons.search" class="size-3.5" aria-hidden="true" />
+            {{ verifyingCandidateId === candidate.id ? 'Проверяем...' : 'Проверить 2GIS' }}
+          </button>
           <button
             v-if="candidate.suggested_identity"
             type="button"

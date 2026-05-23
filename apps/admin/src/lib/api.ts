@@ -250,6 +250,15 @@ export interface ShopSourceCandidateRefreshResponse {
   groups: ShopSourceCandidateGroup[]
 }
 
+export interface ShopSourceCandidateVerificationResponse {
+  candidate: ShopSourceCandidate
+  website_found: boolean
+  products_found: boolean
+  website_url: string | null
+  product_count: number
+  priced_product_count: number
+}
+
 export interface OfficialStrategyMaterializeResponse {
   source: string
   shop: {
@@ -671,6 +680,17 @@ export function approveShopSourceCandidate(
       method: 'POST',
       body: JSON.stringify({ shop_identity_id: shopIdentityId ?? null }),
     },
+    signal,
+  )
+}
+
+export function verifyShopSourceCandidateTwogisData(
+  candidateId: number,
+  signal?: AbortSignal,
+): Promise<ShopSourceCandidateVerificationResponse> {
+  return writeJson<ShopSourceCandidateVerificationResponse>(
+    `/shop-source-candidates/${candidateId}/verify-twogis-data`,
+    { method: 'POST' },
     signal,
   )
 }

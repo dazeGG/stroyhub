@@ -1,5 +1,7 @@
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine, select, text
@@ -91,6 +93,92 @@ def test_candidate_refresh_prioritizes_prices_then_website(db_session: Session) 
     assert items[2].priority_reason == "есть сайт"
     assert items[3].priority_reason == "нет цен и сайта"
     assert [item.product_count for item in items] == [0, 0, 0, 0]
+
+
+def test_candidate_verification_confirms_site_and_products(db_session: Session) -> None:
+    catalog = ShopCandidateCatalog(db_session)
+    catalog.refresh_from_twogis(
+        seeds=[
+            CandidateDiscoverySeed(
+                source_id="verify-both",
+                display_name="Verify Both",
+                address="Yakutsk",
+                rubrics="Стройматериалы",
+                has_prices_signal=True,
+                has_website_signal=True,
+            )
+        ],
+        refreshed_at=datetime(2026, 5, 23, 1, 0, tzinfo=UTC),
+    )
+    candidate = catalog.list_candidates(CandidateListFilters())[0]
+
+    verified, summary = catalog.verify_twogis_data(
+        candidate.id,
+        website_resolver=lambda source_id: "https://verify.example.test/",
+        product_probe=lambda source_id: SimpleNamespace(
+            total=12,
+            items_seen=1,
+            products=[SimpleNamespace(price=Decimal("100.00"))],
+            completeness="partial",
+            stop_reason="max_pages_reached",
+        ),
+        checked_at=datetime(2026, 5, 23, 2, 0, tzinfo=UTC),
+    )
+
+    assert summary.website_found is True
+    assert summary.products_found is True
+    assert verified.has_website is True
+    assert verified.has_prices is True
+    assert verified.has_products is True
+    assert verified.website_url == "https://verify.example.test/"
+    assert verified.product_count == 12
+    assert verified.priced_product_count == 1
+    assert verified.priority == 100
+    assert verified.priority_reason == "есть цены и сайт"
+    assert verified.raw["verification"]["website_found"] is True
+    assert verified.raw["verification"]["products_found"] is True
+
+
+def test_candidate_verification_drops_unconfirmed_signals(db_session: Session) -> None:
+    catalog = ShopCandidateCatalog(db_session)
+    catalog.refresh_from_twogis(
+        seeds=[
+            CandidateDiscoverySeed(
+                source_id="verify-none",
+                display_name="Verify None",
+                address="Yakutsk",
+                rubrics="Стройматериалы",
+                has_prices_signal=True,
+                has_website_signal=True,
+            )
+        ],
+        refreshed_at=datetime(2026, 5, 23, 1, 0, tzinfo=UTC),
+    )
+    candidate = catalog.list_candidates(CandidateListFilters())[0]
+
+    verified, summary = catalog.verify_twogis_data(
+        candidate.id,
+        website_resolver=lambda source_id: None,
+        product_probe=lambda source_id: SimpleNamespace(
+            total=0,
+            items_seen=0,
+            products=[],
+            completeness="empty",
+            stop_reason="source_total_reached",
+        ),
+        checked_at=datetime(2026, 5, 23, 2, 0, tzinfo=UTC),
+    )
+
+    assert summary.website_found is False
+    assert summary.products_found is False
+    assert verified.has_website is False
+    assert verified.has_prices is False
+    assert verified.has_products is False
+    assert verified.website_url is None
+    assert verified.product_count == 0
+    assert verified.priced_product_count == 0
+    assert verified.priority == 10
+    assert verified.priority_reason == "нет цен и сайта"
 
 
 def test_candidate_refresh_prioritizes_implemented_official_strategy(

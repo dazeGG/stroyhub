@@ -9,6 +9,7 @@ from stroyhub.catalog.official_sources import materialize_official_source
 from stroyhub.catalog.shop_candidates import (
     CandidateListFilters,
     CandidateRefreshSummary,
+    CandidateVerificationSummary,
     ShopCandidateCatalog,
 )
 from stroyhub.db import get_session
@@ -86,6 +87,15 @@ class ShopSourceCandidateRefreshResponse(BaseModel):
     skipped_approved: int
     items: list[ShopSourceCandidateResponse]
     groups: list[ShopSourceCandidateGroupResponse] = []
+
+
+class ShopSourceCandidateVerificationResponse(BaseModel):
+    candidate: ShopSourceCandidateResponse
+    website_found: bool
+    products_found: bool
+    website_url: str | None
+    product_count: int
+    priced_product_count: int
 
 
 class OfficialSourceShopResponse(BaseModel):
@@ -177,6 +187,26 @@ def approve_shop_source_candidate(
 
 
 @router.post(
+    "/{candidate_id}/verify-twogis-data",
+    response_model=ShopSourceCandidateVerificationResponse,
+)
+def verify_shop_source_candidate_twogis_data(
+    candidate_id: int,
+    session: Annotated[Session, Depends(get_session)],
+) -> ShopSourceCandidateVerificationResponse:
+    catalog = ShopCandidateCatalog(session)
+    try:
+        candidate, verification = catalog.verify_twogis_data(candidate_id)
+    except ValueError as exc:
+        raise _http_error(exc) from exc
+
+    candidate_id = candidate.id
+    session.commit()
+    session.expire_all()
+    return _verification_response(candidate_id, verification, session)
+
+
+@router.post(
     "/official-strategies/{source}/materialize",
     response_model=OfficialStrategyMaterializeResponse,
 )
@@ -247,6 +277,22 @@ def _candidate_response(
                 session=session,
             )
     raise HTTPException(status_code=404, detail="shop source candidate not found")
+
+
+def _verification_response(
+    candidate_id: int,
+    verification: CandidateVerificationSummary,
+    session: Session,
+) -> ShopSourceCandidateVerificationResponse:
+    candidate = _candidate_response(candidate_id, session)
+    return ShopSourceCandidateVerificationResponse(
+        candidate=candidate,
+        website_found=verification.website_found,
+        products_found=verification.products_found,
+        website_url=verification.website_url,
+        product_count=verification.product_count,
+        priced_product_count=verification.priced_product_count,
+    )
 
 
 def _candidate_response_model(
