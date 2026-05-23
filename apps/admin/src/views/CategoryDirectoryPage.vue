@@ -221,14 +221,16 @@ onMounted(() => {
           class="bg-neutral-950/10"
           data-testid="category-directory-row"
         >
-          <button
-            type="button"
-            class="grid w-full gap-3 px-4 py-4 text-left text-sm transition hover:bg-neutral-900/60 md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px]"
-            :aria-expanded="isCategoryExpanded(category)"
-            :aria-controls="`category-children-${category.id}`"
-            @click="toggleCategory(category)"
+          <div
+            class="grid w-full gap-3 px-4 py-4 text-left text-sm transition hover:bg-neutral-900/60 md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_120px]"
           >
-            <div class="flex min-w-0 items-start gap-3">
+            <button
+              type="button"
+              class="flex min-w-0 items-start gap-3 text-left"
+              :aria-expanded="isCategoryExpanded(category)"
+              :aria-controls="`category-children-${category.id}`"
+              @click="toggleCategory(category)"
+            >
               <span
                 class="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md border text-neutral-300"
                 :class="category.children.length > 0 ? 'border-neutral-700 bg-neutral-900' : 'border-neutral-800 bg-neutral-950 text-neutral-600'"
@@ -243,7 +245,7 @@ onMounted(() => {
               <div class="min-w-0">
                 <p class="truncate text-base font-semibold text-white" :title="category.name">{{ category.name }}</p>
               </div>
-            </div>
+            </button>
             <div class="min-w-0 md:text-right">
               <p class="text-xs uppercase tracking-wide text-neutral-600">Slug</p>
               <p class="mt-1 truncate font-mono text-xs text-neutral-300" :title="category.slug">{{ category.slug }}</p>
@@ -252,7 +254,17 @@ onMounted(() => {
               <p class="text-xs uppercase tracking-wide text-neutral-600">Товары</p>
               <p class="mt-1 font-semibold text-neutral-100">{{ category.product_count }}</p>
             </div>
-          </button>
+            <div class="flex items-start justify-start md:justify-end">
+              <RouterLink
+                :to="{ path: '/', query: { category: category.id } }"
+                class="inline-flex h-8 items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
+                @click.stop
+              >
+                <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
+                Товары
+              </RouterLink>
+            </div>
+          </div>
 
           <div
             v-if="category.children.length > 0 && isCategoryExpanded(category)"
@@ -262,7 +274,7 @@ onMounted(() => {
             <div
               v-for="child in category.children"
               :key="child.id"
-              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px]"
+              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_120px]"
               data-testid="category-directory-row"
             >
               <div class="min-w-0 pl-10 md:pl-12">
@@ -272,6 +284,15 @@ onMounted(() => {
                 {{ child.slug }}
               </p>
               <p class="font-medium text-neutral-200 md:text-right">{{ child.product_count }}</p>
+              <div class="flex justify-start md:justify-end">
+                <RouterLink
+                  :to="{ path: '/', query: { category: child.id } }"
+                  class="inline-flex h-8 items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
+                >
+                  <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
+                  Товары
+                </RouterLink>
+              </div>
             </div>
           </div>
         </section>

@@ -33,6 +33,7 @@ const filterErrorMessage = ref('')
 let productRequest: AbortController | null = null
 let searchTimer: number | undefined
 let syncingShopQuery = false
+let syncingCategoryQuery = false
 
 const categoryOptions = computed(() => {
   const options: { id: number; label: string }[] = []
@@ -132,6 +133,21 @@ function syncSelectedShopFromRoute(): void {
   selectedShopId.value = nextShopId
 }
 
+function syncSelectedCategoryFromRoute(): void {
+  const routeCategory = route.query.category
+  const nextCategoryId = typeof routeCategory === 'string' ? routeCategory : ''
+  if (selectedCategoryId.value === nextCategoryId) {
+    return
+  }
+
+  syncingCategoryQuery = true
+  selectedCategoryId.value = nextCategoryId
+}
+
+function shopOptionLabel(shop: ShopListItem): string {
+  return `${shop.name} · ${shop.source}`
+}
+
 async function loadFilters(): Promise<void> {
   isLoadingFilters.value = true
   filterErrorMessage.value = ''
@@ -213,7 +229,23 @@ watch(selectedShopId, (shopId) => {
   void router.replace({ query: nextQuery })
 })
 
+watch(selectedCategoryId, (categoryId) => {
+  if (syncingCategoryQuery) {
+    syncingCategoryQuery = false
+    return
+  }
+
+  const nextQuery = { ...route.query }
+  if (categoryId) {
+    nextQuery.category = categoryId
+  } else {
+    delete nextQuery.category
+  }
+  void router.replace({ query: nextQuery })
+})
+
 watch(() => route.query.shop, syncSelectedShopFromRoute)
+watch(() => route.query.category, syncSelectedCategoryFromRoute)
 
 watch(offset, () => {
   void loadProducts()
@@ -228,6 +260,7 @@ watch(searchQuery, () => {
 
 onMounted(() => {
   syncSelectedShopFromRoute()
+  syncSelectedCategoryFromRoute()
   void loadFilters()
   void loadProducts()
 })
@@ -283,7 +316,7 @@ onMounted(() => {
         >
           <option value="">Все магазины</option>
           <option v-for="shop in shops" :key="shop.id" :value="String(shop.id)">
-            {{ shop.name }}
+            {{ shopOptionLabel(shop) }}
           </option>
         </select>
         <select
