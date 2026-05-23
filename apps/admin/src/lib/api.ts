@@ -70,6 +70,56 @@ export interface ProductSearchResponse {
   total: number
 }
 
+export type ProductNormalizationState =
+  | 'ineligible'
+  | 'needs_review'
+  | 'eligible_unmatched'
+  | 'candidate_match'
+  | 'accepted'
+
+export interface ProductNormalizationEligibility {
+  status: string
+  confidence: string | null
+  score: number | null
+  reasons: string[]
+}
+
+export interface ProductNormalizationMatchSummary {
+  accepted_match_id: number | null
+  accepted_canonical_product_id: number | null
+  accepted_canonical_title: string | null
+  candidate_count: number
+  rejected_count: number
+}
+
+export interface ProductNormalizationQueueItem {
+  id: number
+  state: ProductNormalizationState
+  source: string
+  source_product_id: string | null
+  title: string
+  normalized_title: string
+  category_id: number | null
+  category_slug: string | null
+  category_name: string | null
+  category_raw: string | null
+  unit_raw: string | null
+  image_url: string | null
+  last_seen_at: string
+  is_not_product: boolean
+  shop: ProductShop
+  latest_price: ProductLatestPrice | null
+  catalog_eligibility: ProductNormalizationEligibility | null
+  match_summary: ProductNormalizationMatchSummary
+}
+
+export interface ProductNormalizationQueueResponse {
+  items: ProductNormalizationQueueItem[]
+  limit: number
+  offset: number
+  total: number
+}
+
 export interface ProductPriceSnapshot {
   id: number
   price: string | null
@@ -296,6 +346,16 @@ export interface ProductSearchParams {
   offset?: number
 }
 
+export interface ProductNormalizationQueueParams {
+  state?: ProductNormalizationState
+  source?: string
+  shopId?: number
+  categoryId?: number
+  q?: string
+  limit?: number
+  offset?: number
+}
+
 export interface ScrapeStatusCount {
   status: string
   count: number
@@ -474,6 +534,25 @@ export function fetchProducts(
   appendOptionalParam(params, 'offset', filters.offset)
 
   return fetchJson<ProductSearchResponse>(`/products?${params.toString()}`, signal)
+}
+
+export function fetchProductNormalizationQueue(
+  filters: ProductNormalizationQueueParams,
+  signal?: AbortSignal,
+): Promise<ProductNormalizationQueueResponse> {
+  const params = new URLSearchParams()
+  appendOptionalParam(params, 'state', filters.state)
+  appendOptionalParam(params, 'source', filters.source)
+  appendOptionalParam(params, 'shop', filters.shopId)
+  appendOptionalParam(params, 'category_id', filters.categoryId)
+  appendOptionalParam(params, 'q', filters.q?.trim())
+  appendOptionalParam(params, 'limit', filters.limit)
+  appendOptionalParam(params, 'offset', filters.offset)
+
+  return fetchJson<ProductNormalizationQueueResponse>(
+    `/product-normalization/queue?${params.toString()}`,
+    signal,
+  )
 }
 
 export function fetchProduct(

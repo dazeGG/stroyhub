@@ -7,6 +7,7 @@ import DashboardPage from './views/DashboardPage.vue'
 import HelpPage from './views/HelpPage.vue'
 import MatchReviewPage from './views/MatchReviewPage.vue'
 import ProductDetailPage from './views/ProductDetailPage.vue'
+import ProductNormalizationInboxPage from './views/ProductNormalizationInboxPage.vue'
 import ScrapeStatusPage from './views/ScrapeStatusPage.vue'
 import ShopCandidateReviewPage from './views/ShopCandidateReviewPage.vue'
 import ShopSourceManagementPage from './views/ShopSourceManagementPage.vue'
@@ -27,6 +28,11 @@ export const router = createRouter({
   routes: [
     { path: '/', name: 'dashboard', component: DashboardPage },
     { path: '/products', name: 'source-products', component: CatalogPage },
+    {
+      path: '/products/normalization',
+      name: 'product-normalization',
+      component: ProductNormalizationInboxPage,
+    },
     { path: '/shops', name: 'shops', component: ShopSourceManagementPage },
     { path: '/shops/candidates', name: 'shop-candidates', component: ShopCandidateReviewPage },
     { path: '/products/:productId', name: 'product-detail', component: ProductDetailPage },
