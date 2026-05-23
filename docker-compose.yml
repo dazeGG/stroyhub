@@ -14,7 +14,8 @@ services:
       - >
         uv sync --all-extras &&
         uv run alembic upgrade head &&
-        uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+        uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000
+        --reload --reload-dir apps/api --reload-dir packages
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
@@ -77,7 +78,8 @@ services:
       - -c
       - >
         uv sync --all-extras &&
-        uv run uvicorn apps.admin_api.main:app --host 0.0.0.0 --port 8001 --reload
+        uv run uvicorn apps.admin_api.main:app --host 0.0.0.0 --port 8001
+        --reload --reload-dir apps/admin_api --reload-dir packages
     ports:
       - "${ADMIN_API_PORT:-8001}:8001"
     volumes:
