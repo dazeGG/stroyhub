@@ -137,12 +137,12 @@ def generate_product_match_candidates(
     allow_category_mismatch: bool = False,
 ) -> tuple[ProductMatchCandidate, ...]:
     """Generate conservative in-memory match candidates without persistence."""
-    prepared_products = tuple(_prepare_product(product) for product in products)
+    prepared_products = tuple(prepare_match_product(product) for product in products)
     candidates: list[ProductMatchCandidate] = []
 
     for left_index, left in enumerate(prepared_products):
         for right in prepared_products[left_index + 1 :]:
-            candidate = _candidate_for_pair(
+            candidate = candidate_for_prepared_pair(
                 left,
                 right,
                 allow_category_mismatch=allow_category_mismatch,
@@ -153,7 +153,7 @@ def generate_product_match_candidates(
     return tuple(sorted(candidates, key=lambda candidate: candidate.confidence, reverse=True))
 
 
-def _prepare_product(product: SourceProductLike) -> MatchProduct:
+def prepare_match_product(product: SourceProductLike) -> MatchProduct:
     normalized_title = product.normalized_title or normalize_title(product.title)
     tokens, ignored_tokens = _matching_tokens(normalized_title)
     attributes = extract_title_attributes(product.title)
@@ -173,7 +173,7 @@ def _prepare_product(product: SourceProductLike) -> MatchProduct:
     )
 
 
-def _candidate_for_pair(
+def candidate_for_prepared_pair(
     left: MatchProduct,
     right: MatchProduct,
     *,

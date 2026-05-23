@@ -9,7 +9,8 @@ from stroyhub.db.repositories import ProductMatchCreate, ProductMatchRepository
 from stroyhub.ml.matching import (
     ProductMatchCandidate,
     ProductMatchReason,
-    generate_product_match_candidates,
+    candidate_for_prepared_pair,
+    prepare_match_product,
 )
 from stroyhub.models.tables import CanonicalProduct, ProductMatch, SourceProduct
 from stroyhub.parsers.common import JsonObject
@@ -51,29 +52,34 @@ class ProductMatchCandidateGenerator:
     def generate(self, filters: ProductMatchGenerationFilters) -> ProductMatchGenerationResult:
         source_products = self._eligible_unmatched_source_products(filters)
         references, canonical_id_by_reference_id = self._reference_products()
+        prepared_references = [
+            (reference, prepare_match_product(reference))
+            for reference in references
+        ]
+        existing_pairs = self._existing_pairs(
+            source_product_ids=[product.id for product in source_products],
+            canonical_product_ids=list(canonical_id_by_reference_id.values()),
+        )
         candidates_seen = 0
         candidates_created = 0
         candidates_skipped_existing = 0
 
         for source_product in source_products:
-            source = _source_comparable(source_product)
-            for reference in references:
+            source = prepare_match_product(_source_comparable(source_product))
+            for reference, prepared_reference in prepared_references:
                 if source_product.id == reference.id and reference.source != "canonical":
                     continue
-                candidates = generate_product_match_candidates(
-                    [source, reference],
-                    min_confidence=filters.min_confidence,
+                candidate = candidate_for_prepared_pair(
+                    source,
+                    prepared_reference,
+                    allow_category_mismatch=False,
                 )
-                if not candidates:
+                if candidate is None or candidate.confidence < filters.min_confidence:
                     continue
 
-                candidate = candidates[0]
                 canonical_product_id = canonical_id_by_reference_id[reference.id]
                 candidates_seen += 1
-                if self._match_for_pair(
-                    source_product_id=source_product.id,
-                    canonical_product_id=canonical_product_id,
-                ):
+                if (source_product.id, canonical_product_id) in existing_pairs:
                     candidates_skipped_existing += 1
                     continue
 
@@ -156,18 +162,27 @@ class ProductMatchCandidateGenerator:
 
         return references, canonical_id_by_reference_id
 
-    def _match_for_pair(
+    def _existing_pairs(
         self,
         *,
-        source_product_id: int,
-        canonical_product_id: int,
-    ) -> ProductMatch | None:
-        return self._session.scalar(
-            select(ProductMatch).where(
-                ProductMatch.source_product_id == source_product_id,
-                ProductMatch.canonical_product_id == canonical_product_id,
+        source_product_ids: list[int],
+        canonical_product_ids: list[int],
+    ) -> set[tuple[int, int]]:
+        if not source_product_ids or not canonical_product_ids:
+            return set()
+
+        return {
+            (source_product_id, canonical_product_id)
+            for source_product_id, canonical_product_id in self._session.execute(
+                select(
+                    ProductMatch.source_product_id,
+                    ProductMatch.canonical_product_id,
+                ).where(
+                    ProductMatch.source_product_id.in_(source_product_ids),
+                    ProductMatch.canonical_product_id.in_(canonical_product_ids),
+                )
             )
-        )
+        }
 
     def _create_candidate(
         self,
