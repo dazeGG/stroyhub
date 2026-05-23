@@ -7,10 +7,14 @@ from sqlalchemy import and_, false, func, or_, select
 from sqlalchemy.orm import Session
 
 from stroyhub.catalog.eligibility import is_matchable_source_product
+from stroyhub.catalog.query_helpers import (
+    category_descendant_ids,
+    escape_like_pattern,
+    latest_price_subquery,
+)
 from stroyhub.models.tables import (
     CanonicalProduct,
     Category,
-    PriceSnapshot,
     ProductMatch,
     Shop,
     SourceProduct,
@@ -179,7 +183,7 @@ class CanonicalProductCatalog:
         if filters.q is not None:
             query = filters.q.strip()
             if query:
-                pattern = f"%{_escape_like_pattern(query)}%"
+                pattern = f"%{escape_like_pattern(query)}%"
                 statement = statement.where(
                     or_(
                         CanonicalProduct.title.ilike(pattern, escape="\\"),
@@ -234,23 +238,7 @@ class CanonicalProductCatalog:
         *,
         status: str,
     ) -> list[CanonicalLinkedSourceProduct]:
-        latest_prices = (
-            select(
-                PriceSnapshot.source_product_id.label("source_product_id"),
-                PriceSnapshot.price.label("latest_price"),
-                PriceSnapshot.currency.label("latest_currency"),
-                PriceSnapshot.unit_raw.label("latest_unit_raw"),
-                PriceSnapshot.source_updated_at.label("latest_source_updated_at"),
-                PriceSnapshot.parsed_at.label("latest_parsed_at"),
-            )
-            .distinct(PriceSnapshot.source_product_id)
-            .order_by(
-                PriceSnapshot.source_product_id,
-                PriceSnapshot.parsed_at.desc(),
-                PriceSnapshot.id.desc(),
-            )
-            .subquery()
-        )
+        latest_prices = latest_price_subquery()
         statement = (
             select(
                 ProductMatch,
@@ -266,7 +254,10 @@ class CanonicalProductCatalog:
             .join(Shop, SourceProduct.shop_id == Shop.id)
             .outerjoin(
                 latest_prices,
-                and_(latest_prices.c.source_product_id == SourceProduct.id),
+                and_(
+                    latest_prices.c.source_product_id == SourceProduct.id,
+                    latest_prices.c.row_number == 1,
+                ),
             )
             .where(
                 ProductMatch.canonical_product_id == canonical_product_id,
@@ -354,32 +345,7 @@ class CanonicalProductCatalog:
     def _category_filter_ids(self, category_id: int | None) -> set[int] | None:
         if category_id is None:
             return None
-
-        category_rows = self._session.execute(select(Category.id, Category.parent_id))
-        child_ids_by_parent: dict[int, list[int]] = {}
-        known_ids: set[int] = set()
-        for row_category_id, parent_id in category_rows:
-            known_ids.add(row_category_id)
-            if parent_id is not None:
-                child_ids_by_parent.setdefault(parent_id, []).append(row_category_id)
-
-        if category_id not in known_ids:
-            return set()
-
-        category_ids = {category_id}
-        pending = [category_id]
-        while pending:
-            pending_id = pending.pop()
-            for child_id in child_ids_by_parent.get(pending_id, []):
-                if child_id not in category_ids:
-                    category_ids.add(child_id)
-                    pending.append(child_id)
-
-        return category_ids
-
-
-def _escape_like_pattern(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        return category_descendant_ids(self._session, {category_id})
 
 
 def _offer_groups(

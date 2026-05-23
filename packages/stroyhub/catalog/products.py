@@ -6,6 +6,11 @@ from typing import Any, Literal
 from sqlalchemy import and_, false, func, or_, select
 from sqlalchemy.orm import Session
 
+from stroyhub.catalog.query_helpers import (
+    category_descendant_ids,
+    escape_like_pattern,
+    latest_price_subquery,
+)
 from stroyhub.models.tables import Category, CategoryOverride, PriceSnapshot, Shop, SourceProduct
 
 ProductSort = Literal[
@@ -18,11 +23,6 @@ ProductSort = Literal[
     "last_seen_at",
     "-last_seen_at",
 ]
-
-
-def _escape_like_pattern(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
 
 @dataclass(frozen=True, kw_only=True)
 class ProductSearchFilters:
@@ -156,23 +156,7 @@ class ProductCatalog:
         ]
 
     def _product_listing_statement(self) -> tuple[Any, Any]:
-        latest_prices = (
-            select(
-                PriceSnapshot.source_product_id.label("source_product_id"),
-                PriceSnapshot.price.label("latest_price"),
-                PriceSnapshot.currency.label("latest_currency"),
-                PriceSnapshot.unit_raw.label("latest_unit_raw"),
-                PriceSnapshot.source_updated_at.label("latest_source_updated_at"),
-                PriceSnapshot.parsed_at.label("latest_parsed_at"),
-                func.row_number()
-                .over(
-                    partition_by=PriceSnapshot.source_product_id,
-                    order_by=(PriceSnapshot.parsed_at.desc(), PriceSnapshot.id.desc()),
-                )
-                .label("row_number"),
-            )
-            .subquery()
-        )
+        latest_prices = latest_price_subquery()
 
         statement = (
             select(
@@ -209,7 +193,7 @@ class ProductCatalog:
         if filters.q is not None:
             query = filters.q.strip()
             if query:
-                pattern = f"%{_escape_like_pattern(query)}%"
+                pattern = f"%{escape_like_pattern(query)}%"
                 statement = statement.where(
                     or_(
                         SourceProduct.title.ilike(pattern, escape="\\"),
@@ -308,25 +292,7 @@ class ProductCatalog:
 
         if not starting_ids:
             return None
-
-        category_rows = self._session.execute(select(Category.id, Category.parent_id))
-        child_ids_by_parent: dict[int, list[int]] = {}
-        known_ids: set[int] = set()
-        for category_id, parent_id in category_rows:
-            known_ids.add(category_id)
-            if parent_id is not None:
-                child_ids_by_parent.setdefault(parent_id, []).append(category_id)
-
-        category_ids = {category_id for category_id in starting_ids if category_id in known_ids}
-        pending = list(category_ids)
-        while pending:
-            category_id = pending.pop()
-            for child_id in child_ids_by_parent.get(category_id, []):
-                if child_id not in category_ids:
-                    category_ids.add(child_id)
-                    pending.append(child_id)
-
-        return category_ids
+        return category_descendant_ids(self._session, starting_ids)
 
     def _sort_expressions(self, sort: ProductSort, latest_prices: Any) -> tuple[Any, ...]:
         if sort == "latest_price":
