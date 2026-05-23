@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,6 +16,7 @@ from stroyhub.db import get_session
 from stroyhub.models import Shop, ShopIdentity, ShopSourceCandidate
 from stroyhub.parsers.metalltorg import METALLTORG_SHOP_SOURCE_ID, METALLTORG_SOURCE
 from stroyhub.parsers.unicom import UNICOM_DEFAULT_SHOP_SOURCE_ID, UNICOM_SOURCE
+from stroyhub.scraping.enqueue import mark_enqueue_failed
 
 from apps.admin_api.scrape_queue import enqueue_shop_scrape
 
@@ -185,13 +186,11 @@ def approve_shop_source_candidate(
         if str(scrape_result.get("status")) == "enqueue_failed":
             shop = session.get(Shop, approved_shop_id)
             if shop is not None:
-                raw = dict(shop.raw or {})
-                raw["enqueue_failed"] = {
-                    "operation": "candidate_approve",
-                    "failed_at": datetime.now(UTC).isoformat(),
-                    "reason": str(scrape_result.get("reason") or "enqueue failed"),
-                }
-                shop.raw = raw
+                mark_enqueue_failed(
+                    shop,
+                    operation="candidate_approve",
+                    reason=str(scrape_result.get("reason") or "enqueue failed"),
+                )
                 session.commit()
             raise HTTPException(
                 status_code=503,
@@ -243,13 +242,11 @@ def materialize_official_strategy(
         if str(scrape_result.get("status")) == "enqueue_failed":
             shop = session.get(Shop, shop_id)
             if shop is not None:
-                raw = dict(shop.raw or {})
-                raw["enqueue_failed"] = {
-                    "operation": "official_materialize",
-                    "failed_at": datetime.now(UTC).isoformat(),
-                    "reason": str(scrape_result.get("reason") or "enqueue failed"),
-                }
-                shop.raw = raw
+                mark_enqueue_failed(
+                    shop,
+                    operation="official_materialize",
+                    reason=str(scrape_result.get("reason") or "enqueue failed"),
+                )
                 session.commit()
             raise HTTPException(
                 status_code=503,

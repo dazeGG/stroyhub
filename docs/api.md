@@ -488,6 +488,26 @@ catalogs, or manual price snapshots. Owner-managed shop behavior should be
 modeled later as ownership and management state, not as a generic `manual`
 source type.
 
+### `POST /shops/{shop_id}/scrape/retry`
+
+Retries a failed or partial scrape by scheduling the shop source immediately.
+
+Success response includes enqueue metadata:
+
+```json
+{
+  "shop_id": 3,
+  "source": "unicom",
+  "source_type": "official_api",
+  "status": "queued",
+  "task_id": "a3e6a147-76be-4e7f-952e-2f9f9fbf9388",
+  "reason": null
+}
+```
+
+If enqueue fails after the status commit, the endpoint returns `503` and stores
+failure metadata in `shops.raw.enqueue_failed` for operator retry/repair.
+
 ## Shop Source Candidates
 
 ### `GET /shop-source-candidates`
@@ -593,6 +613,17 @@ The scrape result is included only in the approve response:
   }
 }
 ```
+
+If enqueue fails after approval commit, the endpoint returns `503` and writes
+`shops.raw.enqueue_failed` for the approved source shop.
+
+### `POST /shop-source-candidates/official-strategies/{source}/materialize`
+
+Materializes an official source strategy into an operational `shops` record and
+optionally enqueues an immediate scrape (`run_scrape=true` by default).
+
+If enqueue fails after materialization commit, the endpoint returns `503` and
+writes `shops.raw.enqueue_failed` for the materialized source shop.
 
 ## Scrapes
 
