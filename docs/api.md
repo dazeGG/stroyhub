@@ -180,6 +180,36 @@ These endpoints record admin decisions that link source product cards to
 canonical products. They preserve source product rows and write audit metadata
 to `product_matches.reviewed_at`, `reviewed_by`, and `reason`.
 
+### `POST /product-matches/generate-candidates`
+
+Runs durable candidate generation for eligible unmatched source products. The
+endpoint creates `product_matches.status = "candidate"` rows only; it does not
+auto-accept matches.
+
+Request:
+
+```json
+{
+  "source": "2gis",
+  "shop_id": null,
+  "category_id": 7,
+  "min_confidence": 0.75,
+  "limit": 100
+}
+```
+
+Example response:
+
+```json
+{
+  "source_products_considered": 42,
+  "reference_products_considered": 18,
+  "candidates_seen": 12,
+  "candidates_created": 8,
+  "candidates_skipped_existing": 4
+}
+```
+
 ### `POST /product-matches/accept`
 
 Accepts a source product into an existing canonical product. If the same

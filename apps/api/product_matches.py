@@ -3,13 +3,17 @@ from decimal import Decimal
 from typing import Annotated, Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from stroyhub.catalog.product_match_decisions import (
     ProductMatchDecisionConflict,
     ProductMatchDecisionInput,
     ProductMatchDecisionNotFound,
     ProductMatchDecisionService,
+)
+from stroyhub.catalog.product_match_generation import (
+    ProductMatchCandidateGenerator,
+    ProductMatchGenerationFilters,
 )
 from stroyhub.db import get_session
 
@@ -21,6 +25,14 @@ class ProductMatchDecisionRequest(BaseModel):
     source_product_id: int
     actor: str | None = "admin"
     reason: str | None = None
+
+
+class ProductMatchGenerateCandidatesRequest(BaseModel):
+    source: str | None = None
+    shop_id: int | None = None
+    category_id: int | None = None
+    min_confidence: float = Field(default=0.75, ge=0, le=1)
+    limit: int = Field(default=100, ge=1, le=1000)
 
 
 class ProductMatchReviewRequest(BaseModel):
@@ -41,6 +53,34 @@ class ProductMatchDecisionResponse(BaseModel):
     reviewed_at: datetime | None
     reviewed_by: str | None
     reason: dict[str, Any] | None
+
+
+class ProductMatchGenerateCandidatesResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    source_products_considered: int
+    reference_products_considered: int
+    candidates_seen: int
+    candidates_created: int
+    candidates_skipped_existing: int
+
+
+@router.post("/generate-candidates", response_model=ProductMatchGenerateCandidatesResponse)
+def generate_product_match_candidates(
+    payload: ProductMatchGenerateCandidatesRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> ProductMatchGenerateCandidatesResponse:
+    result = ProductMatchCandidateGenerator(session).generate(
+        ProductMatchGenerationFilters(
+            source=payload.source,
+            shop_id=payload.shop_id,
+            category_id=payload.category_id,
+            min_confidence=payload.min_confidence,
+            limit=payload.limit,
+        )
+    )
+    session.commit()
+    return ProductMatchGenerateCandidatesResponse.model_validate(result)
 
 
 @router.post("/accept", response_model=ProductMatchDecisionResponse)
