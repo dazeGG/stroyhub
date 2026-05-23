@@ -342,6 +342,40 @@ def test_generate_candidates_skips_ineligible_and_blocked_products(
     assert response.json()["candidates_created"] == 0
 
 
+def test_generate_candidates_respects_category_blocking(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    category = Category(slug="generation-source-category", name="Source Category")
+    other_category = Category(slug="generation-other-category", name="Other Category")
+    db_session.add_all([category, other_category])
+    db_session.flush()
+    canonical = CanonicalProductRepository(db_session).create(
+        CanonicalProductCreate(
+            title="Category Block Cement M500 50kg",
+            normalized_title="category block cement m500 50kg",
+            category_id=other_category.id,
+        )
+    )
+    _source_product(
+        db_session,
+        source_id="generate-category-blocked",
+        title="Category Block Cement M500 50kg",
+        category_id=category.id,
+    )
+
+    response = client.post(
+        "/product-matches/generate-candidates",
+        json={"source": "2gis", "category_id": category.id, "min_confidence": 0.9},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["reference_products_considered"] >= 1
+    assert response.json()["candidates_created"] == 0
+    assert response.json()["candidates_seen"] == 0
+    assert canonical.id > 0
+
+
 def _canonical(session: Session, *, title: str) -> CanonicalProduct:
     category = Category(slug=f"category-{title.casefold().replace(' ', '-')}", name=title)
     session.add(category)
