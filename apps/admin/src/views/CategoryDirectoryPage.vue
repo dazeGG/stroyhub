@@ -222,7 +222,7 @@ onMounted(() => {
           data-testid="category-directory-row"
         >
           <div
-            class="grid w-full gap-3 px-4 py-4 text-left text-sm transition hover:bg-neutral-900/60 md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_120px]"
+            class="grid w-full gap-3 px-4 py-4 text-left text-sm transition hover:bg-neutral-900/60 md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_96px]"
           >
             <button
               type="button"
@@ -257,11 +257,13 @@ onMounted(() => {
             <div class="flex items-start justify-start md:justify-end">
               <RouterLink
                 :to="{ path: '/products', query: { category: category.id } }"
-                class="inline-flex h-8 items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
+                class="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-700 px-2.5 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
+                aria-label="Открыть исходные товары категории"
+                title="Исходные товары"
                 @click.stop
               >
                 <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
-                Исходные товары
+                Товары
               </RouterLink>
             </div>
           </div>
@@ -274,7 +276,7 @@ onMounted(() => {
             <div
               v-for="child in category.children"
               :key="child.id"
-              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_120px]"
+              class="mx-4 grid gap-3 border-t border-neutral-800/70 px-0 py-3 text-sm md:grid-cols-[minmax(260px,1fr)_minmax(150px,220px)_120px_96px]"
               data-testid="category-directory-row"
             >
               <div class="min-w-0 pl-10 md:pl-12">
@@ -287,10 +289,12 @@ onMounted(() => {
               <div class="flex justify-start md:justify-end">
                 <RouterLink
                   :to="{ path: '/products', query: { category: child.id } }"
-                  class="inline-flex h-8 items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
+                  class="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-700 px-2.5 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
+                  aria-label="Открыть исходные товары категории"
+                  title="Исходные товары"
                 >
                   <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
-                  Исходные товары
+                  Товары
                 </RouterLink>
               </div>
             </div>
