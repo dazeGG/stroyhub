@@ -5,6 +5,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Path, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
+from stroyhub.catalog.operator_decision_history import record_operator_decision
 from stroyhub.catalog.products import ProductCatalog, ProductSearchFilters, ProductSort
 from stroyhub.catalog.quality_pipeline import CatalogQualityPipeline
 from stroyhub.db import get_session
@@ -196,13 +197,44 @@ def assign_product_category_override(
             message="Category override must target a leaf category",
         )
 
-    CategoryOverrideRepository(session).create_or_replace(
+    override_repository = CategoryOverrideRepository(session)
+    product = session.get(SourceProduct, product_id)
+    previous_category_id = product.category_id if product is not None else None
+    active_override = override_repository.get_active(product_id)
+    previous_override_id = active_override.id if active_override is not None else None
+    override = override_repository.create_or_replace(
         CategoryOverrideCreate(
             source_product_id=product_id,
             category_id=payload.category_id,
             reason=payload.reason,
             actor=payload.actor,
         )
+    )
+    record_operator_decision(
+        session,
+        decision_type="categorization",
+        action="set_category_override",
+        entity_type="source_product",
+        entity_id=product_id,
+        source_product_id=product_id,
+        category_id=payload.category_id,
+        actor=payload.actor,
+        reason=payload.reason,
+        previous_state={
+            "category_id": previous_category_id,
+            "active_override_id": previous_override_id,
+        },
+        new_state={
+            "category_id": override.category_id,
+            "category_override_id": override.id,
+            "status": override.status,
+        },
+        evidence={
+            "source": "operator_category_override",
+            "previous_category_id": previous_category_id,
+            "selected_category_id": payload.category_id,
+        },
+        alternatives={"items": [{"category_id": payload.category_id, "selected": True}]},
     )
     _refresh_product_quality(session, product_id)
     session.commit()
@@ -235,6 +267,7 @@ def revert_product_category_override(
             message="Source product not found",
         )
 
+    active_override = CategoryOverrideRepository(session).get_active(product_id)
     reverted = CategoryOverrideRepository(session).revert_active(
         CategoryOverrideRevert(source_product_id=product_id, actor=actor)
     )
@@ -245,6 +278,29 @@ def revert_product_category_override(
             message="Active category override not found",
         )
 
+    record_operator_decision(
+        session,
+        decision_type="categorization",
+        action="revert_category_override",
+        entity_type="source_product",
+        entity_id=product_id,
+        source_product_id=product_id,
+        category_id=reverted.previous_category_id,
+        actor=actor,
+        previous_state={
+            "category_id": active_override.category_id if active_override is not None else None,
+            "category_override_id": active_override.id if active_override is not None else None,
+        },
+        new_state={
+            "category_id": reverted.previous_category_id,
+            "category_override_id": reverted.id,
+            "status": reverted.status,
+        },
+        evidence={
+            "source": "operator_category_override_revert",
+            "selected_category_id": reverted.previous_category_id,
+        },
+    )
     _refresh_product_quality(session, product_id)
     session.commit()
 
@@ -284,12 +340,40 @@ def mark_product_data_problem(
             message="Source product not found",
         )
 
+    previous_state = {
+        "is_not_product": product.is_not_product,
+        "operator_review": (product.raw or {}).get("operator_review")
+        if isinstance(product.raw, dict)
+        else None,
+    }
     product.is_not_product = payload.is_not_product
     product.raw = _with_operator_data_problem(
         product.raw,
         is_not_product=payload.is_not_product,
         reason=payload.reason,
         actor=payload.actor,
+    )
+    record_operator_decision(
+        session,
+        decision_type="data_quality",
+        action="mark_data_problem" if payload.is_not_product else "clear_data_problem",
+        entity_type="source_product",
+        entity_id=product_id,
+        source_product_id=product_id,
+        category_id=product.category_id,
+        actor=payload.actor,
+        reason=payload.reason,
+        previous_state=previous_state,
+        new_state={
+            "is_not_product": product.is_not_product,
+            "operator_review": product.raw.get("operator_review")
+            if isinstance(product.raw, dict)
+            else None,
+        },
+        evidence={
+            "source": "operator_data_problem",
+            "is_not_product": payload.is_not_product,
+        },
     )
     _refresh_product_quality(session, product_id)
     session.commit()

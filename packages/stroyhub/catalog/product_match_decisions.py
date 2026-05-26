@@ -5,6 +5,11 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from stroyhub.catalog.operator_decision_history import (
+    decision_action,
+    match_state,
+    record_operator_decision,
+)
 from stroyhub.catalog.product_match_generation import ProductMatchCandidateGenerator
 from stroyhub.catalog.quality_pipeline import CatalogQualityPipeline
 from stroyhub.db.repositories import (
@@ -109,6 +114,8 @@ class ProductMatchDecisionService:
             canonical_product_id=canonical.id,
             source_product_id=source_product.id,
             data=data,
+            default_action="create_normalized_product",
+            previous_state={"accepted_match": None},
         )
 
     def reject_candidate(
@@ -126,12 +133,31 @@ class ProductMatchDecisionService:
             raise ProductMatchDecisionConflict("Only candidate matches can be rejected")
 
         reviewed_at = datetime.now(UTC)
+        previous_reason = match.reason
+        previous_state = match_state(match)
         updated = ProductMatchRepository(self._session).update_status(
             match,
             status="rejected",
             reviewed_at=reviewed_at,
             reviewed_by=data.actor,
             reason=_decision_reason(data, action="reject"),
+        )
+        record_operator_decision(
+            self._session,
+            decision_type="normalization",
+            action=decision_action(data.decision, default="reject_suggestion"),
+            entity_type="product_match",
+            entity_id=updated.id,
+            source_product_id=updated.source_product_id,
+            canonical_product_id=updated.canonical_product_id,
+            product_match_id=updated.id,
+            category_id=self._source_product(updated.source_product_id).category_id,
+            actor=data.actor,
+            reason=data.reason,
+            previous_state=previous_state,
+            new_state=match_state(updated),
+            decision_context=data.decision or _decision_context_from_reason(previous_reason),
+            decided_at=reviewed_at,
         )
         self._refresh_quality_for_source_product(updated.source_product_id)
         return _decision(updated)
@@ -148,6 +174,7 @@ class ProductMatchDecisionService:
         source_product = self._source_product(source_product_id)
 
         accepted = self._accepted_match(source_product_id)
+        previous_state: JsonObject = {"accepted_match": match_state(accepted)}
         if accepted is not None:
             if accepted.canonical_product_id == canonical_product_id:
                 self._refresh_quality_for_shop(source_product.shop_id)
@@ -163,11 +190,14 @@ class ProductMatchDecisionService:
                 reviewed_by=data.actor,
                 reason=_decision_reason(data, action="supersede"),
             )
+            previous_state = {"superseded_match": previous_state["accepted_match"]}
 
         return self._create_or_accept_pair(
             canonical_product_id=canonical_product_id,
             source_product_id=source_product_id,
             data=data,
+            default_action="attach_to_existing",
+            previous_state=previous_state,
         )
 
     def _create_or_accept_pair(
@@ -176,6 +206,8 @@ class ProductMatchDecisionService:
         canonical_product_id: int,
         source_product_id: int,
         data: ProductMatchDecisionInput,
+        default_action: str = "attach_to_existing",
+        previous_state: JsonObject | None = None,
     ) -> ProductMatchDecision:
         existing = self._match_for_pair(
             canonical_product_id=canonical_product_id,
@@ -183,6 +215,7 @@ class ProductMatchDecisionService:
         )
         reviewed_at = datetime.now(UTC)
         if existing is not None:
+            original_state = match_state(existing)
             existing.confidence = Decimal("1.000")
             existing.method = "manual"
             updated = ProductMatchRepository(self._session).update_status(
@@ -191,6 +224,15 @@ class ProductMatchDecisionService:
                 reviewed_at=reviewed_at,
                 reviewed_by=data.actor,
                 reason=_decision_reason(data, action="accept"),
+            )
+            self._record_accept_decision(
+                updated,
+                data=data,
+                action=default_action,
+                previous_state=_merge_previous_state(previous_state, match=original_state),
+                decision_context=data.decision
+                or _decision_context_from_state(original_state),
+                decided_at=reviewed_at,
             )
             self._generate_followup_candidates(canonical_product_id)
             self._refresh_quality_for_source_product(source_product_id)
@@ -208,9 +250,46 @@ class ProductMatchDecisionService:
                 reason=_decision_reason(data, action="accept"),
             )
         )
+        self._record_accept_decision(
+            match,
+            data=data,
+            action=default_action,
+            previous_state=previous_state or {"match": None},
+            decision_context=data.decision or _decision_context_from_reason(match.reason),
+            decided_at=reviewed_at,
+        )
         self._generate_followup_candidates(canonical_product_id)
         self._refresh_quality_for_source_product(source_product_id)
         return _decision(match)
+
+    def _record_accept_decision(
+        self,
+        match: ProductMatch,
+        *,
+        data: ProductMatchDecisionInput,
+        action: str,
+        previous_state: JsonObject,
+        decision_context: JsonObject | None,
+        decided_at: datetime,
+    ) -> None:
+        source_product = self._source_product(match.source_product_id)
+        record_operator_decision(
+            self._session,
+            decision_type="normalization",
+            action=decision_action(data.decision, default=action),
+            entity_type="product_match",
+            entity_id=match.id,
+            source_product_id=match.source_product_id,
+            canonical_product_id=match.canonical_product_id,
+            product_match_id=match.id,
+            category_id=source_product.category_id,
+            actor=data.actor,
+            reason=data.reason,
+            previous_state=previous_state,
+            new_state=match_state(match),
+            decision_context=decision_context,
+            decided_at=decided_at,
+        )
 
     def _canonical_product(self, canonical_product_id: int) -> CanonicalProduct:
         product = self._session.get(CanonicalProduct, canonical_product_id)
@@ -289,3 +368,31 @@ def _decision_reason(
     if data.decision is not None:
         reason["decision"] = data.decision
     return reason
+
+
+def _decision_context_from_reason(reason: JsonObject | None) -> JsonObject | None:
+    if not isinstance(reason, dict):
+        return None
+    raw_decision = reason.get("decision")
+    if isinstance(raw_decision, dict):
+        return raw_decision
+    return reason
+
+
+def _decision_context_from_state(state: JsonObject | None) -> JsonObject | None:
+    if not isinstance(state, dict):
+        return None
+    reason = state.get("reason")
+    return _decision_context_from_reason(reason if isinstance(reason, dict) else None)
+
+
+def _merge_previous_state(
+    previous_state: JsonObject | None,
+    *,
+    match: JsonObject | None,
+) -> JsonObject:
+    if previous_state is None:
+        return {"match": match}
+    merged = dict(previous_state)
+    merged["match"] = match
+    return merged

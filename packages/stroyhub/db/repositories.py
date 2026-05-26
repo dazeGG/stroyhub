@@ -3,13 +3,14 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from stroyhub.models.tables import (
     CanonicalProduct,
     Category,
     CategoryOverride,
+    OperatorDecision,
     PriceSnapshot,
     ProductMatch,
     ScrapeRun,
@@ -26,6 +27,7 @@ CATEGORY_OVERRIDE_STATUSES = frozenset({"active", "replaced", "reverted"})
 SOURCE_CATEGORY_MAPPING_STATUSES = frozenset({"active", "non_product", "disabled"})
 SHOP_IDENTITY_STATUSES = frozenset({"active", "hold", "disabled", "out_of_scope"})
 SHOP_SOURCE_TYPES = frozenset({"2gis", "official_api", "official_html"})
+OPERATOR_DECISION_TYPES = frozenset({"categorization", "normalization", "data_quality"})
 _DEFAULT_SOURCE_TYPES = {
     "2gis": "2gis",
     "unicom": "official_api",
@@ -167,6 +169,39 @@ class ProductMatchCreate:
     reviewed_at: datetime | None = None
     reviewed_by: str | None = None
     reason: JsonObject | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class OperatorDecisionCreate:
+    decision_type: str
+    action: str
+    entity_type: str
+    entity_id: int | None = None
+    source_product_id: int | None = None
+    canonical_product_id: int | None = None
+    product_match_id: int | None = None
+    category_id: int | None = None
+    actor: str | None = None
+    reason: str | None = None
+    previous_state: JsonObject | None = None
+    new_state: JsonObject | None = None
+    evidence: JsonObject | None = None
+    alternatives: JsonObject | None = None
+    metadata: JsonObject | None = None
+    decided_at: datetime | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class OperatorDecisionFilters:
+    decision_type: str | None = None
+    action: str | None = None
+    actor: str | None = None
+    source_product_id: int | None = None
+    canonical_product_id: int | None = None
+    product_match_id: int | None = None
+    category_id: int | None = None
+    limit: int | None = None
+    offset: int = 0
 
 
 class ShopRepository:
@@ -785,10 +820,105 @@ class ProductMatchRepository:
         return match
 
 
+class OperatorDecisionRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def create(self, data: OperatorDecisionCreate) -> OperatorDecision:
+        decision_type = _validated_operator_decision_type(data.decision_type)
+        action = _normalized_required_text(data.action, field="action")
+        entity_type = _normalized_required_text(data.entity_type, field="entity_type")
+        decision = OperatorDecision(
+            decision_type=decision_type,
+            action=action,
+            entity_type=entity_type,
+            entity_id=data.entity_id,
+            source_product_id=data.source_product_id,
+            canonical_product_id=data.canonical_product_id,
+            product_match_id=data.product_match_id,
+            category_id=data.category_id,
+            actor=_normalized_optional_text(data.actor),
+            reason=_normalized_optional_text(data.reason),
+            previous_state=data.previous_state,
+            new_state=data.new_state,
+            evidence=data.evidence,
+            alternatives=data.alternatives,
+            decision_metadata=data.metadata,
+        )
+        if data.decided_at is not None:
+            decision.decided_at = data.decided_at
+
+        self._session.add(decision)
+        self._session.flush()
+        return decision
+
+    def get(self, decision_id: int) -> OperatorDecision | None:
+        return self._session.get(OperatorDecision, decision_id)
+
+    def list(self, filters: OperatorDecisionFilters) -> list[OperatorDecision]:
+        statement = _operator_decision_statement(filters).order_by(
+            OperatorDecision.decided_at.desc(),
+            OperatorDecision.id.desc(),
+        )
+        if filters.offset:
+            statement = statement.offset(filters.offset)
+        if filters.limit is not None:
+            statement = statement.limit(filters.limit)
+        return list(self._session.scalars(statement))
+
+    def count(self, filters: OperatorDecisionFilters) -> int:
+        statement = select(func.count()).select_from(
+            _operator_decision_statement(filters).subquery()
+        )
+        return int(self._session.scalar(statement) or 0)
+
+
+def _operator_decision_statement(filters: OperatorDecisionFilters) -> Any:
+    statement = select(OperatorDecision)
+    if filters.decision_type is not None:
+        statement = statement.where(
+            OperatorDecision.decision_type
+            == _validated_operator_decision_type(filters.decision_type)
+        )
+    if filters.action is not None:
+        statement = statement.where(
+            OperatorDecision.action == _normalized_required_text(filters.action, field="action")
+        )
+    if filters.actor is not None:
+        statement = statement.where(
+            OperatorDecision.actor == _normalized_optional_text(filters.actor)
+        )
+    if filters.source_product_id is not None:
+        statement = statement.where(
+            OperatorDecision.source_product_id == filters.source_product_id
+        )
+    if filters.canonical_product_id is not None:
+        statement = statement.where(
+            OperatorDecision.canonical_product_id == filters.canonical_product_id
+        )
+    if filters.product_match_id is not None:
+        statement = statement.where(
+            OperatorDecision.product_match_id == filters.product_match_id
+        )
+    if filters.category_id is not None:
+        statement = statement.where(OperatorDecision.category_id == filters.category_id)
+    return statement
+
+
 def _validate_product_match_status(status: str) -> None:
     if status not in PRODUCT_MATCH_STATUSES:
         allowed = ", ".join(sorted(PRODUCT_MATCH_STATUSES))
         raise ValueError(f"unknown product match status {status!r}; expected one of: {allowed}")
+
+
+def _validated_operator_decision_type(decision_type: str) -> str:
+    normalized = _normalized_required_text(decision_type, field="decision_type").lower()
+    if normalized not in OPERATOR_DECISION_TYPES:
+        allowed = ", ".join(sorted(OPERATOR_DECISION_TYPES))
+        raise ValueError(
+            f"unknown operator decision type {normalized!r}; expected one of: {allowed}"
+        )
+    return normalized
 
 
 def _validated_source_type(source_type: str | None, *, source: str) -> str:

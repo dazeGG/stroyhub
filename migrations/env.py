@@ -7,11 +7,15 @@ from stroyhub.db.base import Base
 from stroyhub.models import (
     CanonicalProduct,
     Category,
+    CategoryOverride,
+    OperatorDecision,
     PriceSnapshot,
     ProductMatch,
     ScrapeRun,
     Shop,
+    ShopIdentity,
     ShopSourceCandidate,
+    SourceCategoryMapping,
     SourceProduct,
 )
 
@@ -27,11 +31,15 @@ target_metadata = Base.metadata
 _MODELS = (
     CanonicalProduct,
     Category,
+    CategoryOverride,
+    OperatorDecision,
     PriceSnapshot,
     ProductMatch,
     ScrapeRun,
     Shop,
+    ShopIdentity,
     ShopSourceCandidate,
+    SourceCategoryMapping,
     SourceProduct,
 )
 

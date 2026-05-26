@@ -419,6 +419,41 @@ class ProductMatch(Base):
     source_product: Mapped[SourceProduct] = relationship(back_populates="product_matches")
 
 
+class OperatorDecision(Base):
+    __tablename__ = "operator_decisions"
+    __table_args__: Any = (
+        CheckConstraint("LENGTH(BTRIM(decision_type)) > 0", name="decision_type_not_empty"),
+        CheckConstraint("LENGTH(BTRIM(action)) > 0", name="action_not_empty"),
+        CheckConstraint("LENGTH(BTRIM(entity_type)) > 0", name="entity_type_not_empty"),
+        Index("ix_operator_decisions_decided_at", "decided_at"),
+        Index("ix_operator_decisions_decision_type", "decision_type"),
+        Index("ix_operator_decisions_source_product_id", "source_product_id"),
+        Index("ix_operator_decisions_canonical_product_id", "canonical_product_id"),
+        Index("ix_operator_decisions_product_match_id", "product_match_id"),
+        Index("ix_operator_decisions_category_id", "category_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    decision_type: Mapped[str] = mapped_column(Text, nullable=False)
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    entity_type: Mapped[str] = mapped_column(Text, nullable=False)
+    entity_id: Mapped[int | None] = mapped_column(BigInteger)
+    source_product_id: Mapped[int | None] = mapped_column(ForeignKey("source_products.id"))
+    canonical_product_id: Mapped[int | None] = mapped_column(ForeignKey("canonical_products.id"))
+    product_match_id: Mapped[int | None] = mapped_column(ForeignKey("product_matches.id"))
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"))
+    actor: Mapped[str | None] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(Text)
+    previous_state: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    new_state: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    evidence: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    alternatives: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    decision_metadata: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSONB)
+    decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class PriceSnapshot(Base):
     __tablename__ = "price_snapshots"
     __table_args__: Any = (
