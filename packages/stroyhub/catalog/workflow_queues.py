@@ -478,7 +478,8 @@ class CatalogWorkflowAutoAcceptService:
 
         for item in page.items:
             product = products.get(item.id)
-            action = _normalization_action(product.raw if product is not None else None)
+            snapshot_normalization = _normalization_from_quality(item.catalog_quality)
+            action = _normalization_action(snapshot_normalization)
             if product is None or not product.is_active:
                 results.append(_batch_skip(item, action=action, reason="source_product_not_found"))
                 continue
@@ -488,7 +489,9 @@ class CatalogWorkflowAutoAcceptService:
             if action not in {"create_normalized_product", "attach_to_existing"}:
                 results.append(_batch_skip(item, action=action, reason="unsupported_action"))
                 continue
-            canonical_product_id = _normalization_canonical_product_id(product.raw)
+            canonical_product_id = _normalization_canonical_product_id(
+                snapshot_normalization
+            )
             if action == "attach_to_existing" and canonical_product_id is None:
                 results.append(
                     _batch_skip(
@@ -519,7 +522,7 @@ class CatalogWorkflowAutoAcceptService:
                         data=ProductMatchDecisionInput(
                             actor=actor,
                             reason=reason,
-                            decision=_normalization_raw(product.raw),
+                            decision=snapshot_normalization,
                         ),
                     )
                 else:
@@ -529,7 +532,7 @@ class CatalogWorkflowAutoAcceptService:
                         data=ProductMatchDecisionInput(
                             actor=actor,
                             reason=reason,
-                            decision=_normalization_raw(product.raw),
+                            decision=snapshot_normalization,
                         ),
                     )
             except (ProductMatchDecisionConflict, ProductMatchDecisionNotFound) as exc:
@@ -601,6 +604,7 @@ def _queue_predicate(queue: CatalogWorkflowQueueName) -> Any:
             not_accepted,
             SourceProduct.is_not_product.is_(False),
             pipeline_status == "processed",
+            categorization_status == "assigned",
             normalization_status == "ready_to_accept",
             or_(
                 normalization_action == "create_normalized_product",
@@ -656,22 +660,24 @@ def _catalog_quality(raw: JsonObject | None) -> JsonObject | None:
 
 def _normalization_raw(raw: JsonObject | None) -> JsonObject | None:
     quality = _catalog_quality(raw)
+    return _normalization_from_quality(quality)
+
+
+def _normalization_from_quality(quality: JsonObject | None) -> JsonObject | None:
     if quality is None:
         return None
     value = quality.get("normalization")
     return value if isinstance(value, dict) else None
 
 
-def _normalization_action(raw: JsonObject | None) -> str | None:
-    normalization = _normalization_raw(raw)
+def _normalization_action(normalization: JsonObject | None) -> str | None:
     if normalization is None:
         return None
     value = normalization.get("action")
     return value if isinstance(value, str) else None
 
 
-def _normalization_canonical_product_id(raw: JsonObject | None) -> int | None:
-    normalization = _normalization_raw(raw)
+def _normalization_canonical_product_id(normalization: JsonObject | None) -> int | None:
     if normalization is None:
         return None
     value = normalization.get("canonical_product_id")

@@ -335,6 +335,39 @@ Not allowed without a later decision:
 - hidden category changes that bypass audited operator decisions;
 - model training or labels as a required production runtime dependency.
 
+## M16 Readiness Check
+
+The automated readiness scenario is:
+
+```bash
+uv run pytest tests/test_m16_catalog_quality_acceptance.py
+```
+
+It seeds ingestion-shaped source products for:
+
+- obvious create-new acceptance;
+- obvious attach-to-existing acceptance;
+- ambiguous duplicate review;
+- operator data problem;
+- category conflict review;
+- stale attach evidence that must be skipped by batch acceptance.
+
+The scenario runs the catalog-quality pipeline, verifies dashboard and queue
+counts, checks that review/problem items do not appear in the auto-accept or
+normalized queues, applies batch acceptance, and asserts that only safe items
+receive accepted matches. It also confirms that a stale/risky item is reported
+as skipped instead of silently accepted after pipeline refreshes caused by
+earlier accepted items.
+
+Manual live smoke checks are intentionally separate from automated tests:
+
+1. Start local services with `docker compose up -d`.
+2. Run migrations and backend services.
+3. Open the admin UI and inspect Quality dashboard, Processing queues, Review
+   workspace, Normalized catalog, and Data problems.
+4. Use the auto-accept preview before applying; skipped items must remain
+   visible with a reason.
+
 ## Follow-Up Issue Mapping
 
 - [#296](https://github.com/dazeGG/stroyhub/issues/296): structured attribute extraction.
