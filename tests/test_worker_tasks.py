@@ -425,6 +425,47 @@ def test_scrape_shop_runs_unicom_source_without_live_network(
         _delete_worker_test_shops(db_session)
 
 
+def test_run_catalog_quality_checks_returns_summary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeSessionLocal:
+        def __enter__(self) -> object:
+            return object()
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    class FakeCatalogQualityCheckService:
+        def __init__(self, session: object) -> None:
+            self._session = session
+
+        def report(self) -> SimpleNamespace:
+            return SimpleNamespace(
+                summary=SimpleNamespace(
+                    total=3,
+                    blockers=1,
+                    warnings=2,
+                    by_code={"accepted_attribute_conflict": 1, "stale_price": 2},
+                )
+            )
+
+    monkeypatch.setattr(worker_tasks, "SessionLocal", FakeSessionLocal)
+    monkeypatch.setattr(
+        worker_tasks,
+        "CatalogQualityCheckService",
+        FakeCatalogQualityCheckService,
+    )
+
+    result = worker_tasks.run_catalog_quality_checks.run()
+
+    assert result == {
+        "total": 3,
+        "blockers": 1,
+        "warnings": 2,
+        "by_code": {"accepted_attribute_conflict": 1, "stale_price": 2},
+    }
+
+
 def test_scrape_shop_records_unicom_failure_run(
     monkeypatch: pytest.MonkeyPatch,
     db_session: Session,

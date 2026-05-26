@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
+from stroyhub.catalog.quality_checks import CatalogQualityCheckService
 from stroyhub.catalog.quality_pipeline import CatalogQualityPipeline
 from stroyhub.catalog.shop_candidates import CandidateListFilters, ShopCandidateCatalog
 from stroyhub.db import SessionLocal
@@ -94,6 +95,18 @@ def run_catalog_quality_pipeline(shop_id: int) -> dict[str, Any]:
         result = CatalogQualityPipeline(session).run_for_shop(shop_id)
         session.commit()
         return result.as_raw()
+
+
+@celery_app.task(name="stroyhub.run_catalog_quality_checks")  # type: ignore[untyped-decorator]
+def run_catalog_quality_checks() -> dict[str, Any]:
+    with SessionLocal() as session:
+        report = CatalogQualityCheckService(session).report()
+        return {
+            "total": report.summary.total,
+            "blockers": report.summary.blockers,
+            "warnings": report.summary.warnings,
+            "by_code": report.summary.by_code,
+        }
 
 
 @celery_app.task(name="stroyhub.refresh_shop_source_candidates")  # type: ignore[untyped-decorator]
