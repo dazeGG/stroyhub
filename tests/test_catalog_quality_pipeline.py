@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 
 import pytest
+import stroyhub.catalog.quality_pipeline as quality_pipeline_module
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -124,3 +125,42 @@ def test_catalog_quality_pipeline_generates_candidates_idempotently(
     assert match_count == 1
     assert product.raw is not None
     assert product.raw["catalog_quality"]["normalization"]["action"] == "attach_to_existing"
+
+
+def test_catalog_quality_pipeline_records_stage_failures(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="quality-pipeline-failure-shop", name="Shop")
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="quality-pipeline-failure-product",
+            title="Failure Product",
+            normalized_title="failure product",
+        )
+    )
+
+    def fail_extract(*_args: object, **_kwargs: object) -> object:
+        raise ValueError("attribute extraction failed")
+
+    monkeypatch.setattr(
+        quality_pipeline_module,
+        "extract_product_attributes",
+        fail_extract,
+    )
+
+    result = CatalogQualityPipeline(db_session).run_for_shop(shop.id)
+
+    db_session.expire(product)
+    assert result.products_seen == 1
+    assert result.products_processed == 0
+    assert result.products_failed == 1
+    assert product.raw is not None
+    quality = product.raw["catalog_quality"]
+    assert quality["status"] == "failed"
+    assert quality["failed_stage"] == "attributes"
+    assert quality["attributes"]["status"] == "failed"

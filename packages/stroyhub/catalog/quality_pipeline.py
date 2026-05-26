@@ -73,6 +73,17 @@ class CatalogQualityPipeline:
                     source=product.source,
                     category_raw=product.category_raw,
                 )
+            except Exception as exc:
+                product.raw = _with_pipeline_failure(
+                    product.raw,
+                    processed_at=now,
+                    failed_stage="attributes",
+                    error=str(exc),
+                )
+                products_failed += 1
+                continue
+
+            try:
                 category_decision = categorizer.decide(
                     title=product.title,
                     source=product.source,
@@ -89,7 +100,12 @@ class CatalogQualityPipeline:
 
                 stage_data[product.id] = (attributes, category_decision)
             except Exception as exc:
-                product.raw = _with_pipeline_failure(product.raw, processed_at=now, error=str(exc))
+                product.raw = _with_pipeline_failure(
+                    product.raw,
+                    processed_at=now,
+                    failed_stage="categorization",
+                    error=str(exc),
+                )
                 products_failed += 1
 
         self._session.flush()
@@ -109,25 +125,34 @@ class CatalogQualityPipeline:
             if product_stage_data is None:
                 continue
             attributes, category_decision = product_stage_data
-            accepted_match = self._accepted_match(product.id)
-            rejected_canonical_product_ids = self._rejected_canonical_product_ids(product.id)
-            normalization_decision = decide_normalization(
-                product,
-                candidates=self._canonical_candidates(product),
-                rejected_canonical_product_ids=rejected_canonical_product_ids,
-            )
-            product.raw = _with_catalog_quality_raw(
-                product.raw,
-                processed_at=now,
-                attributes=attributes.attributes,
-                attribute_confidence=attributes.confidence,
-                attribute_reasons=attributes.reasons,
-                category_decision=category_decision,
-                normalization_decision=normalization_decision,
-                accepted_match=accepted_match,
-                rejected_canonical_product_ids=rejected_canonical_product_ids,
-            )
-            products_processed += 1
+            try:
+                accepted_match = self._accepted_match(product.id)
+                rejected_canonical_product_ids = self._rejected_canonical_product_ids(product.id)
+                normalization_decision = decide_normalization(
+                    product,
+                    candidates=self._canonical_candidates(product),
+                    rejected_canonical_product_ids=rejected_canonical_product_ids,
+                )
+                product.raw = _with_catalog_quality_raw(
+                    product.raw,
+                    processed_at=now,
+                    attributes=attributes.attributes,
+                    attribute_confidence=attributes.confidence,
+                    attribute_reasons=attributes.reasons,
+                    category_decision=category_decision,
+                    normalization_decision=normalization_decision,
+                    accepted_match=accepted_match,
+                    rejected_canonical_product_ids=rejected_canonical_product_ids,
+                )
+                products_processed += 1
+            except Exception as exc:
+                product.raw = _with_pipeline_failure(
+                    product.raw,
+                    processed_at=now,
+                    failed_stage="normalization",
+                    error=str(exc),
+                )
+                products_failed += 1
 
         self._session.flush()
         return CatalogQualityPipelineResult(
@@ -301,13 +326,25 @@ def _with_pipeline_failure(
     raw: JsonObject | None,
     *,
     processed_at: datetime,
+    failed_stage: str,
     error: str,
 ) -> JsonObject:
     updated = dict(raw or {})
+    stage_raw: JsonObject = {
+        "status": "failed",
+        "processed_at": processed_at.isoformat(),
+        "error": error,
+    }
     updated["catalog_quality"] = {
         "version": _PIPELINE_VERSION,
         "status": "failed",
         "processed_at": processed_at.isoformat(),
+        "failed_stage": failed_stage,
+        "cleanup": {
+            "status": "passed",
+            "processed_at": processed_at.isoformat(),
+        },
+        failed_stage: stage_raw,
         "error": error,
     }
     return updated
