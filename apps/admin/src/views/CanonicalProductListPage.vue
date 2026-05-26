@@ -330,15 +330,18 @@ onMounted(() => {
 
       <div class="grid gap-3 sm:grid-cols-3 2xl:min-w-[640px]" data-testid="canonical-products-metrics">
         <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">На странице</p>
+          <p class="text-xs uppercase tracking-wide text-neutral-500">Товаров в списке</p>
+          <p class="mt-1 text-xs text-neutral-600">по текущей странице</p>
           <p class="mt-2 text-2xl font-semibold text-white">{{ products.length }}</p>
         </div>
         <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">Офферов</p>
+          <p class="text-xs uppercase tracking-wide text-neutral-500">Принятых офферов</p>
+          <p class="mt-1 text-xs text-neutral-600">у этих товаров</p>
           <p class="mt-2 text-2xl font-semibold text-white">{{ acceptedOffersCount }}</p>
         </div>
         <div class="rounded-lg border border-amber-400/20 bg-amber-400/10 p-4">
-          <p class="text-xs uppercase tracking-wide text-amber-200/80">Кандидатов</p>
+          <p class="text-xs uppercase tracking-wide text-amber-200/80">Кандидатов на проверку</p>
+          <p class="mt-1 text-xs text-amber-200/60">у этих товаров</p>
           <p class="mt-2 text-2xl font-semibold text-amber-100">{{ candidateCount }}</p>
         </div>
       </div>
