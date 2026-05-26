@@ -152,6 +152,18 @@ def test_generate_product_match_candidates_blocks_different_dimensions() -> None
     assert candidates == ()
 
 
+def test_generate_product_match_candidates_blocks_different_separate_thickness() -> None:
+    candidates = generate_product_match_candidates(
+        [
+            ProductRecord(id=1, shop_id=10, title="OSB-3 1,25х2,5м 9мм"),
+            ProductRecord(id=2, shop_id=20, title="OSB-3 1,25х2,5м 12мм"),
+        ],
+        min_confidence=0,
+    )
+
+    assert candidates == ()
+
+
 def test_generate_product_match_candidates_blocks_different_grades() -> None:
     candidates = generate_product_match_candidates(
         [

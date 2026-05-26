@@ -34,7 +34,9 @@ _TOKEN_ALIASES = {
     "плиточная": "плиточный",
     "плиточное": "плиточный",
 }
-_ATTRIBUTE_BLOCKER_KINDS = frozenset({"dimension", "package_count", "volume", "weight"})
+_ATTRIBUTE_BLOCKER_KINDS = frozenset(
+    {"dimension", "package_count", "thickness", "volume", "weight"}
+)
 _GRADE_PATTERN = re.compile(r"^[мm]\d{2,3}$", re.IGNORECASE)
 _COLOR_ALIASES = {
     "бежевый": "бежевый",
