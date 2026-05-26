@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import CatalogPage from './views/CatalogPage.vue'
+import CatalogWorkflowQueuePage from './views/CatalogWorkflowQueuePage.vue'
 import CanonicalProductDetailPage from './views/CanonicalProductDetailPage.vue'
 import CanonicalProductListPage from './views/CanonicalProductListPage.vue'
 import CategoryDirectoryPage from './views/CategoryDirectoryPage.vue'
@@ -29,6 +30,11 @@ export const router = createRouter({
   },
   routes: [
     { path: '/', name: 'dashboard', component: DashboardPage },
+    {
+      path: '/workflows/queues/:queue',
+      name: 'catalog-workflow-queue',
+      component: CatalogWorkflowQueuePage,
+    },
     { path: '/products', name: 'source-products', component: CatalogPage },
     {
       path: '/canonical-products',
@@ -48,6 +54,7 @@ export const router = createRouter({
     { path: '/shops', name: 'shops', component: ShopSourceManagementPage },
     { path: '/shops/candidates', name: 'shop-candidates', component: ShopCandidateReviewPage },
     { path: '/products/:productId', name: 'product-detail', component: ProductDetailPage },
+    { path: '/sources', redirect: '/shops' },
     { path: '/scrapes', name: 'scrapes', component: ScrapeStatusPage },
     { path: '/categories', name: 'categories', component: CategoryDirectoryPage },
     { path: '/categories/quality', name: 'category-quality', component: CategoryReviewPage },

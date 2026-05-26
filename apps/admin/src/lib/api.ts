@@ -132,6 +132,101 @@ export interface ProductNormalizationQueueResponse {
   total: number
 }
 
+export type CatalogWorkflowQueueName =
+  | 'auto_acceptable'
+  | 'review_needed'
+  | 'data_problems'
+  | 'possible_duplicates'
+  | 'normalized_items'
+
+export interface CatalogWorkflowDashboardCount {
+  queue: CatalogWorkflowQueueName
+  count: number
+}
+
+export interface CatalogWorkflowDashboardResponse {
+  counts: CatalogWorkflowDashboardCount[]
+}
+
+export interface CatalogWorkflowCategory {
+  id: number
+  slug: string
+  name: string
+}
+
+export interface CatalogWorkflowReason {
+  stage: string
+  status: string | null
+  action: string | null
+  reasons: string[]
+  blockers: string[]
+  message: string | null
+}
+
+export interface CatalogWorkflowQueueItem {
+  id: number
+  queue: CatalogWorkflowQueueName
+  source: string
+  source_product_id: string | null
+  title: string
+  normalized_title: string
+  category_id: number | null
+  category: CatalogWorkflowCategory | null
+  category_raw: string | null
+  unit_raw: string | null
+  image_url: string | null
+  last_seen_at: string
+  is_not_product: boolean
+  shop: ProductShop
+  latest_price: ProductLatestPrice | null
+  catalog_quality: Record<string, unknown> | null
+  reasons: CatalogWorkflowReason[]
+  match_summary: ProductNormalizationMatchSummary
+  candidate_matches: ProductNormalizationCandidateMatch[]
+}
+
+export interface CatalogWorkflowQueueResponse {
+  queue: CatalogWorkflowQueueName
+  items: CatalogWorkflowQueueItem[]
+  limit: number
+  offset: number
+  total: number
+}
+
+export interface CatalogWorkflowQueueParams {
+  source?: string
+  shopId?: number
+  categoryId?: number
+  q?: string
+  limit?: number
+  offset?: number
+}
+
+export interface CatalogWorkflowAutoAcceptRequest extends CatalogWorkflowQueueParams {
+  dryRun?: boolean
+  reason?: string
+}
+
+export interface CatalogWorkflowAutoAcceptItem {
+  source_product_id: number
+  title: string
+  action: string | null
+  status: 'would_accept' | 'accepted' | 'skipped'
+  reason: string
+  canonical_product_id: number | null
+  match_id: number | null
+}
+
+export interface CatalogWorkflowAutoAcceptResponse {
+  dry_run: boolean
+  total: number
+  page_size: number
+  would_accept: number
+  accepted: number
+  skipped: number
+  items: CatalogWorkflowAutoAcceptItem[]
+}
+
 export interface CanonicalProductListItem {
   id: number
   title: string
@@ -732,6 +827,15 @@ function appendOptionalParam(params: URLSearchParams, key: string, value: string
   }
 }
 
+function workflowParams(filters: CatalogWorkflowQueueParams): URLSearchParams {
+  const params = new URLSearchParams()
+  appendOptionalParam(params, 'source', filters.source)
+  appendOptionalParam(params, 'shop', filters.shopId)
+  appendOptionalParam(params, 'category_id', filters.categoryId)
+  appendOptionalParam(params, 'q', filters.q?.trim())
+  return params
+}
+
 export function fetchProducts(
   filters: ProductSearchParams,
   signal?: AbortSignal,
@@ -763,6 +867,58 @@ export function fetchProductNormalizationQueue(
 
   return fetchJson<ProductNormalizationQueueResponse>(
     `/product-normalization/queue?${params.toString()}`,
+    signal,
+  )
+}
+
+export function fetchCatalogWorkflowDashboard(
+  filters: CatalogWorkflowQueueParams = {},
+  signal?: AbortSignal,
+): Promise<CatalogWorkflowDashboardResponse> {
+  const params = workflowParams(filters)
+  const query = params.toString()
+
+  return fetchJson<CatalogWorkflowDashboardResponse>(
+    query ? `/catalog-workflows/dashboard?${query}` : '/catalog-workflows/dashboard',
+    signal,
+  )
+}
+
+export function fetchCatalogWorkflowQueue(
+  queue: CatalogWorkflowQueueName,
+  filters: CatalogWorkflowQueueParams = {},
+  signal?: AbortSignal,
+): Promise<CatalogWorkflowQueueResponse> {
+  const params = workflowParams(filters)
+  appendOptionalParam(params, 'limit', filters.limit)
+  appendOptionalParam(params, 'offset', filters.offset)
+
+  return fetchJson<CatalogWorkflowQueueResponse>(
+    `/catalog-workflows/queues/${queue}?${params.toString()}`,
+    signal,
+  )
+}
+
+export function autoAcceptCatalogWorkflowItems(
+  payload: CatalogWorkflowAutoAcceptRequest,
+  signal?: AbortSignal,
+): Promise<CatalogWorkflowAutoAcceptResponse> {
+  return writeJson<CatalogWorkflowAutoAcceptResponse>(
+    '/catalog-workflows/batches/auto-accept',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        source: payload.source || null,
+        shop_id: payload.shopId ?? null,
+        category_id: payload.categoryId ?? null,
+        q: payload.q?.trim() || null,
+        limit: payload.limit ?? 50,
+        offset: payload.offset ?? 0,
+        dry_run: payload.dryRun ?? true,
+        actor: 'admin',
+        reason: payload.reason || null,
+      }),
+    },
     signal,
   )
 }
