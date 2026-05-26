@@ -51,7 +51,20 @@ The first stable model should distinguish source product cards from future canon
 - `categories`: stores the initial category tree and rule-based assignments.
 - `scrape_runs`: stores scrape attempt metadata and parser health signals.
 
-Canonical product matching is intentionally later. The MVP should first collect enough real data to understand naming variance, units, and duplicate patterns.
+Canonical product matching started as a later additive layer after enough real
+data was collected. M16 now treats catalog quality operations as the product
+readiness layer for the public MVP. The long-lived workflow contract is
+documented in [catalog-quality-operations.md](catalog-quality-operations.md).
+
+The M16 catalog pipeline is:
+
+```text
+source ingestion -> cleanup -> categorization -> normalization -> quality control
+```
+
+`apps/admin_api`, `apps/admin`, and `apps/worker` should expose this workflow as
+operator queues and quality checks. Database table names should not drive the
+primary admin information architecture.
 
 ## Runtime
 
