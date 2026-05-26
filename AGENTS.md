@@ -147,22 +147,18 @@ uv run uvicorn apps.admin_api.main:app --port 8001 --reload
 
 PostgreSQL and Redis are managed through Docker Compose.
 
+Use Docker Compose V2 through the `docker compose` subcommand.
+
 Start services:
 
 ```bash
 docker compose up -d
 ```
 
-If the local Docker installation uses standalone Compose:
-
-```bash
-docker-compose up -d
-```
-
 Check services:
 
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 Known local ports:
@@ -337,7 +333,7 @@ feature/4-db-schema
 feature/6-alembic-models
 feature/7-twogis-client
 docs/4-database-design
-infra/3-docker-compose
+infra/3-compose-services
 fix/<issue-number>-short-name
 ```
 
@@ -428,9 +424,9 @@ uv run mypy packages/stroyhub apps/api apps/admin_api apps/worker
 For Docker Compose changes:
 
 ```bash
-docker-compose config
-docker-compose up -d
-docker-compose ps
+docker compose config
+docker compose up -d
+docker compose ps
 ```
 
 For database changes:

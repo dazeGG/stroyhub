@@ -46,12 +46,6 @@ worker with beat, and the admin dev server, run from the repository root:
 docker compose up -d
 ```
 
-If your Docker installation uses standalone Compose:
-
-```bash
-docker-compose up -d
-```
-
 Run the public API from the repository root:
 
 ```bash

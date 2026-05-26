@@ -42,12 +42,6 @@ Start the full development stack:
 docker compose up -d
 ```
 
-If your Docker installation uses the standalone Compose command:
-
-```bash
-docker-compose up -d
-```
-
 This starts PostgreSQL, Redis, the public FastAPI app, the admin FastAPI app,
 the Celery worker with beat, and the admin Vite dev server. In this mode, both
 API apps reload through Uvicorn, the admin UI reloads through Vite, and the
@@ -62,16 +56,14 @@ Useful local URLs:
 - Admin: `http://127.0.0.1:5173`
 
 Docker Desktop or another Docker daemon must be running before starting the
-services. To start only the infrastructure services, use:
+services. The repository expects Docker Compose V2 through the `docker compose`
+subcommand. If Docker reports `unknown command: docker compose`, install or
+enable the Compose CLI plugin before using the local stack.
+
+To start only the infrastructure services, use:
 
 ```bash
 docker compose up -d postgres redis
-```
-
-or, with standalone Compose:
-
-```bash
-docker-compose up -d postgres redis
 ```
 
 Run the current smoke test:

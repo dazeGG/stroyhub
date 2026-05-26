@@ -5,16 +5,14 @@ StroyHub product data.
 
 ## 1. Start Local Services
 
+The local stack expects Docker Compose V2 through the `docker compose`
+subcommand. If Docker reports `unknown command: docker compose`, install or
+enable the Compose CLI plugin before continuing.
+
 Start the full local development stack:
 
 ```bash
 docker compose up -d
-```
-
-If your Docker installation uses standalone Compose:
-
-```bash
-docker-compose up -d
 ```
 
 This starts PostgreSQL, Redis, the FastAPI API, the admin Vite dev server, and
@@ -26,16 +24,10 @@ start only PostgreSQL and Redis:
 docker compose up -d postgres redis
 ```
 
-or, with standalone Compose:
-
-```bash
-docker-compose up -d postgres redis
-```
-
 Check service health:
 
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 Expected local ports:
@@ -276,7 +268,7 @@ GET http://127.0.0.1:8000/products
 
 Symptoms:
 
-- `docker-compose ps` cannot connect to Docker.
+- `docker compose ps` cannot connect to Docker.
 - PostgreSQL tests are skipped or database commands fail.
 
 Fix:
