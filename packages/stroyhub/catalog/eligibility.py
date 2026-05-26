@@ -62,6 +62,7 @@ _SPECIFIC_ATTRIBUTE_KINDS = frozenset(
         "dimension",
         "length",
         "package_count",
+        "thickness",
         "volume",
         "weight",
     }
