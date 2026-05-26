@@ -7,6 +7,7 @@ import { RouterLink } from 'vue-router'
 import {
   acceptProductMatch,
   autoAcceptProductMatchCandidates,
+  bulkNormalizeProducts,
   createCanonicalFromSourceAndAccept,
   fetchCanonicalProducts,
   fetchCategories,
@@ -15,6 +16,8 @@ import {
   rejectProductMatch,
   type CanonicalProductListItem,
   type CategoryTreeItem,
+  type ProductBulkNormalizationRequest,
+  type ProductBulkNormalizationResponse,
   type ProductMatchAutoAcceptRequest,
   type ProductMatchAutoAcceptResponse,
   type ProductMatchDecision,
@@ -56,6 +59,8 @@ const shops = ref<ShopListItem[]>([])
 const categories = ref<CategoryTreeItem[]>([])
 const isLoading = ref(false)
 const busyAction = ref('')
+const isBulkNormalizing = ref(false)
+const bulkNormalizePreview = ref<ProductBulkNormalizationResponse | null>(null)
 const isAutoAccepting = ref(false)
 const autoAcceptPreview = ref<ProductMatchAutoAcceptResponse | null>(null)
 const toast = useToast()
@@ -92,9 +97,9 @@ const workQueueCount = computed(() => {
   return items.value.filter((item) => item.state !== 'ineligible' && item.state !== 'accepted').length
 })
 
-const canAutoAccept = computed(() => {
-  return selectedState.value === 'eligible_unmatched' || selectedState.value === 'candidate_match'
-})
+const canBulkNormalize = computed(() => selectedState.value === 'eligible_unmatched')
+
+const canAutoAccept = computed(() => selectedState.value === 'candidate_match')
 
 function stateLabel(state: ProductNormalizationState): string {
   return statusOptions.find((status) => status.value === state)?.label ?? state
@@ -195,6 +200,12 @@ function skippedAutoAcceptCount(result: ProductMatchAutoAcceptResponse): number 
     + result.skipped_low_confidence
     + result.skipped_method
     + result.skipped_previously_rejected
+}
+
+function skippedBulkNormalizeCount(result: ProductBulkNormalizationResponse): number {
+  return result.skipped_became_candidate
+    + result.skipped_already_accepted
+    + result.skipped_ineligible
 }
 
 function flattenCategories(itemsToFlatten: CategoryTreeItem[], level = 0): CategoryOption[] {
@@ -362,6 +373,78 @@ async function rejectCandidateMatch(
   }
 }
 
+function bulkNormalizeRequest(dryRun: boolean): ProductBulkNormalizationRequest {
+  return {
+    source: selectedSource.value || undefined,
+    shopId: selectedShopId.value ? Number(selectedShopId.value) : undefined,
+    categoryId: selectedCategoryId.value ? Number(selectedCategoryId.value) : undefined,
+    q: searchQuery.value.trim() || undefined,
+    limit: 50,
+    offset: 0,
+    dryRun,
+    reason: 'Массовая нормализация страницы',
+  }
+}
+
+async function previewBulkNormalizeProducts(): Promise<void> {
+  isBulkNormalizing.value = true
+  bulkNormalizePreview.value = null
+
+  try {
+    const response = await bulkNormalizeProducts(bulkNormalizeRequest(true))
+    bulkNormalizePreview.value = response
+    if (response.would_create === 0) {
+      toastWarning(
+        toast,
+        'Нечего нормализовать',
+        'На текущей странице нет карточек без кандидатов.',
+      )
+    } else {
+      toastSuccess(
+        toast,
+        'Проверка завершена',
+        `Можно создать: ${response.would_create}`,
+      )
+    }
+  } catch (error) {
+    toastError(
+      toast,
+      'Не удалось проверить страницу',
+      error,
+      'Не удалось проверить страницу',
+    )
+  } finally {
+    isBulkNormalizing.value = false
+  }
+}
+
+async function applyBulkNormalizeProducts(): Promise<void> {
+  if (!bulkNormalizePreview.value || bulkNormalizePreview.value.would_create === 0) {
+    return
+  }
+
+  isBulkNormalizing.value = true
+  try {
+    const response = await bulkNormalizeProducts(bulkNormalizeRequest(false))
+    bulkNormalizePreview.value = null
+    toastSuccess(
+      toast,
+      'Страница нормализована',
+      `Создано: ${response.created}. Новых кандидатов: ${response.followup_candidates_created}. Пропущено: ${skippedBulkNormalizeCount(response)}.`,
+    )
+    await loadQueue()
+  } catch (error) {
+    toastError(
+      toast,
+      'Не удалось нормализовать страницу',
+      error,
+      'Не удалось нормализовать страницу',
+    )
+  } finally {
+    isBulkNormalizing.value = false
+  }
+}
+
 function autoAcceptRequest(dryRun: boolean): ProductMatchAutoAcceptRequest {
   return {
     source: selectedSource.value || undefined,
@@ -439,8 +522,17 @@ function clearAutoAcceptPreview(): void {
   autoAcceptPreview.value = null
 }
 
-function resetFilters(): void {
+function clearBulkNormalizePreview(): void {
+  bulkNormalizePreview.value = null
+}
+
+function clearOperationPreviews(): void {
+  clearBulkNormalizePreview()
   clearAutoAcceptPreview()
+}
+
+function resetFilters(): void {
+  clearOperationPreviews()
   selectedSource.value = ''
   selectedShopId.value = ''
   selectedCategoryId.value = ''
@@ -449,7 +541,7 @@ function resetFilters(): void {
 }
 
 watch(selectedSource, () => {
-  clearAutoAcceptPreview()
+  clearOperationPreviews()
   if (selectedSource.value && selectedShopId.value) {
     const selectedShop = shops.value.find((shop) => String(shop.id) === selectedShopId.value)
     if (selectedShop && selectedShop.source !== selectedSource.value) {
@@ -462,7 +554,7 @@ watch(selectedSource, () => {
 })
 
 watch([selectedState, selectedShopId, selectedCategoryId], () => {
-  clearAutoAcceptPreview()
+  clearOperationPreviews()
   void loadQueue()
 })
 
@@ -525,7 +617,7 @@ onMounted(() => {
             class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
             placeholder="Поиск по названию"
             aria-label="Поиск по названию исходного товара"
-            @keyup.enter="clearAutoAcceptPreview(); loadQueue()"
+            @keyup.enter="clearOperationPreviews(); loadQueue()"
           >
         </label>
 
@@ -565,7 +657,7 @@ onMounted(() => {
         <button
           type="button"
           class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200"
-          @click="clearAutoAcceptPreview(); loadQueue()"
+          @click="clearOperationPreviews(); loadQueue()"
         >
           <Icon :icon="icons.filter" class="size-4" aria-hidden="true" />
           Найти
@@ -579,6 +671,74 @@ onMounted(() => {
           <Icon :icon="icons.x" class="size-4" aria-hidden="true" />
           Сбросить
         </button>
+      </div>
+    </div>
+
+    <div
+      v-if="canBulkNormalize"
+      class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
+      data-testid="product-bulk-normalize"
+    >
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <p class="inline-flex items-center gap-2 text-sm font-semibold text-white">
+            <Icon :icon="icons.plus" class="size-4 text-amber-300" aria-hidden="true" />
+            Нормализовать страницу
+          </p>
+          <p class="mt-1 max-w-3xl text-sm leading-6 text-neutral-400">
+            Создаем canonical для отображаемых карточек без кандидатов; появившиеся кандидаты остаются на ручную проверку.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60"
+          :disabled="isBulkNormalizing"
+          @click="previewBulkNormalizeProducts"
+        >
+          <Icon :icon="icons.search" class="size-4" aria-hidden="true" />
+          {{ isBulkNormalizing ? 'Проверяем...' : 'Проверить страницу' }}
+        </button>
+      </div>
+
+      <div
+        v-if="bulkNormalizePreview"
+        class="mt-4 grid gap-3 border-t border-neutral-800 pt-4 xl:grid-cols-[1fr_auto]"
+      >
+        <dl class="grid gap-3 sm:grid-cols-3">
+          <div class="rounded-md border border-neutral-800 bg-neutral-950 p-3">
+            <dt class="text-xs uppercase tracking-wide text-neutral-600">На странице</dt>
+            <dd class="mt-1 text-xl font-semibold text-white">{{ bulkNormalizePreview.page_size }}</dd>
+          </div>
+          <div class="rounded-md border border-amber-400/30 bg-amber-400/10 p-3">
+            <dt class="text-xs uppercase tracking-wide text-amber-200/80">Создать</dt>
+            <dd class="mt-1 text-xl font-semibold text-amber-100">{{ bulkNormalizePreview.would_create }}</dd>
+          </div>
+          <div class="rounded-md border border-neutral-800 bg-neutral-950 p-3">
+            <dt class="text-xs uppercase tracking-wide text-neutral-600">Всего в фильтре</dt>
+            <dd class="mt-1 text-xl font-semibold text-neutral-200">{{ bulkNormalizePreview.total }}</dd>
+          </div>
+        </dl>
+
+        <div class="flex flex-col gap-2 sm:flex-row xl:items-start">
+          <button
+            type="button"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="isBulkNormalizing || bulkNormalizePreview.would_create === 0"
+            @click="applyBulkNormalizeProducts"
+          >
+            <Icon :icon="icons.plus" class="size-4" aria-hidden="true" />
+            {{ isBulkNormalizing ? 'Создаем...' : `Создать ${bulkNormalizePreview.would_create}` }}
+          </button>
+          <button
+            type="button"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-700 px-4 text-sm font-semibold text-neutral-300 transition hover:border-neutral-600 hover:text-white"
+            @click="clearBulkNormalizePreview"
+          >
+            <Icon :icon="icons.x" class="size-4" aria-hidden="true" />
+            Скрыть
+          </button>
+        </div>
       </div>
     </div>
 

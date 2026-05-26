@@ -219,16 +219,25 @@ Use a quick fix when:
 
 ### Product Normalization Inbox
 
-Use `/products/normalization` for persisted canonical-product decisions. The
-`Можно нормализовать` and candidate-match states support a guarded auto-accept
-preview for exact normalized-title candidates; candidate-match rows also support
-manual accept/reject actions.
+Use `/products/normalization` for persisted canonical-product decisions.
+`Можно нормализовать` supports bulk canonical creation for the current visible
+page. Candidate-match rows support manual accept/reject actions and a guarded
+auto-accept preview for exact normalized-title candidates.
+
+Bulk normalization rules:
+
+1. Use `Можно нормализовать` for the day-to-day inbox flow and narrow by source,
+   shop, category, or search when reviewing a focused page.
+2. Run the preview first; it does not create canonical products.
+3. Applying creates canonical products from the page one by one through the same
+   decision service as the single-row action.
+4. After each created canonical, follow-up candidate generation runs. If a later
+   page item becomes a candidate, the bulk action skips it so it moves to
+   `Есть кандидат` for review instead of being auto-created.
 
 Auto-accept rules:
 
-1. Use `Можно нормализовать` for the day-to-day inbox flow, or candidate-match
-   when inspecting candidate pairs directly. Narrow by source, shop, or category
-   when reviewing a focused batch.
+1. Use candidate-match when inspecting already generated candidate pairs.
 2. Run the preview first; it does not mutate `product_matches`.
 3. Apply only when the preview count matches the expected exact-title batch.
 4. Manually review skipped or token-similarity candidates.

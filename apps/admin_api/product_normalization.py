@@ -3,14 +3,20 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from stroyhub.catalog.normalization_queue import (
     NormalizationQueueFilters,
     NormalizationQueueState,
     ProductNormalizationQueue,
 )
+from stroyhub.catalog.product_bulk_normalization import (
+    ProductBulkNormalizationFilters,
+    ProductBulkNormalizationService,
+)
 from stroyhub.db import get_session
+
+from apps.admin_api.validation import ActorName, ReasonText
 
 router = APIRouter(prefix="/product-normalization", tags=["product-normalization"])
 
@@ -97,6 +103,43 @@ class NormalizationQueueResponse(BaseModel):
     total: int
 
 
+class BulkNormalizationRequest(BaseModel):
+    source: str | None = None
+    shop_id: int | None = Field(default=None, gt=0)
+    category_id: int | None = Field(default=None, gt=0)
+    q: str | None = None
+    limit: int = Field(default=50, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+    dry_run: bool = True
+    actor: ActorName | None = "admin"
+    reason: ReasonText | None = None
+
+
+class BulkNormalizationItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    source_product_id: int
+    title: str
+    normalized_title: str
+    canonical_product_id: int | None
+    match_id: int | None
+
+
+class BulkNormalizationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    dry_run: bool
+    total: int
+    page_size: int
+    would_create: int
+    created: int
+    skipped_became_candidate: int
+    skipped_already_accepted: int
+    skipped_ineligible: int
+    followup_candidates_created: int
+    items: tuple[BulkNormalizationItemResponse, ...]
+
+
 @router.get("/queue", response_model=NormalizationQueueResponse)
 def list_normalization_queue(
     session: Annotated[Session, Depends(get_session)],
@@ -128,3 +171,26 @@ def list_normalization_queue(
         offset=page.offset,
         total=page.total,
     )
+
+
+@router.post("/bulk-create-canonicals", response_model=BulkNormalizationResponse)
+def bulk_create_canonicals(
+    payload: BulkNormalizationRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> BulkNormalizationResponse:
+    result = ProductBulkNormalizationService(session).run(
+        ProductBulkNormalizationFilters(
+            source=payload.source,
+            shop_id=payload.shop_id,
+            category_id=payload.category_id,
+            q=payload.q,
+            limit=payload.limit,
+            offset=payload.offset,
+            dry_run=payload.dry_run,
+            actor=payload.actor,
+            reason=payload.reason,
+        )
+    )
+    if not payload.dry_run:
+        session.commit()
+    return BulkNormalizationResponse.model_validate(result)

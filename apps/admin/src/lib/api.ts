@@ -269,6 +269,38 @@ export interface ProductMatchAutoAcceptResponse {
   items: ProductMatchAutoAcceptItem[]
 }
 
+export interface ProductBulkNormalizationRequest {
+  source?: string
+  shopId?: number
+  categoryId?: number
+  q?: string
+  limit?: number
+  offset?: number
+  dryRun?: boolean
+  reason?: string
+}
+
+export interface ProductBulkNormalizationItem {
+  source_product_id: number
+  title: string
+  normalized_title: string
+  canonical_product_id: number | null
+  match_id: number | null
+}
+
+export interface ProductBulkNormalizationResponse {
+  dry_run: boolean
+  total: number
+  page_size: number
+  would_create: number
+  created: number
+  skipped_became_candidate: number
+  skipped_already_accepted: number
+  skipped_ineligible: number
+  followup_candidates_created: number
+  items: ProductBulkNormalizationItem[]
+}
+
 export interface ProductPriceSnapshot {
   id: number
   price: string | null
@@ -825,6 +857,30 @@ export function autoAcceptProductMatchCandidates(
         min_confidence: payload.minConfidence ?? 1,
         methods: payload.methods ?? ['exact_normalized_title'],
         limit: payload.limit ?? 250,
+        dry_run: payload.dryRun ?? true,
+        actor: 'admin',
+        reason: payload.reason || null,
+      }),
+    },
+    signal,
+  )
+}
+
+export function bulkNormalizeProducts(
+  payload: ProductBulkNormalizationRequest,
+  signal?: AbortSignal,
+): Promise<ProductBulkNormalizationResponse> {
+  return writeJson<ProductBulkNormalizationResponse>(
+    '/product-normalization/bulk-create-canonicals',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        source: payload.source || null,
+        shop_id: payload.shopId ?? null,
+        category_id: payload.categoryId ?? null,
+        q: payload.q?.trim() || null,
+        limit: payload.limit ?? 50,
+        offset: payload.offset ?? 0,
         dry_run: payload.dryRun ?? true,
         actor: 'admin',
         reason: payload.reason || null,

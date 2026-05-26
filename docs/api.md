@@ -789,8 +789,8 @@ Queue states:
 
 - `ineligible`: stored source card is blocked from canonical matching.
 - `needs_review`: source card is not safe enough for automatic matching.
-- `eligible_unmatched`: source card can become a canonical product but has no
-  accepted match.
+- `eligible_unmatched`: source card can become a canonical product and has no
+  accepted or candidate match.
 - `candidate_match`: source card has one or more candidate matches.
 - `accepted`: source card is linked to a canonical product.
 
@@ -864,6 +864,55 @@ For `candidate_match` items, `candidate_matches` contains the persisted
 candidate rows with `id`, canonical product title/normalized title/category,
 `confidence`, `method`, and `reason` so the admin UI can accept or reject a
 specific proposal.
+
+### `POST /product-normalization/bulk-create-canonicals`
+
+Previews or applies canonical creation for the current `eligible_unmatched`
+normalization page. The endpoint always rechecks each source product before
+creating a canonical product. If a previous created canonical generated a
+candidate for a later page item, that later item is skipped and remains a
+candidate for manual review.
+
+Request:
+
+```json
+{
+  "source": "2gis",
+  "shop_id": null,
+  "category_id": 7,
+  "q": null,
+  "limit": 50,
+  "offset": 0,
+  "dry_run": true,
+  "actor": "admin",
+  "reason": "page normalization"
+}
+```
+
+Example response after apply:
+
+```json
+{
+  "dry_run": false,
+  "total": 2,
+  "page_size": 2,
+  "would_create": 2,
+  "created": 1,
+  "skipped_became_candidate": 1,
+  "skipped_already_accepted": 0,
+  "skipped_ineligible": 0,
+  "followup_candidates_created": 1,
+  "items": [
+    {
+      "source_product_id": 10,
+      "title": "Цемент М500 50кг",
+      "normalized_title": "цемент м500 50кг",
+      "canonical_product_id": 12,
+      "match_id": 41
+    }
+  ]
+}
+```
 
 ## Matches
 

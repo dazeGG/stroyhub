@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
@@ -20,7 +20,8 @@ from stroyhub.db import (
     SourceProductRepository,
     SourceProductUpsert,
 )
-from stroyhub.models import Category
+from stroyhub.models import CanonicalProduct, Category
+from stroyhub.models.tables import ProductMatch
 
 from apps.admin_api.main import create_app
 from apps.admin_api.product_normalization import get_session
@@ -397,6 +398,87 @@ def test_normalization_queue_endpoint_filters_state_search_and_paginates(
     assert payload["offset"] == 1
     assert [item["id"] for item in payload["items"]] == [matching_older.id]
     assert matching_newer.id != matching_older.id
+
+
+def test_bulk_create_canonicals_skips_products_that_become_candidates(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    category = Category(slug="bulk-normalization-cement", name="Bulk Normalization Cement")
+    db_session.add(category)
+    db_session.flush()
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="bulk-normalization-shop", name="Bulk Shop")
+    )
+    products = SourceProductRepository(db_session)
+    first = products.upsert(
+        _product(
+            shop_id=shop.id,
+            source_product_id="bulk-normalization-first",
+            title="Bulk Cement M500 50kg",
+            category_id=category.id,
+            observed_at=datetime(2026, 5, 23, 9, 2, tzinfo=UTC),
+        )
+    )
+    second = products.upsert(
+        _product(
+            shop_id=shop.id,
+            source_product_id="bulk-normalization-second",
+            title="Bulk Cement M500 50kg",
+            category_id=category.id,
+            observed_at=datetime(2026, 5, 23, 9, 1, tzinfo=UTC),
+        )
+    )
+
+    dry_run_response = client.post(
+        "/product-normalization/bulk-create-canonicals",
+        json={"category_id": category.id, "dry_run": True},
+    )
+    apply_response = client.post(
+        "/product-normalization/bulk-create-canonicals",
+        json={
+            "category_id": category.id,
+            "dry_run": False,
+            "actor": "admin",
+            "reason": "bulk page normalization",
+        },
+    )
+
+    assert dry_run_response.status_code == 200
+    assert dry_run_response.json()["would_create"] == 2
+    assert dry_run_response.json()["created"] == 0
+
+    payload = apply_response.json()
+    assert apply_response.status_code == 200
+    assert payload["would_create"] == 2
+    assert payload["created"] == 1
+    assert payload["skipped_became_candidate"] == 1
+    assert payload["followup_candidates_created"] == 1
+    assert payload["items"][0]["source_product_id"] == first.id
+
+    accepted_match = db_session.scalar(
+        select(ProductMatch).where(
+            ProductMatch.source_product_id == first.id,
+            ProductMatch.status == "accepted",
+        )
+    )
+    followup_candidate = db_session.scalar(
+        select(ProductMatch).where(
+            ProductMatch.source_product_id == second.id,
+            ProductMatch.status == "candidate",
+        )
+    )
+    canonical_count = db_session.scalar(
+        select(func.count())
+        .select_from(CanonicalProduct)
+        .where(CanonicalProduct.title == "Bulk Cement M500 50kg")
+    )
+    assert accepted_match is not None
+    assert accepted_match.reason == {"action": "accept", "note": "bulk page normalization"}
+    assert followup_candidate is not None
+    assert followup_candidate.canonical_product_id == accepted_match.canonical_product_id
+    assert followup_candidate.method == "exact_normalized_title"
+    assert canonical_count == 1
 
 
 def _product(
