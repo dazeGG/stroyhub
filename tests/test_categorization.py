@@ -1,6 +1,7 @@
 from stroyhub.catalog.categorization import (
     DEFAULT_NON_PRODUCT_SOURCE_CATEGORIES,
     DEFAULT_SOURCE_CATEGORY_ALIASES,
+    CategoryRule,
     ManualCategoryOverride,
     NonProductSourceCategory,
     RuleBasedCategorizer,
@@ -28,6 +29,53 @@ def test_rule_based_categorizer_returns_category_and_confidence() -> None:
     assert prediction.confidence >= 0.6
     assert prediction.source == "rules"
     assert "цемент" in prediction.matched_keywords
+
+
+def test_rule_based_categorizer_decision_explains_assignment() -> None:
+    decision = RuleBasedCategorizer().decide(
+        title="Цемент М500 50 кг",
+        category_raw="Строительные смеси",
+    )
+
+    assert decision.status == "assigned"
+    assert decision.prediction is not None
+    assert decision.prediction.category_slug == "cement"
+    assert decision.confidence == decision.prediction.confidence
+    assert decision.reasons
+    assert decision.suggestions[0].matched_keywords
+
+
+def test_rule_based_categorizer_conflicting_top_rules_need_review() -> None:
+    categorizer = RuleBasedCategorizer(
+        rules=(
+            CategoryRule(
+                slug="first",
+                name="First",
+                parent_slug=None,
+                parent_name=None,
+                keywords=("универсальный",),
+            ),
+            CategoryRule(
+                slug="second",
+                name="Second",
+                parent_slug=None,
+                parent_name=None,
+                keywords=("универсальный",),
+            ),
+        ),
+        source_category_aliases=(),
+    )
+
+    decision = categorizer.decide(title="Универсальный материал")
+
+    assert decision.status == "needs_review"
+    assert decision.prediction is None
+    assert decision.reasons[0] == "conflicting_category_rule_scores"
+    assert {suggestion.category_slug for suggestion in decision.suggestions} == {
+        "first",
+        "second",
+    }
+    assert categorizer.categorize(title="Универсальный материал") is None
 
 
 def test_rule_based_categorizer_uses_category_raw_and_title() -> None:

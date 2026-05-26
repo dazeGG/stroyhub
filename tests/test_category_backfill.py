@@ -96,6 +96,11 @@ def test_backfill_main_forwards_filters_and_prints_summary(monkeypatch, capsys) 
     monkeypatch.setattr(backfill_category_ids, "SessionLocal", FakeSessionLocal)
     monkeypatch.setattr(backfill_category_ids, "_list_source_products", fake_list_source_products)
     monkeypatch.setattr(backfill_category_ids, "CategoryRepository", FakeCategoryRepository)
+    monkeypatch.setattr(
+        backfill_category_ids,
+        "categorizer_for_session",
+        lambda session: backfill_category_ids.RuleBasedCategorizer(),
+    )
 
     result = backfill_category_ids.main(
         ["--source", "2gis", "--shop-id", "10", "--dry-run"]

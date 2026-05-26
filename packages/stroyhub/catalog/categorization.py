@@ -1,8 +1,12 @@
 from dataclasses import dataclass
+from typing import Literal
 
 from stroyhub.catalog.taxonomy import DEFAULT_NORMALIZED_CATEGORIES, get_normalized_category
 from stroyhub.catalog.tokenization import tokenize_normalized_text
 from stroyhub.parsers.common import normalize_title
+
+CategoryDecisionStatus = Literal["assigned", "needs_review", "unmapped", "non_product"]
+_LOW_CONFIDENCE_REVIEW_THRESHOLD = 0.65
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -27,6 +31,9 @@ class SourceCategoryAlias:
     source: str
     raw_category: str
     category_slug: str
+    category_name: str | None = None
+    parent_slug: str | None = None
+    parent_name: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -44,6 +51,28 @@ class CategoryPrediction:
     confidence: float
     matched_keywords: tuple[str, ...]
     source: str
+    reasons: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, kw_only=True)
+class CategorySuggestion:
+    category_slug: str
+    category_name: str
+    parent_slug: str | None
+    parent_name: str | None
+    confidence: float
+    matched_keywords: tuple[str, ...]
+    source: str
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True, kw_only=True)
+class CategoryDecision:
+    status: CategoryDecisionStatus
+    confidence: float
+    prediction: CategoryPrediction | None
+    suggestions: tuple[CategorySuggestion, ...]
+    reasons: tuple[str, ...]
 
 
 def _default_category_rules() -> tuple[CategoryRule, ...]:
@@ -330,8 +359,26 @@ class RuleBasedCategorizer:
         description: str | None = None,
         manual_override: ManualCategoryOverride | None = None,
     ) -> CategoryPrediction | None:
+        decision = self.decide(
+            title=title,
+            source=source,
+            category_raw=category_raw,
+            description=description,
+            manual_override=manual_override,
+        )
+        return decision.prediction if decision.status == "assigned" else None
+
+    def decide(
+        self,
+        *,
+        title: str,
+        source: str | None = None,
+        category_raw: str | None = None,
+        description: str | None = None,
+        manual_override: ManualCategoryOverride | None = None,
+    ) -> CategoryDecision:
         if manual_override is not None:
-            return CategoryPrediction(
+            prediction = CategoryPrediction(
                 category_slug=manual_override.category_slug,
                 category_name=manual_override.category_name,
                 parent_slug=manual_override.parent_slug,
@@ -339,17 +386,25 @@ class RuleBasedCategorizer:
                 confidence=1.0,
                 matched_keywords=(),
                 source="manual_override",
+                reasons=("manual_category_override",),
             )
+            return _assigned(prediction, reasons=("manual_category_override",))
 
         if self._is_non_product_source_category(source=source, category_raw=category_raw):
-            return None
+            return CategoryDecision(
+                status="non_product",
+                confidence=1.0,
+                prediction=None,
+                suggestions=(),
+                reasons=("non_product_source_category",),
+            )
 
         alias_prediction = self._source_category_alias_prediction(
             source=source,
             category_raw=category_raw,
         )
         if alias_prediction is not None:
-            return alias_prediction
+            return _assigned(alias_prediction, reasons=alias_prediction.reasons)
 
         title_text = normalize_title(title)
         category_text = normalize_title(category_raw or "")
@@ -358,8 +413,7 @@ class RuleBasedCategorizer:
         category_tokens = tokenize_normalized_text(category_text)
         description_tokens = tokenize_normalized_text(description_text)
 
-        best_prediction: CategoryPrediction | None = None
-        best_score = 0
+        scored_predictions: list[tuple[int, CategoryPrediction]] = []
         for rule in self._rules:
             score, matched_keywords = self._score_rule(
                 rule,
@@ -370,21 +424,62 @@ class RuleBasedCategorizer:
                 description_text=description_text,
                 description_tokens=description_tokens,
             )
-            if score == 0 or score <= best_score:
+            if score == 0:
                 continue
 
-            best_score = score
-            best_prediction = CategoryPrediction(
-                category_slug=rule.slug,
-                category_name=rule.name,
-                parent_slug=rule.parent_slug,
-                parent_name=rule.parent_name,
-                confidence=_confidence(score),
-                matched_keywords=matched_keywords,
-                source="rules",
+            scored_predictions.append(
+                (
+                    score,
+                    CategoryPrediction(
+                        category_slug=rule.slug,
+                        category_name=rule.name,
+                        parent_slug=rule.parent_slug,
+                        parent_name=rule.parent_name,
+                        confidence=_confidence(score),
+                        matched_keywords=matched_keywords,
+                        source="rules",
+                        reasons=(f"rule_score:{score}",),
+                    ),
+                )
             )
 
-        return best_prediction
+        if not scored_predictions:
+            return CategoryDecision(
+                status="unmapped",
+                confidence=0.0,
+                prediction=None,
+                suggestions=(),
+                reasons=("no_category_rule_matched",),
+            )
+
+        scored_predictions.sort(
+            key=lambda item: (-item[0], item[1].category_slug, item[1].category_name)
+        )
+        best_score = scored_predictions[0][0]
+        best_predictions = tuple(
+            prediction for score, prediction in scored_predictions if score == best_score
+        )
+        if len({prediction.category_slug for prediction in best_predictions}) > 1:
+            suggestions = tuple(_suggestion(prediction) for prediction in best_predictions)
+            return CategoryDecision(
+                status="needs_review",
+                confidence=best_predictions[0].confidence,
+                prediction=None,
+                suggestions=suggestions,
+                reasons=("conflicting_category_rule_scores", f"rule_score:{best_score}"),
+            )
+
+        prediction = best_predictions[0]
+        if prediction.confidence < _LOW_CONFIDENCE_REVIEW_THRESHOLD:
+            return CategoryDecision(
+                status="needs_review",
+                confidence=prediction.confidence,
+                prediction=None,
+                suggestions=(_suggestion(prediction),),
+                reasons=("low_confidence_category_rule", *prediction.reasons),
+            )
+
+        return _assigned(prediction, reasons=prediction.reasons)
 
     def _is_non_product_source_category(
         self,
@@ -469,23 +564,55 @@ class RuleBasedCategorizer:
             return None
 
         category = get_normalized_category(alias.category_slug)
-        if category is None:
+        if category is None and alias.category_name is None:
             return None
 
         parent = (
             get_normalized_category(category.parent_slug)
-            if category.parent_slug is not None
+            if category is not None and category.parent_slug is not None
             else None
         )
         return CategoryPrediction(
-            category_slug=category.slug,
-            category_name=category.name,
-            parent_slug=category.parent_slug,
-            parent_name=parent.name if parent is not None else None,
+            category_slug=category.slug if category is not None else alias.category_slug,
+            category_name=category.name if category is not None else alias.category_name or "",
+            parent_slug=category.parent_slug if category is not None else alias.parent_slug,
+            parent_name=(
+                parent.name
+                if parent is not None
+                else alias.parent_name if category is None else None
+            ),
             confidence=0.98,
             matched_keywords=(alias.raw_category,),
             source="source_category_alias",
+            reasons=("source_category_alias",),
         )
+
+
+def _assigned(
+    prediction: CategoryPrediction,
+    *,
+    reasons: tuple[str, ...],
+) -> CategoryDecision:
+    return CategoryDecision(
+        status="assigned",
+        confidence=prediction.confidence,
+        prediction=prediction,
+        suggestions=(_suggestion(prediction),),
+        reasons=reasons,
+    )
+
+
+def _suggestion(prediction: CategoryPrediction) -> CategorySuggestion:
+    return CategorySuggestion(
+        category_slug=prediction.category_slug,
+        category_name=prediction.category_name,
+        parent_slug=prediction.parent_slug,
+        parent_name=prediction.parent_name,
+        confidence=prediction.confidence,
+        matched_keywords=prediction.matched_keywords,
+        source=prediction.source,
+        reasons=prediction.reasons,
+    )
 
 
 def _confidence(score: int) -> float:

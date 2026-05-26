@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from stroyhub.catalog.categorization import RuleBasedCategorizer
+from stroyhub.catalog.source_category_mappings import categorizer_for_session
 from stroyhub.db.repositories import (
     CategoryRepository,
     CategoryUpsert,
@@ -309,7 +310,7 @@ def persist_metalltorg_scrape_result(
     product_repository = SourceProductRepository(session)
     price_repository = PriceSnapshotRepository(session)
     category_repository = CategoryRepository(session)
-    categorizer = RuleBasedCategorizer()
+    categorizer = categorizer_for_session(session)
     source_products_saved = 0
     price_snapshots_saved = 0
 

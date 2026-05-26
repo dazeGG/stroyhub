@@ -137,10 +137,31 @@ The MVP needs category filtering before there is enough data for useful ML-based
 Decision:
 Use a rule-based categorizer with explicit construction-material keyword dictionaries. The service returns a category slug, display name, confidence, matched keywords, and source. During scraping persistence, matched categories are upserted into `categories` and assigned to `source_products.category_id`.
 
-Manual category overrides are represented at the service level: a provided override takes precedence over rules and returns confidence `1.0` with source `manual_override`. A dedicated override table can be added later if an admin UI or audit trail needs it.
+Manual category overrides are represented at the service level: a provided override takes precedence over rules and returns confidence `1.0` with source `manual_override`. Later decisions added persisted override and source-category mapping tables for admin auditability.
 
 Consequences:
 Initial categories are explainable and easy to adjust. Some products will remain uncategorized until rules are expanded from real scrape data.
+
+## 2026-05-26: Manage Source Category Mappings as Operator Data
+
+Context:
+M16 makes categorization a first-class catalog quality workflow. Built-in
+source category aliases are useful, but operators need to inspect raw source
+categories, see examples and counts, and correct a source category once instead
+of overriding every product individually.
+
+Decision:
+Persist reusable source-category decisions in `source_category_mappings`.
+Manual mappings are keyed by `source` and normalized `raw_category`; they can
+map to a StroyHub category, mark the raw category as `non_product`, or disable a
+default mapping. Scraping persistence and category backfill build their
+`RuleBasedCategorizer` from built-in aliases plus these persisted mappings,
+with persisted mappings taking precedence.
+
+Consequences:
+Operators can correct a noisy or wrong source category at the workflow level,
+and future ingested products use that correction automatically. Product-level
+`category_overrides` remain the audit trail for one-off product corrections.
 
 ## 2026-05-22: Treat MVP Categories as Two-Level Taxonomy
 

@@ -180,10 +180,55 @@ class Category(TimestampMixin, Base):
     children: Mapped[list["Category"]] = relationship(back_populates="parent")
     source_products: Mapped[list["SourceProduct"]] = relationship(back_populates="category")
     canonical_products: Mapped[list["CanonicalProduct"]] = relationship(back_populates="category")
+    source_category_mappings: Mapped[list["SourceCategoryMapping"]] = relationship(
+        back_populates="category"
+    )
     category_overrides: Mapped[list["CategoryOverride"]] = relationship(
         back_populates="category",
         foreign_keys="CategoryOverride.category_id",
     )
+
+
+class SourceCategoryMapping(TimestampMixin, Base):
+    __tablename__ = "source_category_mappings"
+    __table_args__: Any = (
+        UniqueConstraint(
+            "source",
+            "normalized_raw_category",
+            name="uq_source_category_mappings_source_normalized_raw_category",
+        ),
+        CheckConstraint(
+            "status IN ('active', 'non_product', 'disabled')",
+            name="status_known",
+        ),
+        CheckConstraint(
+            "(status = 'active' AND category_id IS NOT NULL) OR "
+            "(status <> 'active' AND category_id IS NULL)",
+            name="status_category_consistent",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="confidence_range",
+        ),
+        Index("ix_source_category_mappings_source", "source"),
+        Index("ix_source_category_mappings_category_id", "category_id"),
+        Index("ix_source_category_mappings_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_category: Mapped[str] = mapped_column(Text, nullable=False)
+    normalized_raw_category: Mapped[str] = mapped_column(Text, nullable=False)
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"))
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))
+    confidence: Mapped[Decimal] = mapped_column(
+        Numeric(4, 3), nullable=False, server_default=text("1.000")
+    )
+    reason: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[str | None] = mapped_column(Text)
+    updated_by: Mapped[str | None] = mapped_column(Text)
+
+    category: Mapped[Category | None] = relationship(back_populates="source_category_mappings")
 
 
 class SourceProduct(TimestampMixin, Base):

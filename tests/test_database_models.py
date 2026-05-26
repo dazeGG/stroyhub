@@ -10,6 +10,7 @@ from stroyhub.models import (
     Shop,
     ShopIdentity,
     ShopSourceCandidate,
+    SourceCategoryMapping,
     SourceProduct,
 )
 
@@ -44,6 +45,7 @@ def test_m1_tables_are_registered_in_metadata() -> None:
         "scrape_runs",
         "canonical_products",
         "product_matches",
+        "source_category_mappings",
     }
 
 
@@ -64,6 +66,7 @@ def test_models_match_expected_table_names() -> None:
     assert Shop.__tablename__ == "shops"
     assert ShopIdentity.__tablename__ == "shop_identities"
     assert ShopSourceCandidate.__tablename__ == "shop_source_candidates"
+    assert SourceCategoryMapping.__tablename__ == "source_category_mappings"
     assert Category.__tablename__ == "categories"
     assert SourceProduct.__tablename__ == "source_products"
     assert PriceSnapshot.__tablename__ == "price_snapshots"
@@ -108,6 +111,20 @@ def test_shop_source_candidate_has_review_queue_columns() -> None:
     assert "approved_shop_id" in columns
 
 
+def test_source_category_mapping_has_workflow_columns() -> None:
+    columns = SourceCategoryMapping.__table__.columns
+
+    assert "source" in columns
+    assert "raw_category" in columns
+    assert "normalized_raw_category" in columns
+    assert "category_id" in columns
+    assert "status" in columns
+    assert "confidence" in columns
+    assert "reason" in columns
+    assert "created_by" in columns
+    assert "updated_by" in columns
+
+
 def test_product_match_accepted_unique_index_is_declared() -> None:
     indexes = {index.name: index for index in ProductMatch.__table__.indexes}
 
@@ -137,6 +154,15 @@ def test_db_invariant_check_constraints_are_declared() -> None:
     assert _has_check(Shop, "ck_shops_error_count_nonnegative")
     assert _has_check(SourceProduct, "ck_source_products_has_stable_identity")
     assert _has_check(CategoryOverride, "ck_category_overrides_status_known")
+    assert _has_check(SourceCategoryMapping, "ck_source_category_mappings_status_known")
+    assert _has_check(
+        SourceCategoryMapping,
+        "ck_source_category_mappings_status_category_consistent",
+    )
+    assert _has_check(
+        SourceCategoryMapping,
+        "ck_source_category_mappings_confidence_range",
+    )
     assert _has_check(CanonicalProduct, "ck_canonical_products_match_status_known")
     assert _has_check(ProductMatch, "ck_product_matches_confidence_range")
     assert _has_check(ProductMatch, "ck_product_matches_status_known")
@@ -150,6 +176,7 @@ def test_check_constraint_names_do_not_duplicate_table_prefix() -> None:
         ShopIdentity,
         Shop,
         ShopSourceCandidate,
+        SourceCategoryMapping,
         SourceProduct,
         CategoryOverride,
         CanonicalProduct,

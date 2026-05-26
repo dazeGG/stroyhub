@@ -24,6 +24,8 @@ __all__ = [
     "ShopIdentityUpdate",
     "ShopRepository",
     "ShopUpsert",
+    "SourceCategoryMappingRepository",
+    "SourceCategoryMappingUpsert",
     "SourceProductRepository",
     "SourceProductUpsert",
     "engine",
@@ -49,6 +51,8 @@ _REPOSITORY_EXPORTS = {
     "ShopIdentityUpdate",
     "ShopRepository",
     "ShopUpsert",
+    "SourceCategoryMappingRepository",
+    "SourceCategoryMappingUpsert",
     "SourceProductRepository",
     "SourceProductUpsert",
 }

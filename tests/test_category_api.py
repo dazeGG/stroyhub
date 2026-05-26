@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.catalog.categories import CategoryTreeItem
+from stroyhub.catalog.source_category_mappings import categorizer_for_session
 from stroyhub.core.config import settings
 from stroyhub.db import (
     PriceSnapshotCreate,
@@ -338,3 +339,98 @@ def test_category_quality_endpoint_groups_uncategorized_products(
             }
         ],
     }
+
+
+def test_source_category_mapping_endpoint_lists_and_corrects_raw_categories(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    category = Category(slug="mapping-api-cement", name="Mapping API Cement")
+    db_session.add(category)
+    db_session.flush()
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="mapping-api-shop", name="Mapping Shop")
+    )
+    SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="mapping-api-source",
+            title="Mapping Cement M500 50kg",
+            normalized_title="mapping cement m500 50kg",
+            category_raw="Поставщик / Цемент",
+        )
+    )
+
+    before_response = client.get(
+        "/categories/source-mappings",
+        params={"source": "2gis", "q": "Цемент", "examples_per_group": 1},
+    )
+    upsert_response = client.put(
+        "/categories/source-mappings",
+        json={
+            "source": "2gis",
+            "raw_category": "Поставщик / Цемент",
+            "category_id": category.id,
+            "status": "active",
+            "actor": "admin",
+            "reason": "source category is stable",
+        },
+    )
+    after_response = client.get(
+        "/categories/source-mappings",
+        params={"source": "2gis", "q": "Цемент", "examples_per_group": 1},
+    )
+
+    assert before_response.status_code == 200
+    before_item = before_response.json()["items"][0]
+    assert before_item["mapping_status"] == "unmapped"
+    assert before_item["uncategorized_product_count"] == 1
+    assert before_item["examples"] == ["Mapping Cement M500 50kg"]
+
+    assert upsert_response.status_code == 200
+    upsert_payload = upsert_response.json()
+    assert upsert_payload["source"] == "2gis"
+    assert upsert_payload["normalized_raw_category"] == "поставщик / цемент"
+    assert upsert_payload["category_id"] == category.id
+    assert upsert_payload["status"] == "active"
+
+    assert after_response.status_code == 200
+    after_item = after_response.json()["items"][0]
+    assert after_item["mapping_origin"] == "manual"
+    assert after_item["mapping_status"] == "active"
+    assert after_item["category"] == {
+        "id": category.id,
+        "slug": "mapping-api-cement",
+        "name": "Mapping API Cement",
+    }
+
+
+def test_manual_source_category_mapping_overrides_default_alias(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    category = Category(slug="mapping-api-manual-roofing", name="Manual Roofing")
+    db_session.add(category)
+    db_session.flush()
+
+    response = client.put(
+        "/categories/source-mappings",
+        json={
+            "source": "2gis",
+            "raw_category": "Профлист, металлочерепица",
+            "category_id": category.id,
+            "status": "active",
+            "actor": "admin",
+        },
+    )
+    prediction = categorizer_for_session(db_session).categorize(
+        title="Без сильных ключевых слов",
+        source="2gis",
+        category_raw="Профлист, металлочерепица",
+    )
+
+    assert response.status_code == 200
+    assert prediction is not None
+    assert prediction.category_slug == "mapping-api-manual-roofing"
+    assert prediction.source == "source_category_alias"

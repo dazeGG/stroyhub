@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import exists, not_, select
 from sqlalchemy.orm import Session
 from stroyhub.catalog.categorization import CategoryPrediction, RuleBasedCategorizer
+from stroyhub.catalog.source_category_mappings import categorizer_for_session
 from stroyhub.db import SessionLocal
 from stroyhub.db.repositories import CategoryRepository, CategoryUpsert
 from stroyhub.models import CategoryOverride, SourceProduct
@@ -36,7 +37,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = backfill_products(
             products,
             category_repository=CategoryRepository(session),
-            categorizer=RuleBasedCategorizer(),
+            categorizer=categorizer_for_session(session),
             dry_run=args.dry_run,
         )
         if args.dry_run:
