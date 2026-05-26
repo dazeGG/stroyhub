@@ -673,6 +673,12 @@ export interface ScrapeStatusCount {
   count: number
 }
 
+export interface CatalogPipelineStatusCount {
+  stage: string
+  status: string
+  count: number
+}
+
 export interface RecentScrapeRun {
   id: number
   source: string
@@ -688,6 +694,7 @@ export interface RecentScrapeRun {
 export interface ScrapeHealthResponse {
   status_counts: ScrapeStatusCount[]
   recent_runs: RecentScrapeRun[]
+  catalog_pipeline_status_counts: CatalogPipelineStatusCount[]
 }
 
 export interface ScrapeHealthParams {
@@ -742,6 +749,47 @@ export interface CategoryQualityParams {
   shopId?: number
   limitGroups?: number
   titlesPerGroup?: number
+}
+
+export type CatalogQualitySeverity = 'blocker' | 'warning'
+
+export interface CatalogQualityFinding {
+  code: string
+  severity: CatalogQualitySeverity
+  reason: string
+  recommended_action: string
+  source_product_id: number | null
+  canonical_product_id: number | null
+  shop_id: number | null
+  related_source_product_ids: number[]
+  related_canonical_product_ids: number[]
+  metadata: Record<string, unknown> | null
+}
+
+export interface CatalogQualityFindingPage {
+  items: CatalogQualityFinding[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface CatalogQualitySummary {
+  total: number
+  blockers: number
+  warnings: number
+  by_code: Record<string, number>
+}
+
+export interface CatalogQualityFindingsResponse {
+  summary: CatalogQualitySummary
+  findings: CatalogQualityFindingPage
+}
+
+export interface CatalogQualityFindingsParams {
+  severity?: CatalogQualitySeverity
+  code?: string
+  limit?: number
+  offset?: number
 }
 
 export interface MatchCandidateProduct {
@@ -1369,6 +1417,23 @@ export function fetchCategoryQuality(
   const query = params.toString()
 
   return fetchJson<CategoryQualityResponse>(query ? `/categories/quality?${query}` : '/categories/quality', signal)
+}
+
+export function fetchCatalogQualityFindings(
+  filters: CatalogQualityFindingsParams = {},
+  signal?: AbortSignal,
+): Promise<CatalogQualityFindingsResponse> {
+  const params = new URLSearchParams()
+  appendOptionalParam(params, 'severity', filters.severity)
+  appendOptionalParam(params, 'code', filters.code)
+  appendOptionalParam(params, 'limit', filters.limit)
+  appendOptionalParam(params, 'offset', filters.offset)
+  const query = params.toString()
+
+  return fetchJson<CatalogQualityFindingsResponse>(
+    query ? `/catalog-quality/findings?${query}` : '/catalog-quality/findings',
+    signal,
+  )
 }
 
 export function fetchMatchCandidates(
