@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from stroyhub import __version__
 
 from apps.admin_api.canonical_products import router as canonical_products_router
+from apps.admin_api.catalog_workflows import router as catalog_workflows_router
 from apps.admin_api.categories import router as categories_router
 from apps.admin_api.errors import install_error_handlers
 from apps.admin_api.matches import router as matches_router
@@ -18,6 +19,7 @@ from apps.admin_api.shops import router as shops_router
 def create_app() -> FastAPI:
     app = FastAPI(title="StroyHub Admin API", version=__version__)
     install_error_handlers(app)
+    app.include_router(catalog_workflows_router)
     app.include_router(canonical_products_router)
     app.include_router(categories_router)
     app.include_router(matches_router)
