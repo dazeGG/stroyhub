@@ -738,6 +738,51 @@ def test_product_category_override_put_is_idempotent_for_same_payload(
     assert total == 1
 
 
+def test_product_data_problem_endpoint_marks_product_and_refreshes_quality(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-api-data-problem", name="Data Shop")
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="data-problem-api-1",
+            title="Consultation request",
+            normalized_title="consultation request",
+            raw={"source": "fixture"},
+        )
+    )
+    PriceSnapshotRepository(db_session).add(
+        PriceSnapshotCreate(
+            source_product_id=product.id,
+            price=Decimal("100.00"),
+            parsed_at=datetime(2026, 5, 20, 8, 0, tzinfo=UTC),
+        )
+    )
+
+    response = client.put(
+        f"/products/{product.id}/data-problem",
+        json={
+            "is_not_product": True,
+            "reason": "service card",
+            "actor": "reviewer",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == product.id
+    db_session.expire(product)
+    assert product.is_not_product is True
+    assert product.raw is not None
+    assert product.raw["operator_review"]["data_problem"]["marked"] is True
+    assert product.raw["operator_review"]["data_problem"]["reason"] == "service card"
+    assert product.raw["operator_review"]["data_problem"]["actor"] == "reviewer"
+    assert product.raw["catalog_quality"]["normalization"]["status"] == "data_problem"
+
+
 def test_product_price_history_endpoint_returns_ordered_snapshots(
     client: TestClient, db_session: Session
 ) -> None:

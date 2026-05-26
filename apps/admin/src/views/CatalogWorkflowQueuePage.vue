@@ -1,16 +1,28 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { useToast } from '@nuxt/ui/composables'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
 import {
+  acceptProductMatch,
+  assignProductCategoryOverride,
   autoAcceptCatalogWorkflowItems,
+  createCanonicalFromSourceAndAccept,
+  fetchCanonicalProducts,
   fetchCatalogWorkflowQueue,
+  fetchCategories,
+  markProductDataProblem,
+  rejectProductMatch,
+  type CanonicalProductListItem,
+  type CatalogWorkflowAutoAcceptItem,
   type CatalogWorkflowAutoAcceptResponse,
   type CatalogWorkflowQueueItem,
   type CatalogWorkflowQueueName,
   type CatalogWorkflowReason,
+  type CategoryTreeItem,
+  type ProductMatchDecision,
+  type ProductNormalizationCandidateMatch,
 } from '../lib/api'
 import { icons } from '../lib/icons'
 import { toastError, toastSuccess, toastWarning } from '../lib/notifications'
@@ -21,6 +33,25 @@ interface QueueMeta {
   eyebrow: string
   empty: string
   icon: typeof icons.check
+}
+
+interface CategoryOption {
+  id: number
+  label: string
+}
+
+interface AttributeRow {
+  key: string
+  label: string
+  value: string
+  detail: string
+}
+
+interface ReviewSignal {
+  key: string
+  label: string
+  value: string
+  tone: string
 }
 
 const queueMeta: QueueMeta[] = [
@@ -61,15 +92,41 @@ const queueMeta: QueueMeta[] = [
   },
 ]
 
+const reviewQueues: CatalogWorkflowQueueName[] = [
+  'review_needed',
+  'possible_duplicates',
+  'data_problems',
+]
+
+const stageLabels: Record<string, string> = {
+  pipeline: 'Пайплайн',
+  catalog_eligibility: 'Допуск',
+  cleanup: 'Очистка',
+  attributes: 'Атрибуты',
+  categorization: 'Категория',
+  normalization: 'Нормализация',
+}
+
 const route = useRoute()
 const toast = useToast()
 const items = ref<CatalogWorkflowQueueItem[]>([])
 const total = ref(0)
+const categories = ref<CategoryTreeItem[]>([])
 const isLoading = ref(false)
+const isLoadingCategories = ref(false)
 const isBatching = ref(false)
+const busyAction = ref('')
 const errorMessage = ref('')
 const searchQuery = ref('')
 const batchPreview = ref<CatalogWorkflowAutoAcceptResponse | null>(null)
+const reasonByProductId = reactive<Record<number, string>>({})
+const categoryByProductId = reactive<Record<number, string>>({})
+const dataProblemReasonByProductId = reactive<Record<number, string>>({})
+const canonicalSearchByProductId = reactive<Record<number, string>>({})
+const selectedCanonicalByProductId = reactive<Record<number, string>>({})
+const canonicalResultsByProductId = reactive<Record<number, CanonicalProductListItem[]>>({})
+
+let queueRequest: AbortController | null = null
 
 const queue = computed<CatalogWorkflowQueueName>(() => {
   const value = Array.isArray(route.params.queue) ? route.params.queue[0] : route.params.queue
@@ -81,9 +138,62 @@ const activeMeta = computed(() => {
 })
 
 const canBatchAccept = computed(() => queue.value === 'auto_acceptable')
+const isReviewWorkspace = computed(() => reviewQueues.includes(queue.value))
+
+const leafCategoryOptions = computed(() => {
+  const options: CategoryOption[] = []
+
+  function walk(categoryItems: CategoryTreeItem[], path: string[]): void {
+    for (const category of categoryItems) {
+      const nextPath = [...path, category.name]
+      if (category.children.length === 0) {
+        options.push({ id: category.id, label: nextPath.join(' / ') })
+      } else {
+        walk(category.children, nextPath)
+      }
+    }
+  }
+
+  walk(categories.value, [])
+  return options
+})
 
 function isQueueName(value: unknown): value is CatalogWorkflowQueueName {
   return typeof value === 'string' && queueMeta.some((item) => item.queue === value)
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+}
+
+function asString(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim()
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  return null
+}
+
+function asStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => asString(item))
+    .filter((item): item is string => item !== null)
+}
+
+function confidencePercent(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === '') {
+    return '-'
+  }
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? `${Math.round(numeric * 100)}%` : String(value)
 }
 
 function reasonText(reason: CatalogWorkflowReason): string {
@@ -102,6 +212,19 @@ function primaryReason(item: CatalogWorkflowQueueItem): CatalogWorkflowReason | 
     ?? item.reasons.find((reason) => reason.stage === 'pipeline')
     ?? item.reasons[0]
     ?? null
+}
+
+function primarySignalText(item: CatalogWorkflowQueueItem): string {
+  const reason = primaryReason(item)
+  return reason ? reasonText(reason) : 'Нет данных пайплайна'
+}
+
+function primaryActionLabel(item: CatalogWorkflowQueueItem): string {
+  return actionLabel(primaryReason(item)?.action ?? null)
+}
+
+function canResolveAsProduct(item: CatalogWorkflowQueueItem): boolean {
+  return item.queue !== 'data_problems' && !item.is_not_product
 }
 
 function formatPrice(item: CatalogWorkflowQueueItem): string {
@@ -141,25 +264,280 @@ function actionLabel(action: string | null): string {
   return action ? (labels[action] ?? action) : 'Нет действия'
 }
 
+function batchStatusClass(status: CatalogWorkflowAutoAcceptItem['status']): string {
+  if (status === 'accepted' || status === 'would_accept') {
+    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100'
+  }
+  return 'border-neutral-700 bg-neutral-950 text-neutral-300'
+}
+
+function batchStatusLabel(status: CatalogWorkflowAutoAcceptItem['status']): string {
+  const labels: Record<CatalogWorkflowAutoAcceptItem['status'], string> = {
+    would_accept: 'Можно принять',
+    accepted: 'Принято',
+    skipped: 'Пропущено',
+  }
+  return labels[status]
+}
+
+function qualityStage(item: CatalogWorkflowQueueItem, stage: string): Record<string, unknown> | null {
+  const quality = asRecord(item.catalog_quality)
+  return asRecord(quality?.[stage])
+}
+
+function attributeRows(item: CatalogWorkflowQueueItem): AttributeRow[] {
+  const stage = qualityStage(item, 'attributes')
+  const rawItems = Array.isArray(stage?.items) ? stage.items : []
+  return rawItems.flatMap((rawItem, index) => {
+    const attribute = asRecord(rawItem)
+    if (!attribute) {
+      return []
+    }
+
+    const kind = asString(attribute.kind) ?? 'attribute'
+    const raw = asString(attribute.raw)
+    const values = asStringList(attribute.values)
+    const normalized = asString(attribute.normalized)
+    const unit = asString(attribute.unit)
+    const value = raw ?? (values.length ? values.join(', ') : null) ?? normalized ?? '-'
+    const detail = [
+      unit,
+      normalized && normalized !== value ? normalized : null,
+      confidencePercent(asString(attribute.confidence)),
+      asString(attribute.reason),
+    ].filter(Boolean).join(' · ')
+
+    return [{
+      key: `${kind}:${index}`,
+      label: kind,
+      value,
+      detail,
+    }]
+  })
+}
+
+function reviewSignals(item: CatalogWorkflowQueueItem): ReviewSignal[] {
+  const signals: ReviewSignal[] = []
+  const attributes = attributeRows(item)
+  const categoryStage = qualityStage(item, 'categorization')
+  const normalizationStage = qualityStage(item, 'normalization')
+
+  if (attributes.length) {
+    signals.push({
+      key: `${item.id}:attributes`,
+      label: 'Атрибуты',
+      value: attributes.map((attribute) => attribute.value).join(', '),
+      tone: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-100',
+    })
+  }
+
+  const categorySlug = asString(categoryStage?.category_slug)
+  if (item.category?.name || categorySlug) {
+    signals.push({
+      key: `${item.id}:category`,
+      label: 'Категория',
+      value: item.category?.name ?? categorySlug ?? 'назначена',
+      tone: 'border-sky-400/25 bg-sky-400/10 text-sky-100',
+    })
+  }
+
+  const action = asString(normalizationStage?.action)
+  if (action) {
+    signals.push({
+      key: `${item.id}:normalization-action`,
+      label: 'Действие',
+      value: actionLabel(action),
+      tone: 'border-amber-400/30 bg-amber-400/10 text-amber-100',
+    })
+  }
+
+  for (const reason of item.reasons) {
+    signals.push({
+      key: `${item.id}:${reason.stage}:${reason.status ?? 'signal'}`,
+      label: stageLabels[reason.stage] ?? reason.stage,
+      value: reasonText(reason),
+      tone: 'border-neutral-700 bg-neutral-950 text-neutral-300',
+    })
+  }
+
+  return signals.length
+    ? signals
+    : [{
+        key: `${item.id}:empty`,
+        label: 'Сигнал',
+        value: 'Нет данных пайплайна',
+        tone: 'border-neutral-700 bg-neutral-950 text-neutral-300',
+      }]
+}
+
+function reviewConflicts(item: CatalogWorkflowQueueItem): ReviewSignal[] {
+  const conflicts: ReviewSignal[] = []
+  const normalizationStage = qualityStage(item, 'normalization')
+  const blockers = asStringList(normalizationStage?.blockers)
+
+  if (!item.latest_price || item.latest_price.price === null) {
+    conflicts.push({
+      key: `${item.id}:missing-price`,
+      label: 'Цена',
+      value: 'нет цены',
+      tone: 'border-red-400/25 bg-red-400/10 text-red-100',
+    })
+  }
+
+  if (!item.category_id) {
+    conflicts.push({
+      key: `${item.id}:missing-category`,
+      label: 'Категория',
+      value: item.category_raw ? `только исходная: ${item.category_raw}` : 'не назначена',
+      tone: 'border-red-400/25 bg-red-400/10 text-red-100',
+    })
+  }
+
+  if (item.is_not_product) {
+    conflicts.push({
+      key: `${item.id}:not-product`,
+      label: 'Тип карточки',
+      value: 'не товар',
+      tone: 'border-red-400/25 bg-red-400/10 text-red-100',
+    })
+  }
+
+  for (const blocker of blockers) {
+    conflicts.push({
+      key: `${item.id}:blocker:${blocker}`,
+      label: 'Блокер',
+      value: blocker,
+      tone: 'border-red-400/25 bg-red-400/10 text-red-100',
+    })
+  }
+
+  return conflicts.length
+    ? conflicts
+    : [{
+        key: `${item.id}:no-conflict`,
+        label: 'Конфликтов нет',
+        value: 'явных блокеров не найдено',
+        tone: 'border-neutral-700 bg-neutral-950 text-neutral-300',
+      }]
+}
+
+function suggestedNormalizedProduct(item: CatalogWorkflowQueueItem): string {
+  if (item.queue === 'data_problems') {
+    return item.is_not_product ? 'Оставить вне каталога' : 'Исправить данные перед решением'
+  }
+
+  const normalizationStage = qualityStage(item, 'normalization')
+  return asString(normalizationStage?.canonical_title)
+    ?? item.match_summary.accepted_canonical_title
+    ?? item.candidate_matches[0]?.canonical_title
+    ?? 'Создать новый нормализованный товар'
+}
+
+function matchReason(match: ProductNormalizationCandidateMatch): Record<string, unknown> | null {
+  return asRecord(match.reason)
+}
+
+function matchEvidence(match: ProductNormalizationCandidateMatch): string[] {
+  const reason = matchReason(match)
+  const values = [
+    `уверенность ${confidencePercent(match.confidence)}`,
+    asString(reason?.exact_title) === 'true' ? 'точное название' : null,
+    asString(reason?.same_category) === 'true' ? 'та же категория' : null,
+    ...asStringList(reason?.token_overlap).map((token) => `общий токен: ${token}`),
+  ].filter((item): item is string => item !== null)
+  return values.length ? values : ['нет подробных сигналов']
+}
+
+function matchConflicts(match: ProductNormalizationCandidateMatch): string[] {
+  const reason = matchReason(match)
+  const conflicts = [
+    ...asStringList(reason?.blocked_by).map((value) => `блокер: ${value}`),
+    ...asStringList(reason?.left_only_tokens).map((value) => `только источник: ${value}`),
+    ...asStringList(reason?.right_only_tokens).map((value) => `только каталог: ${value}`),
+  ]
+  if (asString(reason?.same_category) === 'false') {
+    conflicts.push('категории отличаются')
+  }
+  return conflicts.length ? conflicts : ['явных конфликтов нет']
+}
+
+function actionKey(item: CatalogWorkflowQueueItem, action: string): string {
+  return `${item.id}:${action}`
+}
+
+function isBusy(item: CatalogWorkflowQueueItem, action: string): boolean {
+  return busyAction.value === actionKey(item, action)
+}
+
+function decisionReason(item: CatalogWorkflowQueueItem): string | undefined {
+  return reasonByProductId[item.id]?.trim() || undefined
+}
+
+function decisionDescription(decision: ProductMatchDecision): string {
+  const action = typeof decision.reason?.action === 'string' ? decision.reason.action : decision.status
+  const labels: Record<string, string> = {
+    accept: 'Принято',
+    reject: 'Отклонено',
+    accepted: 'Принято',
+    rejected: 'Отклонено',
+    supersede: 'Заменено',
+  }
+  const note = typeof decision.reason?.note === 'string' ? ` · ${decision.reason.note}` : ''
+  return `${labels[action] ?? action}${note}`
+}
+
+async function loadCategories(): Promise<void> {
+  isLoadingCategories.value = true
+  try {
+    const response = await fetchCategories()
+    categories.value = response.items
+  } catch (error) {
+    toastError(toast, 'Не удалось загрузить категории', error, 'Не удалось загрузить категории')
+  } finally {
+    isLoadingCategories.value = false
+  }
+}
+
 async function loadQueue(): Promise<void> {
+  queueRequest?.abort()
+  const request = new AbortController()
+  queueRequest = request
   isLoading.value = true
   errorMessage.value = ''
   batchPreview.value = null
 
   try {
-    const response = await fetchCatalogWorkflowQueue(queue.value, {
-      q: searchQuery.value,
-      limit: 50,
-      offset: 0,
-    })
+    const response = await fetchCatalogWorkflowQueue(
+      queue.value,
+      {
+        q: searchQuery.value,
+        limit: 50,
+        offset: 0,
+      },
+      request.signal,
+    )
     items.value = response.items
     total.value = response.total
+    for (const item of response.items) {
+      if (item.category_id && !categoryByProductId[item.id]) {
+        categoryByProductId[item.id] = String(item.category_id)
+      }
+      if (!canonicalSearchByProductId[item.id]) {
+        canonicalSearchByProductId[item.id] = item.normalized_title
+      }
+    }
   } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return
+    }
+
     errorMessage.value = error instanceof Error ? error.message : 'Неизвестная ошибка'
     items.value = []
     total.value = 0
   } finally {
-    isLoading.value = false
+    if (queueRequest === request) {
+      isLoading.value = false
+    }
   }
 }
 
@@ -200,6 +578,7 @@ async function applyBatchAccept(): Promise<void> {
       dryRun: false,
       reason: 'Принято из очереди качества каталога',
     })
+    batchPreview.value = response
     toastSuccess(
       toast,
       'Очередь обработана',
@@ -213,11 +592,133 @@ async function applyBatchAccept(): Promise<void> {
   }
 }
 
+async function createCanonicalFromItem(item: CatalogWorkflowQueueItem): Promise<void> {
+  busyAction.value = actionKey(item, 'create')
+  try {
+    const decision = await createCanonicalFromSourceAndAccept(item.id, decisionReason(item))
+    toastSuccess(toast, 'Решение сохранено', decisionDescription(decision))
+    await loadQueue()
+  } catch (error) {
+    toastError(toast, 'Не удалось создать нормализованный товар', error, 'Не удалось создать нормализованный товар')
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function acceptCandidateMatch(
+  item: CatalogWorkflowQueueItem,
+  match: ProductNormalizationCandidateMatch,
+): Promise<void> {
+  busyAction.value = actionKey(item, `accept:${match.id}`)
+  try {
+    const decision = await acceptProductMatch(match.canonical_product_id, item.id, decisionReason(item))
+    toastSuccess(toast, 'Решение сохранено', decisionDescription(decision))
+    await loadQueue()
+  } catch (error) {
+    toastError(toast, 'Не удалось связать товары', error, 'Не удалось связать товары')
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function rejectCandidateMatch(
+  item: CatalogWorkflowQueueItem,
+  match: ProductNormalizationCandidateMatch,
+): Promise<void> {
+  busyAction.value = actionKey(item, `reject:${match.id}`)
+  try {
+    const decision = await rejectProductMatch(match.id, decisionReason(item) || 'Не тот товар')
+    toastSuccess(toast, 'Решение сохранено', decisionDescription(decision))
+    await loadQueue()
+  } catch (error) {
+    toastError(toast, 'Не удалось отклонить связь', error, 'Не удалось отклонить связь')
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function searchCanonicalProductsForItem(item: CatalogWorkflowQueueItem): Promise<void> {
+  busyAction.value = actionKey(item, 'search')
+  try {
+    const response = await fetchCanonicalProducts({
+      q: canonicalSearchByProductId[item.id] || item.normalized_title,
+      matchStatus: 'active',
+      limit: 10,
+    })
+    canonicalResultsByProductId[item.id] = response.items
+    if (response.items.length === 1) {
+      selectedCanonicalByProductId[item.id] = String(response.items[0].id)
+    }
+    if (response.items.length === 0) {
+      toastWarning(toast, 'Ничего не найдено', 'По этому запросу нет нормализованных товаров.')
+    }
+  } catch (error) {
+    toastError(toast, 'Не удалось найти товары', error, 'Не удалось найти товары')
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function linkCanonicalProduct(item: CatalogWorkflowQueueItem): Promise<void> {
+  const canonicalProductId = Number(selectedCanonicalByProductId[item.id])
+  if (!canonicalProductId) {
+    toastWarning(toast, 'Выберите товар', 'Сначала выберите нормализованный товар для связи.')
+    return
+  }
+
+  busyAction.value = actionKey(item, 'link')
+  try {
+    const decision = await acceptProductMatch(canonicalProductId, item.id, decisionReason(item))
+    toastSuccess(toast, 'Решение сохранено', decisionDescription(decision))
+    await loadQueue()
+  } catch (error) {
+    toastError(toast, 'Не удалось связать товар', error, 'Не удалось связать товар')
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function saveCategoryOverride(item: CatalogWorkflowQueueItem): Promise<void> {
+  const categoryId = Number(categoryByProductId[item.id])
+  if (!Number.isInteger(categoryId) || categoryId <= 0) {
+    toastWarning(toast, 'Выберите категорию', 'Для исправления нужна конечная категория.')
+    return
+  }
+
+  busyAction.value = actionKey(item, 'category')
+  try {
+    await assignProductCategoryOverride(item.id, categoryId, decisionReason(item))
+    toastSuccess(toast, 'Категория сохранена')
+    await loadQueue()
+  } catch (error) {
+    toastError(toast, 'Не удалось сохранить категорию', error, 'Не удалось сохранить категорию')
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function markItemDataProblem(item: CatalogWorkflowQueueItem): Promise<void> {
+  busyAction.value = actionKey(item, 'data-problem')
+  try {
+    await markProductDataProblem(item.id, {
+      isNotProduct: true,
+      reason: dataProblemReasonByProductId[item.id]?.trim() || decisionReason(item) || 'Проблема данных',
+    })
+    toastSuccess(toast, 'Карточка отправлена в проблемы данных')
+    await loadQueue()
+  } catch (error) {
+    toastError(toast, 'Не удалось пометить проблему', error, 'Не удалось пометить проблему')
+  } finally {
+    busyAction.value = ''
+  }
+}
+
 watch(queue, () => {
   void loadQueue()
 })
 
 onMounted(() => {
+  void loadCategories()
   void loadQueue()
 })
 </script>
@@ -298,7 +799,7 @@ onMounted(() => {
       v-if="batchPreview"
       class="rounded-lg border border-amber-400/30 bg-amber-400/10 p-4"
     >
-      <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div class="grid gap-3 sm:grid-cols-3">
           <div>
             <p class="text-xs uppercase tracking-wide text-amber-200/80">На странице</p>
@@ -324,6 +825,27 @@ onMounted(() => {
           {{ isBatching ? 'Применяем...' : `Принять ${batchPreview.would_accept}` }}
         </button>
       </div>
+
+      <div v-if="batchPreview.items.length" class="mt-4 grid gap-2 border-t border-amber-400/20 pt-4">
+        <div
+          v-for="result in batchPreview.items"
+          :key="`${result.source_product_id}:${result.status}`"
+          class="grid gap-3 rounded-md border border-amber-300/20 bg-neutral-950/60 p-3 text-sm md:grid-cols-[1fr_auto]"
+        >
+          <div class="min-w-0">
+            <p class="truncate font-semibold text-white">{{ result.title }}</p>
+            <p class="mt-1 text-xs text-neutral-400">
+              {{ actionLabel(result.action) }} · {{ result.reason }}
+            </p>
+          </div>
+          <span
+            class="inline-flex w-fit items-center rounded-md border px-2 py-1 text-xs font-semibold"
+            :class="batchStatusClass(result.status)"
+          >
+            {{ batchStatusLabel(result.status) }}
+          </span>
+        </div>
+      </div>
     </div>
 
     <div
@@ -337,7 +859,7 @@ onMounted(() => {
       <div
         v-for="index in 4"
         :key="index"
-        class="h-32 animate-pulse rounded-lg border border-neutral-800 bg-neutral-900/40"
+        class="h-40 animate-pulse rounded-lg border border-neutral-800 bg-neutral-900/40"
       />
     </div>
 
@@ -354,8 +876,8 @@ onMounted(() => {
         :key="item.id"
         class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
       >
-        <div class="grid gap-4 xl:grid-cols-[1fr_280px]">
-          <div>
+        <div class="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
               <span class="rounded-md border border-neutral-700 px-2 py-1 text-xs font-medium text-neutral-300">
                 {{ item.source }}
@@ -363,8 +885,10 @@ onMounted(() => {
               <span class="text-xs text-neutral-500">{{ item.shop.name }}</span>
               <span class="text-xs text-neutral-600">{{ formatDateTime(item.last_seen_at) }}</span>
             </div>
+
             <h3 class="mt-3 text-base font-semibold text-white">{{ item.title }}</h3>
-            <p class="mt-1 text-sm text-neutral-500">{{ item.normalized_title }}</p>
+            <p class="mt-1 break-words text-sm text-neutral-500">{{ item.normalized_title }}</p>
+
             <div class="mt-3 flex flex-wrap gap-2 text-xs text-neutral-300">
               <span class="rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1">
                 {{ item.category?.name ?? item.category_raw ?? 'Без категории' }}
@@ -372,20 +896,130 @@ onMounted(() => {
               <span class="rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1">
                 {{ formatPrice(item) }}
               </span>
-              <span
-                v-if="primaryReason(item)"
-                class="rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1"
-              >
-                {{ actionLabel(primaryReason(item)?.action ?? null) }}
+              <span class="rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1">
+                {{ primaryActionLabel(item) }}
               </span>
+            </div>
+
+            <div v-if="isReviewWorkspace" class="mt-5 grid gap-4 xl:grid-cols-2">
+              <section>
+                <p class="text-xs uppercase tracking-wide text-neutral-600">Сигналы</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <span
+                    v-for="signal in reviewSignals(item)"
+                    :key="signal.key"
+                    class="inline-flex max-w-full items-center gap-2 rounded-md border px-2 py-1 text-xs"
+                    :class="signal.tone"
+                  >
+                    <span class="font-semibold">{{ signal.label }}</span>
+                    <span class="truncate">{{ signal.value }}</span>
+                  </span>
+                </div>
+              </section>
+
+              <section>
+                <p class="text-xs uppercase tracking-wide text-neutral-600">Конфликты</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <span
+                    v-for="conflict in reviewConflicts(item)"
+                    :key="conflict.key"
+                    class="inline-flex max-w-full items-center gap-2 rounded-md border px-2 py-1 text-xs"
+                    :class="conflict.tone"
+                  >
+                    <span class="font-semibold">{{ conflict.label }}</span>
+                    <span class="truncate">{{ conflict.value }}</span>
+                  </span>
+                </div>
+              </section>
+            </div>
+
+            <div v-if="isReviewWorkspace" class="mt-5">
+              <p class="text-xs uppercase tracking-wide text-neutral-600">Извлеченные атрибуты</p>
+              <div v-if="attributeRows(item).length" class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <div
+                  v-for="attribute in attributeRows(item)"
+                  :key="attribute.key"
+                  class="rounded-md border border-neutral-800 bg-neutral-950 p-3"
+                >
+                  <p class="text-xs font-semibold uppercase tracking-wide text-neutral-600">{{ attribute.label }}</p>
+                  <p class="mt-1 text-sm font-semibold text-white">{{ attribute.value }}</p>
+                  <p v-if="attribute.detail" class="mt-1 text-xs text-neutral-500">{{ attribute.detail }}</p>
+                </div>
+              </div>
+              <p v-else class="mt-2 text-sm text-neutral-500">Атрибуты не извлечены.</p>
+            </div>
+
+            <div v-if="item.candidate_matches.length" class="mt-5 grid gap-3">
+              <p class="text-xs uppercase tracking-wide text-neutral-600">Возможные связи</p>
+              <div
+                v-for="match in item.candidate_matches"
+                :key="match.id"
+                class="rounded-md border border-neutral-800 bg-neutral-950 p-3"
+              >
+                <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                  <div class="min-w-0">
+                    <RouterLink
+                      :to="`/canonical-products/${match.canonical_product_id}`"
+                      class="text-sm font-semibold text-white transition hover:text-amber-200"
+                    >
+                      {{ match.canonical_title }}
+                    </RouterLink>
+                    <p class="mt-1 break-words text-xs text-neutral-500">
+                      {{ match.canonical_normalized_title }} · {{ match.method }} · {{ confidencePercent(match.confidence) }}
+                    </p>
+                  </div>
+                  <div v-if="isReviewWorkspace && canResolveAsProduct(item)" class="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-300 px-3 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-wait disabled:opacity-60"
+                      :disabled="Boolean(busyAction)"
+                      @click="acceptCandidateMatch(item, match)"
+                    >
+                      <Icon :icon="icons.check" class="size-4" aria-hidden="true" />
+                      {{ isBusy(item, `accept:${match.id}`) ? 'Принять...' : 'Принять' }}
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 text-sm font-semibold text-neutral-300 transition hover:border-red-300 hover:text-red-100 disabled:cursor-wait disabled:opacity-60"
+                      :disabled="Boolean(busyAction)"
+                      @click="rejectCandidateMatch(item, match)"
+                    >
+                      <Icon :icon="icons.x" class="size-4" aria-hidden="true" />
+                      {{ isBusy(item, `reject:${match.id}`) ? 'Отклонить...' : 'Отклонить' }}
+                    </button>
+                  </div>
+                  <RouterLink
+                    v-else
+                    :to="`/canonical-products/${match.canonical_product_id}`"
+                    class="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 text-sm font-semibold text-neutral-300 transition hover:border-neutral-600 hover:text-white"
+                  >
+                    <Icon :icon="icons.tags" class="size-4" aria-hidden="true" />
+                    Каталог
+                  </RouterLink>
+                </div>
+
+                <div v-if="isReviewWorkspace" class="mt-3 grid gap-3 text-xs lg:grid-cols-2">
+                  <div>
+                    <p class="font-semibold uppercase tracking-wide text-emerald-200/80">За связь</p>
+                    <ul class="mt-1 space-y-1 text-neutral-300">
+                      <li v-for="evidence in matchEvidence(match)" :key="evidence">{{ evidence }}</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p class="font-semibold uppercase tracking-wide text-red-200/80">Риски</p>
+                    <ul class="mt-1 space-y-1 text-neutral-300">
+                      <li v-for="conflict in matchConflicts(match)" :key="conflict">{{ conflict }}</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="rounded-md border border-neutral-800 bg-neutral-950 p-3">
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Сигнал</p>
-            <p class="mt-2 text-sm text-neutral-200">
-              {{ primaryReason(item) ? reasonText(primaryReason(item)!) : 'Нет данных пайплайна' }}
-            </p>
+          <aside class="border-t border-neutral-800 pt-4 2xl:border-l 2xl:border-t-0 2xl:pl-5 2xl:pt-0">
+            <p class="text-xs uppercase tracking-wide text-neutral-600">Предлагаемое решение</p>
+            <p class="mt-2 text-sm font-semibold text-white">{{ suggestedNormalizedProduct(item) }}</p>
+            <p class="mt-2 text-sm text-neutral-400">{{ primarySignalText(item) }}</p>
             <RouterLink
               :to="`/products/${item.id}`"
               class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-amber-200 hover:text-amber-100"
@@ -393,29 +1027,126 @@ onMounted(() => {
               Открыть карточку
               <Icon :icon="icons.chevronRight" class="size-4" aria-hidden="true" />
             </RouterLink>
-          </div>
-        </div>
 
-        <div v-if="item.candidate_matches.length" class="mt-4 grid gap-2">
-          <div
-            v-for="match in item.candidate_matches"
-            :key="match.id"
-            class="rounded-md border border-neutral-800 bg-neutral-950 p-3"
-          >
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p class="text-sm font-semibold text-white">{{ match.canonical_title }}</p>
-                <p class="mt-1 text-xs text-neutral-500">{{ match.method }} · {{ match.confidence }}</p>
-              </div>
-              <RouterLink
-                :to="`/canonical-products/${match.canonical_product_id}`"
-                class="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 text-sm font-semibold text-neutral-300 transition hover:border-neutral-600 hover:text-white"
+            <div v-if="isReviewWorkspace" class="mt-4 space-y-4 border-t border-neutral-800 pt-4">
+              <textarea
+                v-model="reasonByProductId[item.id]"
+                class="min-h-20 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+                placeholder="Причина решения"
+                aria-label="Причина решения"
+              />
+
+              <button
+                v-if="canResolveAsProduct(item)"
+                type="button"
+                class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-300 px-3 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60"
+                :disabled="Boolean(busyAction)"
+                @click="createCanonicalFromItem(item)"
               >
-                <Icon :icon="icons.tags" class="size-4" aria-hidden="true" />
-                Каталог
-              </RouterLink>
+                <Icon :icon="icons.plus" class="size-4" aria-hidden="true" />
+                {{ isBusy(item, 'create') ? 'Создаем...' : 'Создать новый товар' }}
+              </button>
+
+              <div v-if="canResolveAsProduct(item)" class="space-y-2">
+                <label class="block text-xs uppercase tracking-wide text-neutral-600">
+                  Исправить категорию
+                </label>
+                <select
+                  v-model="categoryByProductId[item.id]"
+                  class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                  :disabled="isLoadingCategories"
+                  aria-label="Выбор категории"
+                >
+                  <option value="">Выберите категорию</option>
+                  <option v-for="category in leafCategoryOptions" :key="category.id" :value="String(category.id)">
+                    {{ category.label }}
+                  </option>
+                </select>
+                <button
+                  type="button"
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 py-2 text-sm font-semibold text-neutral-300 transition hover:border-amber-300 hover:text-amber-100 disabled:cursor-wait disabled:opacity-60"
+                  :disabled="Boolean(busyAction) || isLoadingCategories"
+                  @click="saveCategoryOverride(item)"
+                >
+                  <Icon :icon="icons.category" class="size-4" aria-hidden="true" />
+                  {{ isBusy(item, 'category') ? 'Сохраняем...' : 'Сохранить категорию' }}
+                </button>
+              </div>
+
+              <div class="space-y-2">
+                <label class="block text-xs uppercase tracking-wide text-neutral-600">
+                  Связать вручную
+                </label>
+                <div class="grid gap-2">
+                  <input
+                    v-model="canonicalSearchByProductId[item.id]"
+                    type="search"
+                    class="h-10 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+                    :placeholder="item.normalized_title"
+                    aria-label="Поиск нормализованного товара"
+                    @keyup.enter="searchCanonicalProductsForItem(item)"
+                  >
+                  <button
+                    type="button"
+                    class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 text-sm font-semibold text-neutral-300 transition hover:border-amber-300 hover:text-white disabled:cursor-wait disabled:opacity-60"
+                    :disabled="Boolean(busyAction)"
+                    @click="searchCanonicalProductsForItem(item)"
+                  >
+                    <Icon :icon="icons.search" class="size-4" aria-hidden="true" />
+                    {{ isBusy(item, 'search') ? 'Ищем...' : 'Найти в каталоге' }}
+                  </button>
+                </div>
+
+                <select
+                  v-if="canonicalResultsByProductId[item.id]?.length"
+                  v-model="selectedCanonicalByProductId[item.id]"
+                  class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                  aria-label="Выбор нормализованного товара"
+                >
+                  <option value="">Выберите товар</option>
+                  <option
+                    v-for="canonical in canonicalResultsByProductId[item.id]"
+                    :key="canonical.id"
+                    :value="String(canonical.id)"
+                  >
+                    {{ canonical.title }}
+                  </option>
+                </select>
+
+                <button
+                  v-if="canonicalResultsByProductId[item.id]?.length"
+                  type="button"
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-300 px-3 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60"
+                  :disabled="Boolean(busyAction) || !selectedCanonicalByProductId[item.id]"
+                  @click="linkCanonicalProduct(item)"
+                >
+                  <Icon :icon="icons.link" class="size-4" aria-hidden="true" />
+                  {{ isBusy(item, 'link') ? 'Связываем...' : 'Связать выбранный' }}
+                </button>
+              </div>
+
+              <div class="space-y-2 border-t border-neutral-800 pt-4">
+                <label class="block text-xs uppercase tracking-wide text-neutral-600">
+                  Проблема данных
+                </label>
+                <textarea
+                  v-model="dataProblemReasonByProductId[item.id]"
+                  class="min-h-16 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-red-300"
+                  placeholder="Что не так с карточкой"
+                  aria-label="Причина проблемы данных"
+                />
+                <button
+                  type="button"
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-red-400/40 px-3 py-2 text-sm font-semibold text-red-100 transition hover:border-red-300 disabled:cursor-wait disabled:opacity-60"
+                  :disabled="Boolean(busyAction)"
+                  @click="markItemDataProblem(item)"
+                >
+                  <Icon :icon="icons.alertTriangle" class="size-4" aria-hidden="true" />
+                  {{ isBusy(item, 'data-problem') ? 'Сохраняем...' : 'Пометить проблему' }}
+                </button>
+              </div>
             </div>
-          </div>
+          </aside>
         </div>
       </article>
     </div>

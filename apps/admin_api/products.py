@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Path, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -102,6 +102,12 @@ class ProductPriceHistoryResponse(BaseModel):
 
 class ProductCategoryOverrideRequest(BaseModel):
     category_id: Annotated[int, Field(gt=0)]
+    reason: ReasonText | None = None
+    actor: ActorName | None = "admin"
+
+
+class ProductDataProblemRequest(BaseModel):
+    is_not_product: bool = True
     reason: ReasonText | None = None
     actor: ActorName | None = "admin"
 
@@ -252,11 +258,81 @@ def revert_product_category_override(
     return ProductSearchItemResponse.model_validate(item)
 
 
+@router.put(
+    "/{product_id}/data-problem",
+    response_model=ProductSearchItemResponse,
+    responses=api_error_responses(404),
+)
+def mark_product_data_problem(
+    product_id: Annotated[int, Path(gt=0)],
+    payload: ProductDataProblemRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> ProductSearchItemResponse:
+    catalog = ProductCatalog(session)
+    if catalog.get_product(product_id) is None:
+        raise ApiError(
+            status_code=404,
+            code="source_product_not_found",
+            message="Source product not found",
+        )
+
+    product = session.get(SourceProduct, product_id)
+    if product is None:
+        raise ApiError(
+            status_code=404,
+            code="source_product_not_found",
+            message="Source product not found",
+        )
+
+    product.is_not_product = payload.is_not_product
+    product.raw = _with_operator_data_problem(
+        product.raw,
+        is_not_product=payload.is_not_product,
+        reason=payload.reason,
+        actor=payload.actor,
+    )
+    _refresh_product_quality(session, product_id)
+    session.commit()
+
+    item = ProductCatalog(session).get_product(product_id)
+    if item is None:
+        raise ApiError(
+            status_code=404,
+            code="source_product_not_found",
+            message="Source product not found",
+        )
+    return ProductSearchItemResponse.model_validate(item)
+
+
 def _refresh_product_quality(session: Session, product_id: int) -> None:
     product = session.get(SourceProduct, product_id)
     if product is None:
         return
     CatalogQualityPipeline(session).run_for_shop(product.shop_id)
+
+
+def _with_operator_data_problem(
+    raw: dict[str, Any] | None,
+    *,
+    is_not_product: bool,
+    reason: str | None,
+    actor: str | None,
+) -> dict[str, Any]:
+    updated = dict(raw or {})
+    operator_review = updated.get("operator_review")
+    if not isinstance(operator_review, dict):
+        operator_review = {}
+    else:
+        operator_review = dict(operator_review)
+
+    operator_review["data_problem"] = {
+        "marked": is_not_product,
+        "reason": reason,
+        "actor": actor,
+        "reviewed_at": datetime.now(UTC).isoformat(),
+    }
+    updated["operator_review"] = operator_review
+    return updated
 
 
 @router.get(
