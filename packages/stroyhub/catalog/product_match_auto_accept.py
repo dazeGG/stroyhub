@@ -12,6 +12,7 @@ from stroyhub.catalog.normalization_decisions import (
     decide_normalization,
 )
 from stroyhub.catalog.product_match_generation import ProductMatchCandidateGenerator
+from stroyhub.catalog.quality_pipeline import CatalogQualityPipeline
 from stroyhub.catalog.query_helpers import escape_like_pattern
 from stroyhub.models.tables import CanonicalProduct, ProductMatch, SourceProduct
 from stroyhub.parsers.common import JsonObject
@@ -131,6 +132,9 @@ class ProductMatchAutoAcceptService:
         if not filters.dry_run:
             accepted = self._accept(limited, filters)
             followup_candidates_created = self._generate_followups(limited)
+            self._refresh_quality_for_shops(
+                {source_product.shop_id for _match, source_product, _canonical, _ in limited}
+            )
 
         return ProductMatchAutoAcceptResult(
             dry_run=filters.dry_run,
@@ -281,6 +285,11 @@ class ProductMatchAutoAcceptService:
         for canonical_product_id in sorted(canonical_product_ids):
             created += generator.generate_for_canonical(canonical_product_id).candidates_created
         return created
+
+    def _refresh_quality_for_shops(self, shop_ids: set[int]) -> None:
+        pipeline = CatalogQualityPipeline(self._session)
+        for shop_id in sorted(shop_ids):
+            pipeline.run_for_shop(shop_id, generate_candidates=False)
 
 
 def _item(

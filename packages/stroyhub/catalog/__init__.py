@@ -14,6 +14,10 @@ from stroyhub.catalog.normalization_decisions import (
     decide_normalization,
     decide_normalization_batch,
 )
+from stroyhub.catalog.quality_pipeline import (
+    CatalogQualityPipeline,
+    CatalogQualityPipelineResult,
+)
 from stroyhub.catalog.source_category_mappings import (
     SourceCategoryMappingCatalog,
     SourceCategoryMappingFilters,
@@ -30,6 +34,8 @@ __all__ = [
     "NormalizationDecisionEngine",
     "NormalizationEvidence",
     "ProductAttributeExtraction",
+    "CatalogQualityPipeline",
+    "CatalogQualityPipelineResult",
     "SourceCategoryMappingCatalog",
     "SourceCategoryMappingFilters",
     "SourceCategoryMappingItem",

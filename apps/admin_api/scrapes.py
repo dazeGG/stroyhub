@@ -33,9 +33,18 @@ class RecentScrapeRunResponse(BaseModel):
     error: str | None
 
 
+class CatalogPipelineStatusCountResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    stage: str
+    status: str
+    count: int
+
+
 class ScrapeHealthResponse(BaseModel):
     status_counts: list[ScrapeStatusCountResponse]
     recent_runs: list[RecentScrapeRunResponse]
+    catalog_pipeline_status_counts: list[CatalogPipelineStatusCountResponse]
 
 
 @router.get("/health", response_model=ScrapeHealthResponse)
@@ -59,5 +68,9 @@ def get_scrape_health(
         ],
         recent_runs=[
             RecentScrapeRunResponse.model_validate(item) for item in health.recent_runs
+        ],
+        catalog_pipeline_status_counts=[
+            CatalogPipelineStatusCountResponse.model_validate(item)
+            for item in health.catalog_pipeline_status_counts
         ],
     )

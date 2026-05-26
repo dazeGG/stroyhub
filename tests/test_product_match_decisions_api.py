@@ -97,6 +97,13 @@ def test_accept_product_match_creates_manual_accepted_match(
     assert payload["confidence"] == "1.000"
     assert payload["reviewed_by"] == "admin"
     assert payload["reason"] == {"action": "accept", "note": "looks exact"}
+    db_session.expire(source_product)
+    assert source_product.raw is not None
+    assert source_product.raw["catalog_quality"]["normalization"]["status"] == "accepted"
+    assert (
+        source_product.raw["catalog_quality"]["normalization"]["canonical_product_id"]
+        == canonical.id
+    )
 
 
 def test_accept_product_match_conflicts_until_superseded(
@@ -250,6 +257,12 @@ def test_reject_candidate_match_records_review_metadata(
     assert payload["status"] == "rejected"
     assert payload["reviewed_by"] == "admin"
     assert payload["reason"] == {"action": "reject", "note": "different package"}
+    db_session.expire(source_product)
+    assert source_product.raw is not None
+    assert source_product.raw["catalog_quality"]["status"] == "processed"
+    assert canonical.id in source_product.raw["catalog_quality"]["normalization"][
+        "rejected_canonical_product_ids"
+    ]
 
 
 def test_product_match_validation_rejects_blank_or_too_long_actor(

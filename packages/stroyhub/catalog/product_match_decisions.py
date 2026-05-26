@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from stroyhub.catalog.product_match_generation import ProductMatchCandidateGenerator
+from stroyhub.catalog.quality_pipeline import CatalogQualityPipeline
 from stroyhub.db.repositories import (
     CanonicalProductCreate,
     CanonicalProductRepository,
@@ -132,6 +133,7 @@ class ProductMatchDecisionService:
             reviewed_by=data.actor,
             reason=_decision_reason(data, action="reject"),
         )
+        self._refresh_quality_for_source_product(updated.source_product_id)
         return _decision(updated)
 
     def _accept(
@@ -143,11 +145,12 @@ class ProductMatchDecisionService:
         supersede_existing: bool,
     ) -> ProductMatchDecision:
         self._canonical_product(canonical_product_id)
-        self._source_product(source_product_id)
+        source_product = self._source_product(source_product_id)
 
         accepted = self._accepted_match(source_product_id)
         if accepted is not None:
             if accepted.canonical_product_id == canonical_product_id:
+                self._refresh_quality_for_shop(source_product.shop_id)
                 return _decision(accepted)
             if not supersede_existing:
                 raise ProductMatchDecisionConflict(
@@ -190,6 +193,7 @@ class ProductMatchDecisionService:
                 reason=_decision_reason(data, action="accept"),
             )
             self._generate_followup_candidates(canonical_product_id)
+            self._refresh_quality_for_source_product(source_product_id)
             return _decision(updated)
 
         match = ProductMatchRepository(self._session).create(
@@ -205,6 +209,7 @@ class ProductMatchDecisionService:
             )
         )
         self._generate_followup_candidates(canonical_product_id)
+        self._refresh_quality_for_source_product(source_product_id)
         return _decision(match)
 
     def _canonical_product(self, canonical_product_id: int) -> CanonicalProduct:
@@ -243,6 +248,18 @@ class ProductMatchDecisionService:
     def _generate_followup_candidates(self, canonical_product_id: int) -> None:
         ProductMatchCandidateGenerator(self._session).generate_for_canonical(
             canonical_product_id
+        )
+
+    def _refresh_quality_for_source_product(self, source_product_id: int) -> None:
+        product = self._session.get(SourceProduct, source_product_id)
+        if product is None:
+            return
+        self._refresh_quality_for_shop(product.shop_id)
+
+    def _refresh_quality_for_shop(self, shop_id: int) -> None:
+        CatalogQualityPipeline(self._session).run_for_shop(
+            shop_id,
+            generate_candidates=False,
         )
 
 

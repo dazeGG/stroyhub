@@ -583,6 +583,9 @@ def test_product_category_override_endpoint_creates_reads_and_reverts_override(
     assert assigned["category_override"]["previous_category_id"] == original_category.id
     assert assigned["category_override"]["reason"] == "admin review"
     assert assigned["category_override"]["created_by"] == "tester"
+    db_session.expire(product)
+    assert product.raw is not None
+    assert product.raw["catalog_quality"]["status"] == "processed"
 
     detail_response = client.get(f"/products/{product.id}")
 
@@ -598,6 +601,9 @@ def test_product_category_override_endpoint_creates_reads_and_reverts_override(
     reverted = revert_response.json()
     assert reverted["category_id"] == original_category.id
     assert reverted["category_override"] is None
+    db_session.expire(product)
+    assert product.raw is not None
+    assert product.raw["catalog_quality"]["normalization"]["processed_at"] is not None
 
 
 def test_product_category_override_endpoint_rejects_root_category(

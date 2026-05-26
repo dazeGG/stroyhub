@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
+from stroyhub.catalog.quality_pipeline import CatalogQualityPipeline
 from stroyhub.catalog.shop_candidates import CandidateListFilters, ShopCandidateCatalog
 from stroyhub.db import SessionLocal
 from stroyhub.models import Shop
@@ -74,7 +75,25 @@ def scrape_due_shops(
 @celery_app.task(name="stroyhub.scrape_shop")  # type: ignore[untyped-decorator]
 def scrape_shop(shop_id: int) -> dict[str, Any]:
     with SessionLocal() as session:
-        return run_shop_scrape(session, shop_id)
+        result = run_shop_scrape(session, shop_id)
+
+    should_enqueue_quality = (
+        result.get("status") in {"success", "partial"}
+        and int(result.get("products_saved") or 0) > 0
+    )
+    if should_enqueue_quality:
+        run_catalog_quality_pipeline.delay(shop_id)
+    if result.get("status") in {"success", "partial"}:
+        result["catalog_quality_pipeline_scheduled"] = should_enqueue_quality
+    return result
+
+
+@celery_app.task(name="stroyhub.run_catalog_quality_pipeline")  # type: ignore[untyped-decorator]
+def run_catalog_quality_pipeline(shop_id: int) -> dict[str, Any]:
+    with SessionLocal() as session:
+        result = CatalogQualityPipeline(session).run_for_shop(shop_id)
+        session.commit()
+        return result.as_raw()
 
 
 @celery_app.task(name="stroyhub.refresh_shop_source_candidates")  # type: ignore[untyped-decorator]

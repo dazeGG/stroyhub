@@ -401,7 +401,13 @@ def test_scrape_shop_runs_unicom_source_without_live_network(
             price_snapshots_saved=3,
         )
 
+    scheduled_quality_shop_ids: list[int] = []
     monkeypatch.setattr(scrape_runner, "scrape_unicom_shop", fake_scrape_unicom_shop)
+    monkeypatch.setattr(
+        worker_tasks.run_catalog_quality_pipeline,
+        "delay",
+        scheduled_quality_shop_ids.append,
+    )
 
     try:
         result = worker_tasks.scrape_shop.run(shop.id)
@@ -411,6 +417,8 @@ def test_scrape_shop_runs_unicom_source_without_live_network(
         assert result["source"] == "unicom"
         assert result["status"] == "success"
         assert result["products_seen"] == 3
+        assert result["catalog_quality_pipeline_scheduled"] is True
+        assert scheduled_quality_shop_ids == [shop.id]
         assert refreshed_shop is not None
         assert refreshed_shop.scrape_status == "success"
     finally:
@@ -479,7 +487,13 @@ def test_scrape_shop_runs_metalltorg_source_without_live_network(
             price_snapshots_saved=1,
         )
 
+    scheduled_quality_shop_ids: list[int] = []
     monkeypatch.setattr(scrape_runner, "scrape_metalltorg_shop", fake_scrape_metalltorg_shop)
+    monkeypatch.setattr(
+        worker_tasks.run_catalog_quality_pipeline,
+        "delay",
+        scheduled_quality_shop_ids.append,
+    )
 
     try:
         result = worker_tasks.scrape_shop.run(shop.id)
@@ -489,6 +503,8 @@ def test_scrape_shop_runs_metalltorg_source_without_live_network(
         assert result["source"] == "metalltorg"
         assert result["status"] == "success"
         assert result["products_seen"] == 1
+        assert result["catalog_quality_pipeline_scheduled"] is True
+        assert scheduled_quality_shop_ids == [shop.id]
         assert refreshed_shop is not None
         assert refreshed_shop.scrape_status == "success"
     finally:
