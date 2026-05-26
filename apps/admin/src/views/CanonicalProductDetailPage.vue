@@ -211,11 +211,11 @@ onMounted(() => {
     <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
       <div>
         <RouterLink
-          to="/products/normalization"
+          to="/canonical-products"
           class="inline-flex items-center gap-2 text-sm font-medium text-neutral-400 transition hover:text-white"
         >
           <Icon :icon="icons.arrowLeft" class="size-4" aria-hidden="true" />
-          Вернуться в нормализацию
+          К списку нормализованных
         </RouterLink>
         <p class="mt-5 flex items-center gap-2 text-sm font-medium text-amber-300">
           <Icon :icon="icons.package" class="size-4" aria-hidden="true" />

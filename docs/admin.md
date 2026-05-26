@@ -85,9 +85,12 @@ terminal commands:
 
 ## M12 Screens
 
-- `/`: product catalog inspection with search, shop/category filters,
+- `/products`: product catalog inspection with search, shop/category filters,
   normalized category, raw category, latest price, last-seen metadata, and
   links into price history.
+- `/canonical-products`: normalized canonical product list with search,
+  category/status filters, match counters, and links into the canonical detail
+  editor.
 - `/shops`: shop/source management for M13. It shows real shop identities,
   linked 2GIS/official source records, source priority, scrape status,
   last/next scrape times, error counts, hold/disabled/out-of-scope states, and
