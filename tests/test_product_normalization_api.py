@@ -474,7 +474,12 @@ def test_bulk_create_canonicals_skips_products_that_become_candidates(
         .where(CanonicalProduct.title == "Bulk Cement M500 50kg")
     )
     assert accepted_match is not None
-    assert accepted_match.reason == {"action": "accept", "note": "bulk page normalization"}
+    assert accepted_match.reason is not None
+    assert accepted_match.reason["action"] == "accept"
+    assert accepted_match.reason["note"] == "bulk page normalization"
+    assert accepted_match.reason["decision"]["action"] == "create_normalized_product"
+    assert accepted_match.reason["decision"]["positive_evidence"]
+    assert accepted_match.reason["decision"]["negative_evidence"]
     assert followup_candidate is not None
     assert followup_candidate.canonical_product_id == accepted_match.canonical_product_id
     assert followup_candidate.method == "exact_normalized_title"

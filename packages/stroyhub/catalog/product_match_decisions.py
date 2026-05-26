@@ -47,6 +47,7 @@ class ProductMatchDecision:
 class ProductMatchDecisionInput:
     actor: str | None = "admin"
     reason: str | None = None
+    decision: JsonObject | None = None
 
 
 class ProductMatchDecisionService:
@@ -268,4 +269,6 @@ def _decision_reason(
     reason: JsonObject = {"action": action}
     if data.reason is not None:
         reason["note"] = data.reason
+    if data.decision is not None:
+        reason["decision"] = data.decision
     return reason
