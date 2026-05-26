@@ -8,6 +8,7 @@ from apps.admin_api.categories import router as categories_router
 from apps.admin_api.errors import install_error_handlers
 from apps.admin_api.matches import router as matches_router
 from apps.admin_api.operations import router as operations_router
+from apps.admin_api.operator_decisions import router as operator_decisions_router
 from apps.admin_api.product_matches import router as product_matches_router
 from apps.admin_api.product_normalization import router as product_normalization_router
 from apps.admin_api.products import router as products_router
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
     app.include_router(canonical_products_router)
     app.include_router(categories_router)
     app.include_router(matches_router)
+    app.include_router(operator_decisions_router)
     app.include_router(product_normalization_router)
     app.include_router(product_matches_router)
     app.include_router(products_router)

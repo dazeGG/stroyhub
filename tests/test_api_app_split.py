@@ -46,6 +46,7 @@ def test_admin_api_exposes_admin_routes() -> None:
     assert "/health" in routes
     assert "/canonical-products" in routes
     assert "/catalog-quality/findings" in routes
+    assert "/operator-decisions" in routes
     assert "/product-matches/accept" in routes
     assert "/product-normalization/queue" in routes
     assert "/shop-source-candidates" in routes

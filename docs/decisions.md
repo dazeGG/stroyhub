@@ -377,3 +377,31 @@ before deployment now depends on M16, because the public catalog is only useful
 when the data-quality pipeline can keep normalized products, categories, and
 offers trustworthy. Admin UI and API work should be task-first rather than
 database-entity-first.
+
+## 2026-05-26: Capture Operator Decisions Before Promoting ML
+
+Context:
+M16 adds task-oriented admin review flows for categorization, normalization, and
+data-quality cleanup. Those decisions are valuable training and evaluation
+signals, but they are also operational audit events. The earlier category
+verifier work kept experimental labels and snapshots in `.var/ml`; that remains
+valid for model artifacts, but it does not capture the evidence and alternatives
+operators see in the admin workflow.
+
+Decision:
+Persist admin/operator decisions in PostgreSQL through `operator_decisions`.
+Each mutating review action should record actor, timestamp, action, affected
+source/canonical/match/category IDs, previous/new state, reason, evidence, and
+alternatives when available. Derived categorization and normalization evaluation
+datasets are built from that journal.
+
+ML remains offline/evaluation-first. Future predictors must show precision,
+recall, top-N category accuracy, and unsafe auto-accept rate before they can be
+considered for production use. Category predictor design continues in
+[#165](https://github.com/dazeGG/stroyhub/issues/165).
+
+Consequences:
+The first production path stays rule-based and explainable. A trained model may
+surface suggestions as review evidence, but it must not auto-accept or silently
+change categories unless protected-attribute checks and explainable safety gates
+pass and a later release decision explicitly allows it.

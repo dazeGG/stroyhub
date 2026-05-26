@@ -307,6 +307,28 @@ Allowed in M16:
 - evaluate future predictors offline;
 - use ML suggestions as review evidence.
 
+Evaluation datasets are derived from audited operator decisions:
+
+- categorization examples use accepted category override decisions and the
+  category alternatives shown to the operator;
+- normalization examples use accepted and rejected match decisions, including
+  evidence, blockers, alternatives, and final action.
+
+Future category predictors should report top-1 and top-N category accuracy.
+Future normalization predictors should report precision, recall, and unsafe
+auto-accept rate. An auto-accept is unsafe when the evaluated label disagrees,
+protected safety checks did not pass, or the predictor cannot provide an
+explainable decision contract.
+
+Graduating from rules to trained models requires:
+
+- enough recent operator decisions to build a representative evaluation set;
+- stable offline metrics across several snapshots;
+- explainable evidence that can be shown in the admin review workspace;
+- protected-attribute checks outside the model output;
+- an explicit follow-up decision linked to the category predictor design issue
+  [#165](https://github.com/dazeGG/stroyhub/issues/165).
+
 Not allowed without a later decision:
 
 - black-box auto-accept without protected-attribute checks;

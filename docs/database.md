@@ -516,6 +516,57 @@ Constraints and indexes:
 - Check: known `status`
 - Check: known `method`
 
+### `operator_decisions`
+
+Immutable journal of operator-visible decisions made through admin workflows.
+This table is operational audit data first and ML training/evaluation source
+data second.
+
+Core fields:
+
+- `id`: `bigint` primary key
+- `decision_type`: `text`, required, such as `categorization`,
+  `normalization`, or `data_quality`
+- `action`: `text`, required, such as `set_category_override`,
+  `attach_to_existing`, `create_normalized_product`, `reject_suggestion`, or
+  `mark_data_problem`
+- `entity_type`: `text`, required
+- `entity_id`: `bigint`, nullable
+- `source_product_id`: `bigint`, nullable reference to `source_products.id`
+- `canonical_product_id`: `bigint`, nullable reference to `canonical_products.id`
+- `product_match_id`: `bigint`, nullable reference to `product_matches.id`
+- `category_id`: `bigint`, nullable reference to `categories.id`
+- `actor`: `text`, nullable
+- `reason`: `text`, nullable
+- `previous_state`: `jsonb`, nullable
+- `new_state`: `jsonb`, nullable
+- `evidence`: `jsonb`, nullable
+- `alternatives`: `jsonb`, nullable
+- `metadata`: `jsonb`, nullable
+- `decided_at`: `timestamp with time zone`, required
+
+Rules:
+
+- Mutating admin actions should record actor, timestamp, final action,
+  previous/new state, and the evidence or alternatives shown to the operator
+  when available.
+- Derived ML datasets may read this table, but production catalog decisions
+  must remain explainable and protected by rule-based safety gates until a later
+  release decision changes that policy.
+- This table does not replace `product_matches.reason` or
+  `category_overrides`; those tables remain the current operational state, while
+  `operator_decisions` is the append-only history.
+
+Constraints and indexes:
+
+- Index: `decided_at`.
+- Index: `decision_type`.
+- Index: `source_product_id`.
+- Index: `canonical_product_id`.
+- Index: `product_match_id`.
+- Index: `category_id`.
+- Check: `decision_type`, `action`, and `entity_type` are not blank.
+
 ## PostgreSQL Type Rules
 
 Use these defaults unless a later decision changes them:

@@ -11,6 +11,10 @@ from stroyhub.catalog.normalization_decisions import (
     NormalizationDecision,
     decide_normalization,
 )
+from stroyhub.catalog.operator_decision_history import (
+    match_state,
+    record_operator_decision,
+)
 from stroyhub.catalog.product_match_generation import ProductMatchCandidateGenerator
 from stroyhub.catalog.quality_pipeline import CatalogQualityPipeline
 from stroyhub.catalog.query_helpers import escape_like_pattern
@@ -250,13 +254,32 @@ class ProductMatchAutoAcceptService:
     ) -> int:
         now = datetime.now(UTC)
         accepted = 0
-        for match, _source_product, _canonical, decision in rows:
+        for match, source_product, canonical, decision in rows:
             if self._has_accepted_match(match.source_product_id):
                 continue
+            previous_state = match_state(match)
             match.status = "accepted"
             match.reviewed_at = now
             match.reviewed_by = filters.actor
             match.reason = _reason(filters, decision=decision)
+            record_operator_decision(
+                self._session,
+                decision_type="normalization",
+                action=decision.action,
+                entity_type="product_match",
+                entity_id=match.id,
+                source_product_id=match.source_product_id,
+                canonical_product_id=match.canonical_product_id,
+                product_match_id=match.id,
+                category_id=source_product.category_id,
+                actor=filters.actor,
+                reason=filters.reason,
+                previous_state=previous_state,
+                new_state=match_state(match),
+                decision_context=decision.as_reason(),
+                metadata={"auto_accept": True, "canonical_title": canonical.title},
+                decided_at=now,
+            )
             accepted += 1
 
         self._session.flush()
