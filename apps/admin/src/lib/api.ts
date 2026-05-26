@@ -398,6 +398,11 @@ export interface ProductBulkNormalizationResponse {
   items: ProductBulkNormalizationItem[]
 }
 
+export interface ProductDataProblemRequest {
+  isNotProduct?: boolean
+  reason?: string
+}
+
 export interface ProductPriceSnapshot {
   id: number
   price: string | null
@@ -1073,15 +1078,23 @@ export function fetchProduct(
 export function assignProductCategoryOverride(
   productId: number,
   categoryId: number,
+  reasonOrSignal?: string | AbortSignal,
   signal?: AbortSignal,
 ): Promise<ProductSearchItem> {
+  const reason = typeof reasonOrSignal === 'string' ? reasonOrSignal.trim() : ''
+  const requestSignal = typeof reasonOrSignal === 'string' ? signal : reasonOrSignal
+
   return writeJson<ProductSearchItem>(
     `/products/${productId}/category-override`,
     {
       method: 'PUT',
-      body: JSON.stringify({ category_id: categoryId, actor: 'admin' }),
+      body: JSON.stringify({
+        category_id: categoryId,
+        actor: 'admin',
+        reason: reason || null,
+      }),
     },
-    signal,
+    requestSignal,
   )
 }
 
@@ -1092,6 +1105,25 @@ export function revertProductCategoryOverride(
   return writeJson<ProductSearchItem>(
     `/products/${productId}/category-override?actor=admin`,
     { method: 'DELETE' },
+    signal,
+  )
+}
+
+export function markProductDataProblem(
+  productId: number,
+  payload: ProductDataProblemRequest = {},
+  signal?: AbortSignal,
+): Promise<ProductSearchItem> {
+  return writeJson<ProductSearchItem>(
+    `/products/${productId}/data-problem`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        is_not_product: payload.isNotProduct ?? true,
+        actor: 'admin',
+        reason: payload.reason?.trim() || null,
+      }),
+    },
     signal,
   )
 }
