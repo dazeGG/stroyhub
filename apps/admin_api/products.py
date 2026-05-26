@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Path, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from stroyhub.catalog.products import ProductCatalog, ProductSearchFilters, ProductSort
+from stroyhub.catalog.quality_pipeline import CatalogQualityPipeline
 from stroyhub.db import get_session
 from stroyhub.db.repositories import (
     CategoryOverrideCreate,
@@ -13,6 +14,7 @@ from stroyhub.db.repositories import (
     CategoryOverrideRevert,
     CategoryRepository,
 )
+from stroyhub.models import SourceProduct
 
 from apps.admin_api.errors import ApiError, api_error_responses
 from apps.admin_api.validation import ActorName, ReasonText
@@ -196,6 +198,7 @@ def assign_product_category_override(
             actor=payload.actor,
         )
     )
+    _refresh_product_quality(session, product_id)
     session.commit()
 
     item = ProductCatalog(session).get_product(product_id)
@@ -236,6 +239,7 @@ def revert_product_category_override(
             message="Active category override not found",
         )
 
+    _refresh_product_quality(session, product_id)
     session.commit()
 
     item = ProductCatalog(session).get_product(product_id)
@@ -246,6 +250,13 @@ def revert_product_category_override(
             message="Source product not found",
         )
     return ProductSearchItemResponse.model_validate(item)
+
+
+def _refresh_product_quality(session: Session, product_id: int) -> None:
+    product = session.get(SourceProduct, product_id)
+    if product is None:
+        return
+    CatalogQualityPipeline(session).run_for_shop(product.shop_id)
 
 
 @router.get(

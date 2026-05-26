@@ -7,7 +7,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
-from stroyhub.db import ScrapeRunCreate, ScrapeRunRepository, ShopRepository, ShopUpsert
+from stroyhub.db import (
+    ScrapeRunCreate,
+    ScrapeRunRepository,
+    ShopRepository,
+    ShopUpsert,
+    SourceProductRepository,
+    SourceProductUpsert,
+)
 
 from apps.admin_api.main import create_app
 from apps.admin_api.products import get_session
@@ -127,6 +134,7 @@ def test_scrape_health_endpoint_returns_counts_and_recent_runs(
             "error": "timeout",
         }
     ]
+    assert payload["catalog_pipeline_status_counts"] == []
     assert "raw" not in payload["recent_runs"][0]
 
 
@@ -157,11 +165,53 @@ def test_scrape_health_endpoint_filters_by_status(
     assert success.id not in returned_ids
 
 
+def test_scrape_health_endpoint_reports_catalog_pipeline_status_counts(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="scrape-health-pipeline-shop", name="Pipeline")
+    )
+    SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="scrape-health-pipeline-product",
+            title="Pipeline Product",
+            normalized_title="pipeline product",
+            raw={
+                "catalog_quality": {
+                    "status": "processed",
+                    "cleanup": {"status": "passed"},
+                    "attributes": {"status": "passed"},
+                    "categorization": {"status": "assigned"},
+                    "normalization": {"status": "ready_to_accept"},
+                }
+            },
+        )
+    )
+
+    response = client.get("/scrapes/health", params={"source": "2gis", "shop": shop.id})
+
+    assert response.status_code == 200
+    assert response.json()["catalog_pipeline_status_counts"] == [
+        {"stage": "attributes", "status": "passed", "count": 1},
+        {"stage": "categorization", "status": "assigned", "count": 1},
+        {"stage": "cleanup", "status": "passed", "count": 1},
+        {"stage": "normalization", "status": "ready_to_accept", "count": 1},
+        {"stage": "pipeline", "status": "processed", "count": 1},
+    ]
+
+
 def test_scrape_health_endpoint_handles_empty_results(client: TestClient) -> None:
     response = client.get("/scrapes/health", params={"source": "missing-source"})
 
     assert response.status_code == 200
-    assert response.json() == {"status_counts": [], "recent_runs": []}
+    assert response.json() == {
+        "status_counts": [],
+        "recent_runs": [],
+        "catalog_pipeline_status_counts": [],
+    }
 
 
 def payload_ids(response: object) -> list[int]:
