@@ -70,23 +70,23 @@ const renderedContent = computed(() => {
 </script>
 
 <template>
-  <section class="min-h-screen bg-neutral-950 px-4 py-5 text-neutral-100 sm:px-6 lg:px-8">
+  <section class="min-h-screen bg-admin-surface px-4 py-5 text-admin-text sm:px-6 lg:px-8">
     <div class="mx-auto max-w-6xl space-y-7">
-      <header class="flex flex-col gap-5 border-b border-neutral-800 pb-5 sm:flex-row sm:items-center sm:justify-between">
+      <header class="flex flex-col gap-5 border-b border-admin-border pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+          <p class="inline-flex items-center gap-2 text-sm font-medium text-admin-link">
             <Icon :icon="icons.helpCircle" class="size-4" aria-hidden="true" />
             Помощь
           </p>
-          <h2 class="mt-2 text-2xl font-semibold text-white">Документация по админке</h2>
-          <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+          <h2 class="mt-2 text-2xl font-semibold text-admin-text">Документация по админке</h2>
+          <p class="mt-2 max-w-3xl text-sm leading-6 text-admin-text-muted">
             Markdown-разделы с примерами экранов, рабочими сценариями и правилами для follow-up issues.
           </p>
         </div>
 
         <RouterLink
           to="/"
-          class="inline-flex w-fit items-center rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-100 transition hover:border-amber-300/60 hover:text-amber-200"
+          class="inline-flex w-fit items-center rounded-md border border-admin-border-strong bg-admin-surface-muted px-3 py-2 text-sm font-medium text-admin-text transition hover:border-admin-border-strong hover:text-admin-link-hover"
         >
           <Icon :icon="icons.arrowLeft" class="mr-2 size-4" aria-hidden="true" />
           Назад в админку
@@ -101,8 +101,8 @@ const renderedContent = computed(() => {
           class="shrink-0 rounded-md border px-3 py-2 text-left transition"
           :class="
             selectedSlug === doc.slug
-              ? 'border-amber-400/40 bg-amber-400/10 text-amber-100'
-              : 'border-neutral-800 bg-neutral-900/40 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-900'
+              ? 'border-admin-border-strong bg-admin-surface-muted text-admin-link'
+              : 'border-admin-border bg-admin-surface text-admin-text-muted hover:border-admin-border-strong hover:bg-admin-surface-muted'
           "
           type="button"
           @click="selectedSlug = doc.slug"
@@ -114,7 +114,7 @@ const renderedContent = computed(() => {
         </button>
       </nav>
 
-      <article class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5 sm:p-7">
+      <article class="rounded-lg border border-admin-border bg-admin-surface p-5 sm:p-7">
         <div class="admin-markdown" v-html="renderedContent" />
       </article>
     </div>

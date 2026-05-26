@@ -163,17 +163,17 @@ onMounted(() => {
       <div>
         <RouterLink
           to="/categories"
-          class="mb-5 mr-3 inline-flex h-9 items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 text-sm font-medium text-neutral-300 transition hover:border-amber-300/50 hover:text-white"
+          class="mb-5 mr-3 inline-flex h-9 items-center gap-2 rounded-md border border-admin-border bg-admin-surface px-3 text-sm font-medium text-admin-text-muted transition hover:border-admin-border-strong hover:text-admin-text"
         >
           <Icon :icon="icons.arrowLeft" class="size-4" aria-hidden="true" />
           Категории
         </RouterLink>
-        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-admin-link">
           <Icon :icon="icons.category" class="size-4" aria-hidden="true" />
           Качество категорий
         </p>
-        <h2 class="mt-2 text-2xl font-semibold text-white">Проверка шумных категорий</h2>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+        <h2 class="mt-2 text-2xl font-semibold text-admin-text">Проверка шумных категорий</h2>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-admin-text-muted">
           Группируем некатегоризованные товары по исходной категории и собираем примеры для правок.
         </p>
       </div>
@@ -185,7 +185,7 @@ onMounted(() => {
         <select
           v-model="selectedSource"
           aria-label="Фильтр качества категорий по источнику"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
         >
           <option value="">Все источники</option>
           <option v-for="source in sourceOptions" :key="source" :value="source">
@@ -195,7 +195,7 @@ onMounted(() => {
         <select
           v-model="selectedShopId"
           aria-label="Фильтр качества категорий по магазину"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
         >
           <option value="">Все магазины</option>
           <option v-for="shop in filteredShopOptions" :key="shop.id" :value="String(shop.id)">
@@ -206,67 +206,67 @@ onMounted(() => {
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.shoppingBag" class="size-4" aria-hidden="true" />
           Всего товаров
         </p>
-        <p class="mt-3 text-3xl font-semibold text-white">{{ quality?.total_products || 0 }}</p>
+        <p class="mt-3 text-3xl font-semibold text-admin-text">{{ quality?.total_products || 0 }}</p>
       </div>
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.chartLine" class="size-4" aria-hidden="true" />
           Покрытие
         </p>
         <p
           class="mt-3 text-3xl font-semibold"
-          :class="coveragePercent < 90 ? 'text-amber-200' : 'text-white'"
+          :class="coveragePercent < 90 ? 'text-admin-link' : 'text-admin-text'"
         >
           {{ quality?.coverage_pct || '0.00' }}%
         </p>
       </div>
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.alertTriangle" class="size-4" aria-hidden="true" />
           Без категории
         </p>
         <p
           class="mt-3 text-3xl font-semibold"
-          :class="(quality?.uncategorized_products || 0) > 0 ? 'text-red-200' : 'text-white'"
+          :class="(quality?.uncategorized_products || 0) > 0 ? 'text-admin-danger' : 'text-admin-text'"
         >
           {{ quality?.uncategorized_products || 0 }}
         </p>
       </div>
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.listCheck" class="size-4" aria-hidden="true" />
           Групп на ревью
         </p>
-        <p class="mt-3 text-3xl font-semibold text-white">{{ quality?.groups.length || 0 }}</p>
+        <p class="mt-3 text-3xl font-semibold text-admin-text">{{ quality?.groups.length || 0 }}</p>
       </div>
     </div>
 
     <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div class="overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900/40">
-        <div class="flex items-center gap-2 border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+      <div class="overflow-hidden rounded-lg border border-admin-border bg-admin-surface">
+        <div class="flex items-center gap-2 border-b border-admin-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-admin-text-faint">
           <Icon :icon="icons.tags" class="size-4" aria-hidden="true" />
           Unmatched by source category
         </div>
 
-        <div v-if="isLoading" class="px-4 py-14 text-center text-sm text-neutral-500">
-          <Icon :icon="icons.category" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+        <div v-if="isLoading" class="px-4 py-14 text-center text-sm text-admin-text-faint">
+          <Icon :icon="icons.category" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
           Загружаем группы...
         </div>
 
         <div
           v-else-if="!quality || quality.groups.length === 0"
-          class="px-4 py-14 text-center text-sm text-neutral-500"
+          class="px-4 py-14 text-center text-sm text-admin-text-faint"
         >
-          <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+          <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
           Некатегоризованных групп по этим фильтрам нет.
         </div>
 
-        <div v-else class="divide-y divide-neutral-800">
+        <div v-else class="divide-y divide-admin-border">
           <div
             v-for="group in quality.groups"
             :key="`${group.source}:${group.shop_id}:${group.category_raw || '-'}`"
@@ -275,14 +275,14 @@ onMounted(() => {
           >
             <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div class="min-w-0">
-                <p class="truncate text-base font-semibold text-white" :title="group.category_raw || 'Без исходной категории'">
+                <p class="truncate text-base font-semibold text-admin-text" :title="group.category_raw || 'Без исходной категории'">
                   {{ group.category_raw || 'Без исходной категории' }}
                 </p>
-                <p class="mt-1 text-sm text-neutral-500">
+                <p class="mt-1 text-sm text-admin-text-faint">
                   {{ group.shop_name }} · {{ group.source }} · {{ group.shop_source_id }}
                 </p>
               </div>
-              <span class="w-fit rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-xs text-amber-200">
+              <span class="w-fit rounded-full border border-admin-border-strong bg-admin-surface-muted px-2 py-1 text-xs text-admin-link">
                 {{ group.count }} товаров
               </span>
             </div>
@@ -290,7 +290,7 @@ onMounted(() => {
               <li
                 v-for="title in group.titles"
                 :key="title"
-                class="rounded-md bg-neutral-950/50 px-3 py-2 text-sm text-neutral-300"
+                class="rounded-md bg-admin-surface-subtle px-3 py-2 text-sm text-admin-text-muted"
               >
                 {{ title }}
               </li>
@@ -301,7 +301,7 @@ onMounted(() => {
 
       <div class="space-y-3">
         <button
-          class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-sm font-medium text-amber-100 transition hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
+          class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-admin-border-strong bg-admin-surface-muted px-3 text-sm font-medium text-admin-link transition hover:border-admin-primary disabled:cursor-not-allowed disabled:opacity-40"
           :disabled="!exportText"
           type="button"
           @click="copyExportText"
@@ -310,7 +310,7 @@ onMounted(() => {
           Скопировать отчет
         </button>
         <textarea
-          class="min-h-[420px] w-full resize-y rounded-lg border border-neutral-800 bg-neutral-950 p-3 font-mono text-xs leading-5 text-neutral-300 outline-none focus:border-amber-400"
+          class="min-h-[420px] w-full resize-y rounded-lg border border-admin-border bg-admin-surface p-3 font-mono text-xs leading-5 text-admin-text-muted outline-none focus:border-admin-focus"
           readonly
           :value="exportText"
         />

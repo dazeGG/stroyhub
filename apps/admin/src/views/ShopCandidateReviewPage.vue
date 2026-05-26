@@ -73,16 +73,16 @@ function statusLabel(status: ShopSourceCandidateStatus): string {
 
 function statusClass(status: ShopSourceCandidateStatus): string {
   if (status === 'pending') {
-    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+    return 'border-admin-success-border bg-admin-success-soft text-admin-success'
   }
   if (status === 'stale') {
-    return 'border-amber-400/30 bg-amber-400/10 text-amber-200'
+    return 'border-admin-border-strong bg-admin-surface-muted text-admin-link'
   }
   if (status === 'approved') {
-    return 'border-sky-400/30 bg-sky-400/10 text-sky-200'
+    return 'border-admin-border-strong bg-admin-surface-muted text-admin-text'
   }
 
-  return 'border-neutral-700 bg-neutral-900 text-neutral-400'
+  return 'border-admin-border-strong bg-admin-surface-muted text-admin-text-muted'
 }
 
 function canApprove(candidate: ShopSourceCandidate): boolean {
@@ -288,50 +288,50 @@ onMounted(() => {
       <div>
         <RouterLink
           to="/shops"
-          class="mb-5 mr-3 inline-flex h-9 items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 text-sm font-medium text-neutral-300 transition hover:border-amber-300/50 hover:text-white"
+          class="mb-5 mr-3 inline-flex h-9 items-center gap-2 rounded-md border border-admin-border bg-admin-surface px-3 text-sm font-medium text-admin-text-muted transition hover:border-admin-border-strong hover:text-admin-text"
         >
           <Icon :icon="icons.arrowLeft" class="size-4" aria-hidden="true" />
           Магазины
         </RouterLink>
-        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-admin-link">
           <Icon :icon="icons.databaseImport" class="size-4" aria-hidden="true" />
           Кандидаты источников
         </p>
-        <h2 class="mt-2 text-2xl font-semibold text-white">Подтверждение магазинов из 2GIS</h2>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+        <h2 class="mt-2 text-2xl font-semibold text-admin-text">Подтверждение магазинов из 2GIS</h2>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-admin-text-muted">
           Новые магазины попадают сюда перед тем, как стать отслеживаемыми источниками. Приоритет выше у кандидатов с ценами и сайтом.
         </p>
       </div>
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.listCheck" class="size-4" aria-hidden="true" />
           Ожидают
         </p>
-        <p class="mt-3 text-3xl font-semibold text-white">{{ pendingCount }}</p>
+        <p class="mt-3 text-3xl font-semibold text-admin-text">{{ pendingCount }}</p>
       </div>
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.currencyRubel" class="size-4" aria-hidden="true" />
           С ценами
         </p>
-        <p class="mt-3 text-3xl font-semibold text-white">{{ pricedCount }}</p>
+        <p class="mt-3 text-3xl font-semibold text-admin-text">{{ pricedCount }}</p>
       </div>
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.externalLink" class="size-4" aria-hidden="true" />
           С сайтом
         </p>
-        <p class="mt-3 text-3xl font-semibold text-white">{{ websiteCount }}</p>
+        <p class="mt-3 text-3xl font-semibold text-admin-text">{{ websiteCount }}</p>
       </div>
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.alertTriangle" class="size-4" aria-hidden="true" />
           Пропали
         </p>
-        <p class="mt-3 text-3xl font-semibold" :class="staleCount > 0 ? 'text-amber-200' : 'text-white'">
+        <p class="mt-3 text-3xl font-semibold" :class="staleCount > 0 ? 'text-admin-link' : 'text-admin-text'">
           {{ staleCount }}
         </p>
       </div>
@@ -339,25 +339,25 @@ onMounted(() => {
 
     <div
       v-if="lastRefresh"
-      class="grid gap-3 rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-400 md:grid-cols-5"
+      class="grid gap-3 rounded-lg border border-admin-border bg-admin-surface p-4 text-sm text-admin-text-muted md:grid-cols-5"
     >
-      <p>Проверено: <span class="text-neutral-100">{{ lastRefresh.checked }}</span></p>
-      <p>Новых: <span class="text-neutral-100">{{ lastRefresh.created }}</span></p>
-      <p>Обновлено: <span class="text-neutral-100">{{ lastRefresh.updated }}</span></p>
-      <p>Пропали: <span class="text-neutral-100">{{ lastRefresh.stale }}</span></p>
-      <p>Уже утверждены: <span class="text-neutral-100">{{ lastRefresh.skipped_approved }}</span></p>
+      <p>Проверено: <span class="text-admin-text">{{ lastRefresh.checked }}</span></p>
+      <p>Новых: <span class="text-admin-text">{{ lastRefresh.created }}</span></p>
+      <p>Обновлено: <span class="text-admin-text">{{ lastRefresh.updated }}</span></p>
+      <p>Пропали: <span class="text-admin-text">{{ lastRefresh.stale }}</span></p>
+      <p>Уже утверждены: <span class="text-admin-text">{{ lastRefresh.skipped_approved }}</span></p>
     </div>
 
-    <div class="flex flex-col gap-3 border-t border-neutral-800 pt-5 lg:flex-row lg:items-center lg:justify-between">
+    <div class="flex flex-col gap-3 border-t border-admin-border pt-5 lg:flex-row lg:items-center lg:justify-between">
       <div>
-        <h3 class="text-base font-semibold text-white">Магазины 2GIS</h3>
-        <p class="mt-1 text-sm text-neutral-500">Кандидаты из поиска 2GIS с полезными сигналами для добавления источников.</p>
+        <h3 class="text-base font-semibold text-admin-text">Магазины 2GIS</h3>
+        <p class="mt-1 text-sm text-admin-text-faint">Кандидаты из поиска 2GIS с полезными сигналами для добавления источников.</p>
       </div>
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
         <select
           v-model="selectedStatus"
           aria-label="Фильтр кандидатов по статусу"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           @change="loadCandidates"
         >
           <option value="">Все кандидаты</option>
@@ -368,7 +368,7 @@ onMounted(() => {
         </select>
         <button
           type="button"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-primary px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="isRefreshing"
           @click="refreshCandidates"
         >
@@ -378,59 +378,59 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="isLoading" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">
+    <div v-if="isLoading" class="rounded-lg border border-admin-border bg-admin-surface p-8 text-center text-sm text-admin-text-faint">
       Загружаем кандидатов...
     </div>
 
-    <div v-else-if="candidates.length === 0" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center">
-      <Icon :icon="icons.databaseImport" class="mx-auto mb-3 size-7 text-neutral-600" aria-hidden="true" />
-      <p class="text-sm font-medium text-neutral-200">Кандидатов пока нет</p>
-      <p class="mt-2 text-sm text-neutral-500">Обновите список из 2GIS, чтобы загрузить магазины на подтверждение.</p>
+    <div v-else-if="candidates.length === 0" class="rounded-lg border border-admin-border bg-admin-surface p-8 text-center">
+      <Icon :icon="icons.databaseImport" class="mx-auto mb-3 size-7 text-admin-text-faint" aria-hidden="true" />
+      <p class="text-sm font-medium text-admin-text">Кандидатов пока нет</p>
+      <p class="mt-2 text-sm text-admin-text-faint">Обновите список из 2GIS, чтобы загрузить магазины на подтверждение.</p>
     </div>
 
     <div v-else class="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
       <article
         v-for="group in candidateGroups"
         :key="group.key"
-        class="flex min-h-[260px] flex-col rounded-lg border border-amber-400/20 bg-neutral-900/40 p-4"
+        class="flex min-h-[260px] flex-col rounded-lg border border-admin-border-strong bg-admin-surface p-4"
       >
         <div class="min-h-[92px]">
           <div class="flex flex-wrap items-center gap-2">
-            <h3 class="text-base font-semibold text-white">{{ group.label }}</h3>
-            <span class="rounded-full border border-neutral-700 bg-neutral-900 px-2 py-0.5 text-xs font-medium text-neutral-300">
+            <h3 class="text-base font-semibold text-admin-text">{{ group.label }}</h3>
+            <span class="rounded-full border border-admin-border-strong bg-admin-surface-muted px-2 py-0.5 text-xs font-medium text-admin-text-muted">
               {{ group.size }} источника
             </span>
             <span
               v-if="group.official_strategy"
-              class="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-xs font-medium text-amber-100"
+              class="inline-flex items-center gap-1 rounded-full border border-admin-border-strong bg-admin-surface-muted px-2 py-0.5 text-xs font-medium text-admin-link"
             >
               <Icon :icon="icons.shieldLock" class="size-3.5" aria-hidden="true" />
               {{ group.official_strategy.label }}
             </span>
           </div>
-          <p class="mt-2 text-sm text-neutral-500">
+          <p class="mt-2 text-sm text-admin-text-faint">
             Группа похожих 2GIS-кандидатов. Source-записи остаются отдельными до решения оператора.
           </p>
         </div>
 
-        <div class="mt-4 grid flex-1 gap-3 border-t border-neutral-800 pt-4">
+        <div class="mt-4 grid flex-1 gap-3 border-t border-admin-border pt-4">
           <div
             v-for="candidate in group.items"
             :key="candidate.id"
-            class="rounded-md border border-neutral-800 bg-neutral-950/40 p-3"
+            class="rounded-md border border-admin-border bg-admin-surface-subtle p-3"
           >
             <div class="flex flex-wrap items-center gap-2">
-              <p class="text-sm font-medium text-white">{{ candidate.display_name }}</p>
+              <p class="text-sm font-medium text-admin-text">{{ candidate.display_name }}</p>
               <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="statusClass(candidate.status)">
                 {{ statusLabel(candidate.status) }}
               </span>
             </div>
-            <p class="mt-1 text-xs text-neutral-500">{{ candidate.address || 'Адрес не указан' }}</p>
-            <p class="mt-1 font-mono text-xs text-neutral-600">2GIS · {{ candidate.source_id }}</p>
+            <p class="mt-1 text-xs text-admin-text-faint">{{ candidate.address || 'Адрес не указан' }}</p>
+            <p class="mt-1 font-mono text-xs text-admin-text-faint">2GIS · {{ candidate.source_id }}</p>
             <div class="mt-3 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
-                class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-sky-400/30 bg-sky-400/10 px-2.5 text-xs font-semibold text-sky-100 transition hover:border-sky-300 hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-admin-border-strong bg-admin-surface-muted px-2.5 text-xs font-semibold text-admin-text transition hover:border-admin-border-strong hover:bg-admin-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="!canVerify(candidate) || verifyingCandidateId === candidate.id"
                 @click="verifyCandidate(candidate)"
               >
@@ -440,7 +440,7 @@ onMounted(() => {
               <button
                 v-if="candidate.suggested_identity"
                 type="button"
-                class="inline-flex h-8 items-center justify-center rounded-md border border-neutral-700 px-2.5 text-xs font-semibold text-neutral-300 transition hover:border-amber-300 hover:text-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-8 items-center justify-center rounded-md border border-admin-border-strong px-2.5 text-xs font-semibold text-admin-text-muted transition hover:border-admin-primary hover:text-admin-link-hover disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
                 @click="approveCandidate(candidate)"
               >
@@ -448,7 +448,7 @@ onMounted(() => {
               </button>
               <button
                 type="button"
-                class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-emerald-300 px-2.5 text-xs font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-admin-success px-2.5 text-xs font-semibold text-admin-primary-text transition hover:bg-admin-success disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
                 @click="approveCandidate(candidate, candidate.suggested_identity?.id)"
               >
@@ -469,7 +469,7 @@ onMounted(() => {
           <button
             v-if="group.official_strategy"
             type="button"
-            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-amber-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-admin-primary px-3 text-xs font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="materializingOfficialSource === group.official_strategy.source"
             @click="materializeOfficialGroup(group)"
           >
@@ -487,70 +487,70 @@ onMounted(() => {
       <article
         v-for="candidate in ungroupedCandidates"
         :key="candidate.id"
-        class="flex min-h-[260px] flex-col rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
+        class="flex min-h-[260px] flex-col rounded-lg border border-admin-border bg-admin-surface p-4"
       >
         <div class="min-h-[92px]">
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
-              <h3 class="text-base font-semibold text-white">{{ candidate.display_name }}</h3>
+              <h3 class="text-base font-semibold text-admin-text">{{ candidate.display_name }}</h3>
               <span class="rounded-full border px-2 py-0.5 text-xs font-medium" :class="statusClass(candidate.status)">
                 {{ statusLabel(candidate.status) }}
               </span>
               <span
                 v-if="candidate.official_strategy"
-                class="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-xs font-medium text-amber-100"
+                class="inline-flex items-center gap-1 rounded-full border border-admin-border-strong bg-admin-surface-muted px-2 py-0.5 text-xs font-medium text-admin-link"
               >
                 <Icon :icon="icons.shieldLock" class="size-3.5" aria-hidden="true" />
                 {{ candidate.official_strategy.label }}
               </span>
             </div>
-            <p class="mt-2 text-sm text-neutral-500">{{ candidate.address || 'Адрес не указан' }}</p>
-            <p class="mt-1 font-mono text-xs text-neutral-600">2GIS · {{ candidate.source_id }}</p>
+            <p class="mt-2 text-sm text-admin-text-faint">{{ candidate.address || 'Адрес не указан' }}</p>
+            <p class="mt-1 font-mono text-xs text-admin-text-faint">2GIS · {{ candidate.source_id }}</p>
           </div>
         </div>
 
-        <div class="mt-4 grid flex-1 gap-4 border-t border-neutral-800 pt-4 text-sm text-neutral-400">
+        <div class="mt-4 grid flex-1 gap-4 border-t border-admin-border pt-4 text-sm text-admin-text-muted">
           <div>
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Сигналы 2GIS</p>
+            <p class="text-xs uppercase tracking-wide text-admin-text-faint">Сигналы 2GIS</p>
             <div class="mt-2 flex flex-wrap gap-2">
               <span
                 v-if="candidate.has_prices"
-                class="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-200"
+                class="inline-flex items-center gap-1 rounded-full border border-admin-success-border bg-admin-success-soft px-2.5 py-1 text-xs font-medium text-admin-success"
               >
                 <Icon :icon="icons.currencyRubel" class="size-3.5" aria-hidden="true" />
                 Есть товары и цены
               </span>
               <span
                 v-if="candidate.has_website"
-                class="inline-flex items-center gap-1 rounded-full border border-sky-400/30 bg-sky-400/10 px-2.5 py-1 text-xs font-medium text-sky-200"
+                class="inline-flex items-center gap-1 rounded-full border border-admin-border-strong bg-admin-surface-muted px-2.5 py-1 text-xs font-medium text-admin-text"
               >
                 <Icon :icon="icons.externalLink" class="size-3.5" aria-hidden="true" />
                 Есть сайт
               </span>
             </div>
-            <p class="mt-2 text-xs text-neutral-500">
+            <p class="mt-2 text-xs text-admin-text-faint">
               Ссылка на сайт и товары подтягиваются после утверждения источника.
             </p>
           </div>
           <div>
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Последняя проверка</p>
-            <p class="mt-2 text-neutral-200">{{ formatDateTime(candidate.last_checked_at) }}</p>
-            <p v-if="candidate.missing_since" class="mt-1 text-xs text-amber-200">
+            <p class="text-xs uppercase tracking-wide text-admin-text-faint">Последняя проверка</p>
+            <p class="mt-2 text-admin-text">{{ formatDateTime(candidate.last_checked_at) }}</p>
+            <p v-if="candidate.missing_since" class="mt-1 text-xs text-admin-link">
               Не найден с {{ formatDateTime(candidate.missing_since) }}
             </p>
           </div>
           <div
             v-if="candidate.suggested_identity"
-            class="rounded-md border border-amber-400/20 bg-amber-400/5 p-3"
+            class="rounded-md border border-admin-border-strong bg-admin-surface-muted p-3"
           >
-            <p class="text-xs uppercase tracking-wide text-amber-200/70">Похожий магазин</p>
+            <p class="text-xs uppercase tracking-wide text-admin-link">Похожий магазин</p>
             <div class="mt-2 flex flex-wrap items-center gap-2">
-              <p class="font-medium text-amber-50">{{ candidate.suggested_identity.display_name }}</p>
-              <span class="rounded-full border border-amber-300/30 px-2 py-0.5 text-xs text-amber-100">
+              <p class="font-medium text-admin-link">{{ candidate.suggested_identity.display_name }}</p>
+              <span class="rounded-full border border-admin-border-strong px-2 py-0.5 text-xs text-admin-link">
                 источников: {{ candidate.suggested_identity.source_count }}
               </span>
             </div>
-            <p class="mt-2 text-xs text-neutral-500">
+            <p class="mt-2 text-xs text-admin-text-faint">
               Можно добавить этот 2GIS-адрес как филиал существующего магазина.
             </p>
           </div>
@@ -559,7 +559,7 @@ onMounted(() => {
         <div class="mt-4 flex flex-wrap justify-end gap-2">
           <button
             type="button"
-            class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-sky-400/30 bg-sky-400/10 px-3 text-xs font-semibold text-sky-100 transition hover:border-sky-300 hover:bg-sky-300/15 disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-admin-border-strong bg-admin-surface-muted px-3 text-xs font-semibold text-admin-text transition hover:border-admin-border-strong hover:bg-admin-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="!canVerify(candidate) || verifyingCandidateId === candidate.id"
             @click="verifyCandidate(candidate)"
           >
@@ -569,7 +569,7 @@ onMounted(() => {
           <button
             v-if="candidate.suggested_identity"
             type="button"
-            class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-semibold text-neutral-300 transition hover:border-amber-300 hover:text-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-admin-border-strong px-3 text-xs font-semibold text-admin-text-muted transition hover:border-admin-primary hover:text-admin-link-hover disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
             @click="approveCandidate(candidate)"
           >
@@ -577,7 +577,7 @@ onMounted(() => {
           </button>
           <button
             type="button"
-            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-300 px-3 text-xs font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-admin-success px-3 text-xs font-semibold text-admin-primary-text transition hover:bg-admin-success disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="!canApprove(candidate) || approvingCandidateId === candidate.id"
             @click="approveCandidate(candidate, candidate.suggested_identity?.id)"
           >

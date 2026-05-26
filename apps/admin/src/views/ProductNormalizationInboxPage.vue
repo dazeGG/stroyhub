@@ -107,19 +107,19 @@ function stateLabel(state: ProductNormalizationState): string {
 
 function stateClass(state: ProductNormalizationState): string {
   if (state === 'ineligible') {
-    return 'border-red-400/30 bg-red-400/10 text-red-200'
+    return 'border-admin-danger-border bg-admin-danger-soft text-admin-danger'
   }
   if (state === 'needs_review') {
-    return 'border-amber-400/30 bg-amber-400/10 text-amber-200'
+    return 'border-admin-border-strong bg-admin-surface-muted text-admin-link'
   }
   if (state === 'candidate_match') {
-    return 'border-sky-400/30 bg-sky-400/10 text-sky-200'
+    return 'border-admin-border-strong bg-admin-surface-muted text-admin-text'
   }
   if (state === 'accepted') {
-    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+    return 'border-admin-success-border bg-admin-success-soft text-admin-success'
   }
 
-  return 'border-neutral-700 bg-neutral-900 text-neutral-300'
+  return 'border-admin-border-strong bg-admin-surface-muted text-admin-text-muted'
 }
 
 function categoryLabel(item: ProductNormalizationQueueItem): string {
@@ -569,28 +569,28 @@ onMounted(() => {
   <section class="space-y-6">
     <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
       <div>
-        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-admin-link">
           <Icon :icon="icons.listCheck" class="size-4" aria-hidden="true" />
           Нормализация товаров
         </p>
-        <h2 class="mt-2 text-2xl font-semibold text-white">Inbox исходных карточек</h2>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+        <h2 class="mt-2 text-2xl font-semibold text-admin-text">Inbox исходных карточек</h2>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-admin-text-muted">
           Очередь решает, какие source products могут стать нормализованными товарами, а какие нужно оставить вне каталога.
         </p>
       </div>
 
       <div class="grid gap-3 sm:grid-cols-3 2xl:min-w-[640px]" data-testid="product-normalization-metrics">
-        <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">В текущем статусе</p>
-          <p class="mt-2 text-2xl font-semibold text-white">{{ total }}</p>
+        <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
+          <p class="text-xs uppercase tracking-wide text-admin-text-faint">В текущем статусе</p>
+          <p class="mt-2 text-2xl font-semibold text-admin-text">{{ total }}</p>
         </div>
-        <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">В работе</p>
-          <p class="mt-2 text-2xl font-semibold text-white">{{ workQueueCount }}</p>
+        <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
+          <p class="text-xs uppercase tracking-wide text-admin-text-faint">В работе</p>
+          <p class="mt-2 text-2xl font-semibold text-admin-text">{{ workQueueCount }}</p>
         </div>
-        <div class="rounded-lg border border-red-400/20 bg-red-400/10 p-4">
-          <p class="text-xs uppercase tracking-wide text-red-200/80">Заблокировано</p>
-          <p class="mt-2 text-2xl font-semibold text-red-100">{{ blockedCount }}</p>
+        <div class="rounded-lg border border-admin-danger-border bg-admin-danger-soft p-4">
+          <p class="text-xs uppercase tracking-wide text-admin-danger">Заблокировано</p>
+          <p class="mt-2 text-2xl font-semibold text-admin-danger">{{ blockedCount }}</p>
         </div>
       </div>
     </div>
@@ -601,7 +601,7 @@ onMounted(() => {
         :key="status.value"
         type="button"
         class="min-w-40 rounded-lg border px-4 py-3 text-left transition"
-        :class="selectedState === status.value ? stateClass(status.value) : 'border-neutral-800 bg-neutral-900/40 text-neutral-400 hover:border-neutral-700 hover:text-white'"
+        :class="selectedState === status.value ? stateClass(status.value) : 'border-admin-border bg-admin-surface text-admin-text-muted hover:border-admin-border-strong hover:text-admin-text'"
         @click="selectedState = status.value"
       >
         <span class="block text-sm font-semibold">{{ status.label }}</span>
@@ -609,14 +609,14 @@ onMounted(() => {
       </button>
     </div>
 
-    <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4" data-testid="product-normalization-filters">
+    <div class="rounded-lg border border-admin-border bg-admin-surface p-4" data-testid="product-normalization-filters">
       <div class="grid gap-3 lg:grid-cols-[1.3fr_0.8fr_1fr_1fr_auto_auto]">
         <label class="relative block">
-          <Icon :icon="icons.search" class="pointer-events-none absolute left-3 top-3 size-4 text-neutral-600" aria-hidden="true" />
+          <Icon :icon="icons.search" class="pointer-events-none absolute left-3 top-3 size-4 text-admin-text-faint" aria-hidden="true" />
           <input
             v-model="searchQuery"
             type="search"
-            class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+            class="h-10 w-full rounded-md border border-admin-border bg-admin-surface pl-9 pr-3 text-sm text-admin-text outline-none transition placeholder:text-admin-text-faint focus:border-admin-focus"
             placeholder="Поиск по названию"
             aria-label="Поиск по названию исходного товара"
             @keyup.enter="clearOperationPreviews(); loadQueue()"
@@ -626,7 +626,7 @@ onMounted(() => {
         <select
           v-model="selectedSource"
           aria-label="Фильтр по источнику"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          class="h-10 rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
         >
           <option value="">Все источники</option>
           <option v-for="source in sourceOptions" :key="source" :value="source">
@@ -637,7 +637,7 @@ onMounted(() => {
         <select
           v-model="selectedShopId"
           aria-label="Фильтр по магазину"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          class="h-10 rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
         >
           <option value="">Все магазины</option>
           <option v-for="shop in filteredShopOptions" :key="shop.id" :value="String(shop.id)">
@@ -648,7 +648,7 @@ onMounted(() => {
         <select
           v-model="selectedCategoryId"
           aria-label="Фильтр по категории"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          class="h-10 rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
         >
           <option value="">Все категории</option>
           <option v-for="category in categoryOptions" :key="category.id" :value="String(category.id)">
@@ -658,7 +658,7 @@ onMounted(() => {
 
         <button
           type="button"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-primary px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover"
           @click="clearOperationPreviews(); loadQueue()"
         >
           <Icon :icon="icons.filter" class="size-4" aria-hidden="true" />
@@ -667,7 +667,7 @@ onMounted(() => {
 
         <button
           type="button"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-800 px-4 text-sm font-semibold text-neutral-300 transition hover:border-neutral-700 hover:text-white"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-admin-border px-4 text-sm font-semibold text-admin-text-muted transition hover:border-admin-border-strong hover:text-admin-text"
           @click="resetFilters"
         >
           <Icon :icon="icons.x" class="size-4" aria-hidden="true" />
@@ -678,23 +678,23 @@ onMounted(() => {
 
     <div
       v-if="canBulkNormalize"
-      class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
+      class="rounded-lg border border-admin-border bg-admin-surface p-4"
       data-testid="product-bulk-normalize"
     >
       <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <p class="inline-flex items-center gap-2 text-sm font-semibold text-white">
-            <Icon :icon="icons.plus" class="size-4 text-amber-300" aria-hidden="true" />
+          <p class="inline-flex items-center gap-2 text-sm font-semibold text-admin-text">
+            <Icon :icon="icons.plus" class="size-4 text-admin-link" aria-hidden="true" />
             Нормализовать страницу
           </p>
-          <p class="mt-1 max-w-3xl text-sm leading-6 text-neutral-400">
+          <p class="mt-1 max-w-3xl text-sm leading-6 text-admin-text-muted">
             Создаем canonical для отображаемых карточек без кандидатов; появившиеся кандидаты остаются на ручную проверку.
           </p>
         </div>
 
         <button
           type="button"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-primary px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-wait disabled:opacity-60"
           :disabled="isBulkNormalizing"
           @click="previewBulkNormalizeProducts"
         >
@@ -705,27 +705,27 @@ onMounted(() => {
 
       <div
         v-if="bulkNormalizePreview"
-        class="mt-4 grid gap-3 border-t border-neutral-800 pt-4 xl:grid-cols-[1fr_auto]"
+        class="mt-4 grid gap-3 border-t border-admin-border pt-4 xl:grid-cols-[1fr_auto]"
       >
         <dl class="grid gap-3 sm:grid-cols-3">
-          <div class="rounded-md border border-neutral-800 bg-neutral-950 p-3">
-            <dt class="text-xs uppercase tracking-wide text-neutral-600">На странице</dt>
-            <dd class="mt-1 text-xl font-semibold text-white">{{ bulkNormalizePreview.page_size }}</dd>
+          <div class="rounded-md border border-admin-border bg-admin-surface p-3">
+            <dt class="text-xs uppercase tracking-wide text-admin-text-faint">На странице</dt>
+            <dd class="mt-1 text-xl font-semibold text-admin-text">{{ bulkNormalizePreview.page_size }}</dd>
           </div>
-          <div class="rounded-md border border-amber-400/30 bg-amber-400/10 p-3">
-            <dt class="text-xs uppercase tracking-wide text-amber-200/80">Создать</dt>
-            <dd class="mt-1 text-xl font-semibold text-amber-100">{{ bulkNormalizePreview.would_create }}</dd>
+          <div class="rounded-md border border-admin-border-strong bg-admin-surface-muted p-3">
+            <dt class="text-xs uppercase tracking-wide text-admin-link">Создать</dt>
+            <dd class="mt-1 text-xl font-semibold text-admin-link">{{ bulkNormalizePreview.would_create }}</dd>
           </div>
-          <div class="rounded-md border border-neutral-800 bg-neutral-950 p-3">
-            <dt class="text-xs uppercase tracking-wide text-neutral-600">Всего в фильтре</dt>
-            <dd class="mt-1 text-xl font-semibold text-neutral-200">{{ bulkNormalizePreview.total }}</dd>
+          <div class="rounded-md border border-admin-border bg-admin-surface p-3">
+            <dt class="text-xs uppercase tracking-wide text-admin-text-faint">Всего в фильтре</dt>
+            <dd class="mt-1 text-xl font-semibold text-admin-text">{{ bulkNormalizePreview.total }}</dd>
           </div>
         </dl>
 
         <div class="flex flex-col gap-2 sm:flex-row xl:items-start">
           <button
             type="button"
-            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-primary px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="isBulkNormalizing || bulkNormalizePreview.would_create === 0"
             @click="applyBulkNormalizeProducts"
           >
@@ -734,7 +734,7 @@ onMounted(() => {
           </button>
           <button
             type="button"
-            class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-700 px-4 text-sm font-semibold text-neutral-300 transition hover:border-neutral-600 hover:text-white"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-admin-border-strong px-4 text-sm font-semibold text-admin-text-muted transition hover:border-admin-border-strong hover:text-admin-text"
             @click="clearBulkNormalizePreview"
           >
             <Icon :icon="icons.x" class="size-4" aria-hidden="true" />
@@ -746,23 +746,23 @@ onMounted(() => {
 
     <div
       v-if="canAutoAccept"
-      class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
+      class="rounded-lg border border-admin-border bg-admin-surface p-4"
       data-testid="product-match-auto-accept"
     >
       <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <p class="inline-flex items-center gap-2 text-sm font-semibold text-white">
-            <Icon :icon="icons.check" class="size-4 text-emerald-300" aria-hidden="true" />
+          <p class="inline-flex items-center gap-2 text-sm font-semibold text-admin-text">
+            <Icon :icon="icons.check" class="size-4 text-admin-success" aria-hidden="true" />
             Автопринятие точных кандидатов
           </p>
-          <p class="mt-1 max-w-3xl text-sm leading-6 text-neutral-400">
+          <p class="mt-1 max-w-3xl text-sm leading-6 text-admin-text-muted">
             Проверяем текущие фильтры: 100% exact title, одна пара на карточку, совпадающая категория.
           </p>
         </div>
 
         <button
           type="button"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-emerald-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-wait disabled:opacity-60"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-success px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-success disabled:cursor-wait disabled:opacity-60"
           :disabled="isAutoAccepting"
           @click="previewAutoAcceptCandidates"
         >
@@ -773,27 +773,27 @@ onMounted(() => {
 
       <div
         v-if="autoAcceptPreview"
-        class="mt-4 grid gap-3 border-t border-neutral-800 pt-4 xl:grid-cols-[1fr_auto]"
+        class="mt-4 grid gap-3 border-t border-admin-border pt-4 xl:grid-cols-[1fr_auto]"
       >
         <dl class="grid gap-3 sm:grid-cols-3">
-          <div class="rounded-md border border-neutral-800 bg-neutral-950 p-3">
-            <dt class="text-xs uppercase tracking-wide text-neutral-600">Кандидатов</dt>
-            <dd class="mt-1 text-xl font-semibold text-white">{{ autoAcceptPreview.candidates_seen }}</dd>
+          <div class="rounded-md border border-admin-border bg-admin-surface p-3">
+            <dt class="text-xs uppercase tracking-wide text-admin-text-faint">Кандидатов</dt>
+            <dd class="mt-1 text-xl font-semibold text-admin-text">{{ autoAcceptPreview.candidates_seen }}</dd>
           </div>
-          <div class="rounded-md border border-emerald-400/30 bg-emerald-400/10 p-3">
-            <dt class="text-xs uppercase tracking-wide text-emerald-200/80">Можно принять</dt>
-            <dd class="mt-1 text-xl font-semibold text-emerald-100">{{ autoAcceptPreview.would_accept }}</dd>
+          <div class="rounded-md border border-admin-success-border bg-admin-success-soft p-3">
+            <dt class="text-xs uppercase tracking-wide text-admin-success">Можно принять</dt>
+            <dd class="mt-1 text-xl font-semibold text-admin-success">{{ autoAcceptPreview.would_accept }}</dd>
           </div>
-          <div class="rounded-md border border-neutral-800 bg-neutral-950 p-3">
-            <dt class="text-xs uppercase tracking-wide text-neutral-600">Пропущено</dt>
-            <dd class="mt-1 text-xl font-semibold text-neutral-200">{{ skippedAutoAcceptCount(autoAcceptPreview) }}</dd>
+          <div class="rounded-md border border-admin-border bg-admin-surface p-3">
+            <dt class="text-xs uppercase tracking-wide text-admin-text-faint">Пропущено</dt>
+            <dd class="mt-1 text-xl font-semibold text-admin-text">{{ skippedAutoAcceptCount(autoAcceptPreview) }}</dd>
           </div>
         </dl>
 
         <div class="flex flex-col gap-2 sm:flex-row xl:items-start">
           <button
             type="button"
-            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-emerald-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-success px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-success disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="isAutoAccepting || autoAcceptPreview.would_accept === 0"
             @click="applyAutoAcceptCandidates"
           >
@@ -802,7 +802,7 @@ onMounted(() => {
           </button>
           <button
             type="button"
-            class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-700 px-4 text-sm font-semibold text-neutral-300 transition hover:border-neutral-600 hover:text-white"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-admin-border-strong px-4 text-sm font-semibold text-admin-text-muted transition hover:border-admin-border-strong hover:text-admin-text"
             @click="clearAutoAcceptPreview"
           >
             <Icon :icon="icons.x" class="size-4" aria-hidden="true" />
@@ -812,16 +812,16 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="isLoading" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">
-      <Icon :icon="icons.listCheck" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+    <div v-if="isLoading" class="rounded-lg border border-admin-border bg-admin-surface p-8 text-center text-sm text-admin-text-faint">
+      <Icon :icon="icons.listCheck" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
       Загружаем очередь нормализации...
     </div>
 
     <div
       v-else-if="items.length === 0"
-      class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500"
+      class="rounded-lg border border-admin-border bg-admin-surface p-8 text-center text-sm text-admin-text-faint"
     >
-      <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+      <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
       В статусе «{{ activeStatus.label }}» ничего нет.
     </div>
 
@@ -830,7 +830,7 @@ onMounted(() => {
         v-for="item in items"
         :key="item.id"
         class="rounded-lg border p-4"
-        :class="item.state === 'ineligible' ? 'border-red-400/20 bg-red-950/20' : 'border-neutral-800 bg-neutral-900/40'"
+        :class="item.state === 'ineligible' ? 'border-admin-danger-border bg-admin-danger-soft' : 'border-admin-border bg-admin-surface'"
         data-testid="product-normalization-row"
       >
         <div class="grid gap-4 xl:grid-cols-[1fr_280px]">
@@ -840,36 +840,36 @@ onMounted(() => {
                 <Icon :icon="item.state === 'ineligible' ? icons.shieldLock : icons.listCheck" class="size-3.5" aria-hidden="true" />
                 {{ stateLabel(item.state) }}
               </span>
-              <span class="text-xs text-neutral-500">#{{ item.id }} · {{ item.source }}</span>
-              <span v-if="item.source_product_id" class="text-xs text-neutral-600">{{ item.source_product_id }}</span>
+              <span class="text-xs text-admin-text-faint">#{{ item.id }} · {{ item.source }}</span>
+              <span v-if="item.source_product_id" class="text-xs text-admin-text-faint">{{ item.source_product_id }}</span>
             </div>
 
             <RouterLink
               :to="`/products/${item.id}`"
-              class="mt-3 block text-lg font-semibold text-white transition hover:text-amber-200"
+              class="mt-3 block text-lg font-semibold text-admin-text transition hover:text-admin-link-hover"
             >
               {{ item.title }}
             </RouterLink>
-            <p class="mt-1 text-sm text-neutral-500">{{ item.normalized_title }}</p>
+            <p class="mt-1 text-sm text-admin-text-faint">{{ item.normalized_title }}</p>
 
-            <div class="mt-4 grid gap-3 text-sm text-neutral-400 md:grid-cols-2 xl:grid-cols-4">
+            <div class="mt-4 grid gap-3 text-sm text-admin-text-muted md:grid-cols-2 xl:grid-cols-4">
               <div>
-                <p class="text-xs uppercase tracking-wide text-neutral-600">Магазин</p>
-                <p class="mt-1 truncate text-neutral-200">{{ item.shop.name }}</p>
-                <p class="text-xs text-neutral-600">{{ item.shop.source_id }}</p>
+                <p class="text-xs uppercase tracking-wide text-admin-text-faint">Магазин</p>
+                <p class="mt-1 truncate text-admin-text">{{ item.shop.name }}</p>
+                <p class="text-xs text-admin-text-faint">{{ item.shop.source_id }}</p>
               </div>
               <div>
-                <p class="text-xs uppercase tracking-wide text-neutral-600">Цена</p>
-                <p class="mt-1 text-neutral-200">{{ formatPrice(item) }}</p>
+                <p class="text-xs uppercase tracking-wide text-admin-text-faint">Цена</p>
+                <p class="mt-1 text-admin-text">{{ formatPrice(item) }}</p>
               </div>
               <div>
-                <p class="text-xs uppercase tracking-wide text-neutral-600">Категория</p>
-                <p class="mt-1 text-neutral-200">{{ categoryLabel(item) }}</p>
-                <p v-if="item.category_raw" class="text-xs text-neutral-600">{{ item.category_raw }}</p>
+                <p class="text-xs uppercase tracking-wide text-admin-text-faint">Категория</p>
+                <p class="mt-1 text-admin-text">{{ categoryLabel(item) }}</p>
+                <p v-if="item.category_raw" class="text-xs text-admin-text-faint">{{ item.category_raw }}</p>
               </div>
               <div>
-                <p class="text-xs uppercase tracking-wide text-neutral-600">Последнее наблюдение</p>
-                <p class="mt-1 text-neutral-200">{{ formatDateTime(item.last_seen_at) }}</p>
+                <p class="text-xs uppercase tracking-wide text-admin-text-faint">Последнее наблюдение</p>
+                <p class="mt-1 text-admin-text">{{ formatDateTime(item.last_seen_at) }}</p>
               </div>
             </div>
 
@@ -877,48 +877,48 @@ onMounted(() => {
               <span
                 v-for="reason in eligibilityReasons(item)"
                 :key="reason"
-                class="inline-flex items-center rounded-full border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs text-neutral-300"
+                class="inline-flex items-center rounded-full border border-admin-border-strong bg-admin-surface px-2 py-1 text-xs text-admin-text-muted"
               >
                 {{ reason }}
               </span>
             </div>
           </div>
 
-          <aside class="border-t border-neutral-800 pt-4 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
-            <p class="inline-flex items-center gap-2 text-sm font-semibold text-white">
-              <Icon :icon="icons.gitCompare" class="size-4 text-amber-300" aria-hidden="true" />
+          <aside class="border-t border-admin-border pt-4 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
+            <p class="inline-flex items-center gap-2 text-sm font-semibold text-admin-text">
+              <Icon :icon="icons.gitCompare" class="size-4 text-admin-link" aria-hidden="true" />
               Матчи
             </p>
             <dl class="mt-4 grid grid-cols-3 gap-3 text-center">
               <div>
-                <dt class="text-xs text-neutral-600">Кандидаты</dt>
-                <dd class="mt-1 text-lg font-semibold text-white">{{ item.match_summary.candidate_count }}</dd>
+                <dt class="text-xs text-admin-text-faint">Кандидаты</dt>
+                <dd class="mt-1 text-lg font-semibold text-admin-text">{{ item.match_summary.candidate_count }}</dd>
               </div>
               <div>
-                <dt class="text-xs text-neutral-600">Отклонено</dt>
-                <dd class="mt-1 text-lg font-semibold text-white">{{ item.match_summary.rejected_count }}</dd>
+                <dt class="text-xs text-admin-text-faint">Отклонено</dt>
+                <dd class="mt-1 text-lg font-semibold text-admin-text">{{ item.match_summary.rejected_count }}</dd>
               </div>
               <div>
-                <dt class="text-xs text-neutral-600">Принято</dt>
-                <dd class="mt-1 text-lg font-semibold text-white">{{ item.match_summary.accepted_match_id ? 1 : 0 }}</dd>
+                <dt class="text-xs text-admin-text-faint">Принято</dt>
+                <dd class="mt-1 text-lg font-semibold text-admin-text">{{ item.match_summary.accepted_match_id ? 1 : 0 }}</dd>
               </div>
             </dl>
 
             <RouterLink
               v-if="item.match_summary.accepted_canonical_product_id && item.match_summary.accepted_canonical_title"
               :to="`/canonical-products/${item.match_summary.accepted_canonical_product_id}`"
-              class="mt-4 block text-sm font-semibold text-neutral-200 transition hover:text-amber-200"
+              class="mt-4 block text-sm font-semibold text-admin-text transition hover:text-admin-link-hover"
             >
               {{ item.match_summary.accepted_canonical_title }}
             </RouterLink>
-            <p v-else-if="item.state === 'ineligible'" class="mt-4 text-sm text-red-100/80">
+            <p v-else-if="item.state === 'ineligible'" class="mt-4 text-sm text-admin-danger">
               Эта карточка не попадает в основной поток нормализации.
             </p>
 
             <div v-if="item.state !== 'ineligible' && item.state !== 'accepted'" class="mt-4 space-y-3">
               <textarea
                 v-model="reasonByProductId[item.id]"
-                class="min-h-20 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+                class="min-h-20 w-full rounded-md border border-admin-border bg-admin-surface px-3 py-2 text-sm text-admin-text outline-none transition placeholder:text-admin-text-faint focus:border-admin-focus"
                 placeholder="Причина решения"
                 aria-label="Причина решения по нормализации"
               />
@@ -926,7 +926,7 @@ onMounted(() => {
               <button
                 v-if="item.state === 'eligible_unmatched'"
                 type="button"
-                class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-300 px-3 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60"
+                class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-admin-primary px-3 py-2 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-wait disabled:opacity-60"
                 :disabled="Boolean(busyAction)"
                 @click="createCanonicalFromItem(item)"
               >
@@ -934,7 +934,7 @@ onMounted(() => {
                 {{ isBusy(item, 'create') ? 'Создаем...' : 'Создать товар' }}
               </button>
 
-              <div v-if="item.candidate_matches.length" class="space-y-3 border-t border-neutral-800 pt-3">
+              <div v-if="item.candidate_matches.length" class="space-y-3 border-t border-admin-border pt-3">
                 <div
                   v-for="match in item.candidate_matches"
                   :key="match.id"
@@ -942,17 +942,17 @@ onMounted(() => {
                 >
                   <RouterLink
                     :to="`/canonical-products/${match.canonical_product_id}`"
-                    class="block text-sm font-semibold text-white transition hover:text-amber-200"
+                    class="block text-sm font-semibold text-admin-text transition hover:text-admin-link-hover"
                   >
                     {{ match.canonical_title }}
                   </RouterLink>
-                  <p class="text-xs text-neutral-500">
+                  <p class="text-xs text-admin-text-faint">
                     {{ match.canonical_normalized_title }} · {{ confidencePercent(match.confidence) }} · {{ match.method }}
                   </p>
                   <div class="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      class="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-300 px-3 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-wait disabled:opacity-60"
+                      class="inline-flex items-center justify-center gap-2 rounded-md bg-admin-success px-3 py-2 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-success disabled:cursor-wait disabled:opacity-60"
                       :disabled="Boolean(busyAction)"
                       @click="acceptCandidateMatch(item, match)"
                     >
@@ -961,7 +961,7 @@ onMounted(() => {
                     </button>
                     <button
                       type="button"
-                      class="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 py-2 text-sm font-semibold text-neutral-300 transition hover:border-red-300 hover:text-red-100 disabled:cursor-wait disabled:opacity-60"
+                      class="inline-flex items-center justify-center gap-2 rounded-md border border-admin-border-strong px-3 py-2 text-sm font-semibold text-admin-text-muted transition hover:border-admin-danger-border hover:text-admin-danger disabled:cursor-wait disabled:opacity-60"
                       :disabled="Boolean(busyAction)"
                       @click="rejectCandidateMatch(item, match)"
                     >
@@ -972,22 +972,22 @@ onMounted(() => {
                 </div>
               </div>
 
-              <div class="space-y-2 border-t border-neutral-800 pt-3">
-                <label class="block text-xs uppercase tracking-wide text-neutral-600">
+              <div class="space-y-2 border-t border-admin-border pt-3">
+                <label class="block text-xs uppercase tracking-wide text-admin-text-faint">
                   Связать с существующим
                 </label>
                 <div class="grid gap-2 sm:grid-cols-[1fr_auto] xl:grid-cols-1">
                   <input
                     v-model="canonicalSearchByProductId[item.id]"
                     type="search"
-                    class="h-10 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+                    class="h-10 rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition placeholder:text-admin-text-faint focus:border-admin-focus"
                     :placeholder="item.normalized_title"
                     aria-label="Поиск нормализованного товара"
                     @keyup.enter="searchCanonicalProductsForItem(item)"
                   >
                   <button
                     type="button"
-                    class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 text-sm font-semibold text-neutral-300 transition hover:border-amber-300 hover:text-white disabled:cursor-wait disabled:opacity-60"
+                    class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-admin-border-strong px-3 text-sm font-semibold text-admin-text-muted transition hover:border-admin-primary hover:text-admin-text disabled:cursor-wait disabled:opacity-60"
                     :disabled="Boolean(busyAction)"
                     @click="searchCanonicalProductsForItem(item)"
                   >
@@ -999,7 +999,7 @@ onMounted(() => {
                 <select
                   v-if="canonicalResultsByProductId[item.id]?.length"
                   v-model="selectedCanonicalByProductId[item.id]"
-                  class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                  class="h-10 w-full rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
                   aria-label="Выбор нормализованного товара"
                 >
                   <option value="">Выберите товар</option>
@@ -1015,7 +1015,7 @@ onMounted(() => {
                 <button
                   v-if="canonicalResultsByProductId[item.id]?.length"
                   type="button"
-                  class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-300 px-3 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60"
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-admin-primary px-3 py-2 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-wait disabled:opacity-60"
                   :disabled="Boolean(busyAction) || !selectedCanonicalByProductId[item.id]"
                   @click="linkCanonicalProduct(item)"
                 >

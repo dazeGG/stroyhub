@@ -47,7 +47,7 @@ const queueMeta: QueueMeta[] = [
     detail: 'готово к пакетному решению',
     to: '/workflows/queues/auto_acceptable',
     icon: icons.check,
-    tone: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100',
+    tone: 'border-admin-success-border bg-admin-success-soft text-admin-success',
   },
   {
     queue: 'review_needed',
@@ -55,7 +55,7 @@ const queueMeta: QueueMeta[] = [
     detail: 'спорные категории или нормализация',
     to: '/workflows/queues/review_needed',
     icon: icons.listCheck,
-    tone: 'border-amber-400/30 bg-amber-400/10 text-amber-100',
+    tone: 'border-admin-border-strong bg-admin-surface-muted text-admin-link',
   },
   {
     queue: 'possible_duplicates',
@@ -63,7 +63,7 @@ const queueMeta: QueueMeta[] = [
     detail: 'есть кандидаты на связь',
     to: '/workflows/queues/possible_duplicates',
     icon: icons.gitCompare,
-    tone: 'border-sky-400/30 bg-sky-400/10 text-sky-100',
+    tone: 'border-admin-border-strong bg-admin-surface-muted text-admin-text',
   },
   {
     queue: 'data_problems',
@@ -71,7 +71,7 @@ const queueMeta: QueueMeta[] = [
     detail: 'не товар, ошибка обработки или плохие данные',
     to: '/workflows/queues/data_problems',
     icon: icons.alertTriangle,
-    tone: 'border-red-400/30 bg-red-400/10 text-red-100',
+    tone: 'border-admin-danger-border bg-admin-danger-soft text-admin-danger',
   },
   {
     queue: 'normalized_items',
@@ -79,7 +79,7 @@ const queueMeta: QueueMeta[] = [
     detail: 'принятые карточки',
     to: '/workflows/queues/normalized_items',
     icon: icons.tags,
-    tone: 'border-neutral-700 bg-neutral-900/70 text-neutral-100',
+    tone: 'border-admin-border-strong bg-admin-surface-hover text-admin-text',
   },
 ]
 
@@ -180,7 +180,7 @@ const attentionMetrics = computed<AttentionMetric[]>(() => [
     detail: 'безопасные решения',
     to: '/workflows/queues/auto_acceptable',
     icon: icons.check,
-    tone: 'border-emerald-400/30 text-emerald-100',
+    tone: 'border-admin-success-border text-admin-success',
   },
   {
     label: 'Проверить',
@@ -188,7 +188,7 @@ const attentionMetrics = computed<AttentionMetric[]>(() => [
     detail: 'спорные карточки',
     to: '/workflows/queues/review_needed',
     icon: icons.listCheck,
-    tone: 'border-amber-400/30 text-amber-100',
+    tone: 'border-admin-border-strong text-admin-link',
   },
   {
     label: 'Блокеры',
@@ -196,7 +196,7 @@ const attentionMetrics = computed<AttentionMetric[]>(() => [
     detail: 'качество каталога',
     to: '/workflows/queues/normalized_items',
     icon: icons.alertTriangle,
-    tone: 'border-red-400/30 text-red-100',
+    tone: 'border-admin-danger-border text-admin-danger',
   },
   {
     label: 'Источники',
@@ -204,7 +204,7 @@ const attentionMetrics = computed<AttentionMetric[]>(() => [
     detail: 'просрочены или с ошибками',
     to: '/shops',
     icon: icons.buildingStore,
-    tone: 'border-sky-400/30 text-sky-100',
+    tone: 'border-admin-border-strong text-admin-text',
   },
   {
     label: 'Новые источники',
@@ -212,7 +212,7 @@ const attentionMetrics = computed<AttentionMetric[]>(() => [
     detail: 'ждут решения',
     to: '/shops/candidates',
     icon: icons.databaseImport,
-    tone: 'border-violet-400/30 text-violet-100',
+    tone: 'border-admin-border-strong text-admin-text',
   },
   {
     label: 'Без категории',
@@ -220,7 +220,7 @@ const attentionMetrics = computed<AttentionMetric[]>(() => [
     detail: 'нужна категоризация',
     to: '/categories/quality',
     icon: icons.category,
-    tone: 'border-orange-400/30 text-orange-100',
+    tone: 'border-admin-border-strong text-admin-text',
   },
 ])
 
@@ -308,12 +308,12 @@ onMounted(() => {
   <section class="space-y-7">
     <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <div>
-        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-admin-link">
           <Icon :icon="icons.layoutDashboard" class="size-4" aria-hidden="true" />
           Качество каталога
         </p>
-        <h2 class="mt-2 text-2xl font-semibold text-white">Что требует внимания</h2>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+        <h2 class="mt-2 text-2xl font-semibold text-admin-text">Что требует внимания</h2>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-admin-text-muted">
           Сводка по очередям, источникам и проверкам, которые влияют на готовность публичного каталога.
         </p>
       </div>
@@ -321,7 +321,7 @@ onMounted(() => {
       <div class="flex flex-wrap gap-2">
         <button
           type="button"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-700 px-4 text-sm font-semibold text-neutral-100 transition hover:border-neutral-500"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-admin-border-strong px-4 text-sm font-semibold text-admin-text transition hover:border-admin-border-strong"
           @click="loadDashboard"
         >
           <Icon :icon="icons.refresh" class="size-4" aria-hidden="true" />
@@ -329,7 +329,7 @@ onMounted(() => {
         </button>
         <RouterLink
           to="/workflows/queues/auto_acceptable"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-primary px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover"
         >
           <Icon :icon="icons.check" class="size-4" aria-hidden="true" />
           Открыть очередь
@@ -339,13 +339,13 @@ onMounted(() => {
 
     <div
       v-if="errorMessage"
-      class="rounded-lg border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-100"
+      class="rounded-lg border border-admin-danger-border bg-admin-danger-soft p-4 text-sm text-admin-danger"
     >
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p>{{ errorMessage }}</p>
         <button
           type="button"
-          class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-red-300/40 px-3 text-sm font-semibold text-red-50 transition hover:border-red-200"
+          class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-admin-danger-border px-3 text-sm font-semibold text-admin-danger transition hover:border-admin-danger-border"
           @click="loadDashboard"
         >
           <Icon :icon="icons.refresh" class="size-4" aria-hidden="true" />
@@ -359,17 +359,17 @@ onMounted(() => {
         v-for="metric in attentionMetrics"
         :key="metric.label"
         :to="metric.to"
-        class="group rounded-lg border bg-neutral-900/40 p-4 transition hover:-translate-y-0.5 hover:border-amber-300/50"
+        class="group rounded-lg border bg-admin-surface p-4 transition hover:-translate-y-0.5 hover:border-admin-border-strong"
         :class="metric.tone"
       >
         <div class="flex items-center justify-between gap-3">
           <Icon :icon="metric.icon" class="size-5 text-current" aria-hidden="true" />
-          <span class="text-2xl font-semibold text-white">
+          <span class="text-2xl font-semibold text-admin-text">
             {{ isLoading ? '...' : metric.value }}
           </span>
         </div>
-        <p class="mt-4 text-sm font-semibold text-neutral-100">{{ metric.label }}</p>
-        <p class="mt-1 text-xs text-neutral-400">{{ metric.detail }}</p>
+        <p class="mt-4 text-sm font-semibold text-admin-text">{{ metric.label }}</p>
+        <p class="mt-1 text-xs text-admin-text-muted">{{ metric.detail }}</p>
       </RouterLink>
     </div>
 
@@ -377,12 +377,12 @@ onMounted(() => {
       <section class="space-y-3">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <h3 class="text-base font-semibold text-white">Очереди решений</h3>
-            <p class="mt-1 text-sm text-neutral-500">{{ activeWorkCount }} карточек в работе</p>
+            <h3 class="text-base font-semibold text-admin-text">Очереди решений</h3>
+            <p class="mt-1 text-sm text-admin-text-faint">{{ activeWorkCount }} карточек в работе</p>
           </div>
           <RouterLink
             to="/workflows/queues/review_needed"
-            class="text-sm font-semibold text-amber-300 hover:text-amber-200"
+            class="text-sm font-semibold text-admin-link hover:text-admin-link-hover"
           >
             Проверка
           </RouterLink>
@@ -393,7 +393,7 @@ onMounted(() => {
             v-for="item in queueMeta"
             :key="item.queue"
             :to="item.to"
-            class="rounded-lg border p-4 transition hover:-translate-y-0.5 hover:border-amber-300/50"
+            class="rounded-lg border p-4 transition hover:-translate-y-0.5 hover:border-admin-border-strong"
             :class="item.tone"
           >
             <div class="flex items-center justify-between gap-3">
@@ -408,37 +408,37 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
+      <section class="min-w-0 rounded-lg border border-admin-border bg-admin-surface p-5">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <h3 class="text-base font-semibold text-white">Источники</h3>
-            <p class="mt-1 text-sm text-neutral-500">свежесть данных и загрузки</p>
+            <h3 class="text-base font-semibold text-admin-text">Источники</h3>
+            <p class="mt-1 text-sm text-admin-text-faint">свежесть данных и загрузки</p>
           </div>
-          <RouterLink to="/scrapes" class="text-sm font-semibold text-amber-300 hover:text-amber-200">
+          <RouterLink to="/scrapes" class="text-sm font-semibold text-admin-link hover:text-admin-link-hover">
             Загрузки
           </RouterLink>
         </div>
 
         <dl class="mt-5 grid grid-cols-2 gap-3 text-sm">
           <div>
-            <dt class="text-neutral-500">Просрочены</dt>
-            <dd class="mt-1 text-2xl font-semibold text-white">{{ isLoading ? '...' : staleSourceCount }}</dd>
+            <dt class="text-admin-text-faint">Просрочены</dt>
+            <dd class="mt-1 text-2xl font-semibold text-admin-text">{{ isLoading ? '...' : staleSourceCount }}</dd>
           </div>
           <div>
-            <dt class="text-neutral-500">Источники с ошибкой</dt>
-            <dd class="mt-1 text-2xl font-semibold text-white">{{ isLoading ? '...' : sourceFailureCount }}</dd>
+            <dt class="text-admin-text-faint">Источники с ошибкой</dt>
+            <dd class="mt-1 text-2xl font-semibold text-admin-text">{{ isLoading ? '...' : sourceFailureCount }}</dd>
           </div>
           <div>
-            <dt class="text-neutral-500">Запуски с ошибкой</dt>
-            <dd class="mt-1 text-2xl font-semibold text-white">{{ isLoading ? '...' : failedScrapeCount }}</dd>
+            <dt class="text-admin-text-faint">Запуски с ошибкой</dt>
+            <dd class="mt-1 text-2xl font-semibold text-admin-text">{{ isLoading ? '...' : failedScrapeCount }}</dd>
           </div>
           <div>
-            <dt class="text-neutral-500">Ошибка обработки</dt>
-            <dd class="mt-1 text-2xl font-semibold text-white">{{ isLoading ? '...' : pipelineFailedCount }}</dd>
+            <dt class="text-admin-text-faint">Ошибка обработки</dt>
+            <dd class="mt-1 text-2xl font-semibold text-admin-text">{{ isLoading ? '...' : pipelineFailedCount }}</dd>
           </div>
           <div>
-            <dt class="text-neutral-500">Новые источники</dt>
-            <dd class="mt-1 text-2xl font-semibold text-white">{{ isLoading ? '...' : pendingCandidateCount }}</dd>
+            <dt class="text-admin-text-faint">Новые источники</dt>
+            <dd class="mt-1 text-2xl font-semibold text-admin-text">{{ isLoading ? '...' : pendingCandidateCount }}</dd>
           </div>
         </dl>
 
@@ -447,28 +447,28 @@ onMounted(() => {
             v-for="run in recentProblemRuns"
             :key="run.id"
             to="/scrapes"
-            class="flex items-center justify-between gap-3 rounded-md border border-neutral-800 px-3 py-2 text-sm transition hover:border-neutral-600"
+            class="flex items-center justify-between gap-3 rounded-md border border-admin-border px-3 py-2 text-sm transition hover:border-admin-border-strong"
           >
-            <span class="min-w-0 truncate text-neutral-200">{{ runShopLabel(run) }}</span>
-            <span class="shrink-0 text-neutral-500">{{ formatDate(run.started_at) }}</span>
+            <span class="min-w-0 truncate text-admin-text">{{ runShopLabel(run) }}</span>
+            <span class="shrink-0 text-admin-text-faint">{{ formatDate(run.started_at) }}</span>
           </RouterLink>
         </div>
-        <p v-else class="mt-5 text-sm text-neutral-500">Свежих ошибок загрузки нет.</p>
+        <p v-else class="mt-5 text-sm text-admin-text-faint">Свежих ошибок загрузки нет.</p>
       </section>
     </div>
 
-    <div class="grid gap-4 xl:grid-cols-2">
-      <section class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
+    <div class="grid min-w-0 gap-4 xl:grid-cols-2">
+      <section class="min-w-0 rounded-lg border border-admin-border bg-admin-surface p-5">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <h3 class="text-base font-semibold text-white">Проверки каталога</h3>
-            <p class="mt-1 text-sm text-neutral-500">
+            <h3 class="text-base font-semibold text-admin-text">Проверки каталога</h3>
+            <p class="mt-1 text-sm text-admin-text-faint">
               {{ qualityBlockerCount }} блокеров, {{ qualityWarningCount }} предупреждений
             </p>
           </div>
           <RouterLink
             to="/workflows/queues/normalized_items"
-            class="text-sm font-semibold text-amber-300 hover:text-amber-200"
+            class="text-sm font-semibold text-admin-link hover:text-admin-link-hover"
           >
             Каталог
           </RouterLink>
@@ -479,48 +479,48 @@ onMounted(() => {
             v-for="finding in topQualityFindings"
             :key="`${finding.code}-${finding.source_product_id}-${finding.canonical_product_id}`"
             :to="findingLink(finding)"
-            class="block rounded-md border border-neutral-800 px-3 py-3 transition hover:border-neutral-600"
+            class="block min-w-0 rounded-md border border-admin-border px-3 py-3 transition hover:border-admin-border-strong"
           >
             <div class="flex items-center justify-between gap-3">
-              <p class="text-sm font-semibold text-neutral-100">{{ findingLabel(finding) }}</p>
+              <p class="text-sm font-semibold text-admin-text">{{ findingLabel(finding) }}</p>
               <span
                 class="rounded px-2 py-1 text-xs font-semibold"
-                :class="finding.severity === 'blocker' ? 'bg-red-400/10 text-red-200' : 'bg-amber-400/10 text-amber-200'"
+                :class="finding.severity === 'blocker' ? 'bg-admin-danger-soft text-admin-danger' : 'bg-admin-surface-muted text-admin-link'"
               >
                 {{ finding.severity === 'blocker' ? 'Блокер' : 'Риск' }}
               </span>
             </div>
-            <p class="mt-2 line-clamp-2 text-sm text-neutral-400">{{ findingDetail(finding) }}</p>
+            <p class="mt-2 line-clamp-2 text-sm text-admin-text-muted">{{ findingDetail(finding) }}</p>
           </RouterLink>
         </div>
-        <p v-else class="mt-5 text-sm text-neutral-500">Активных замечаний нет.</p>
+        <p v-else class="mt-5 text-sm text-admin-text-faint">Активных замечаний нет.</p>
       </section>
 
-      <section class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
+      <section class="min-w-0 rounded-lg border border-admin-border bg-admin-surface p-5">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <h3 class="text-base font-semibold text-white">Категоризация</h3>
-            <p class="mt-1 text-sm text-neutral-500">
+            <h3 class="text-base font-semibold text-admin-text">Категоризация</h3>
+            <p class="mt-1 text-sm text-admin-text-faint">
               покрытие {{ categoryQuality?.coverage_pct ?? '0.00' }}%
             </p>
           </div>
-          <RouterLink to="/categories/quality" class="text-sm font-semibold text-amber-300 hover:text-amber-200">
+          <RouterLink to="/categories/quality" class="text-sm font-semibold text-admin-link hover:text-admin-link-hover">
             Категории
           </RouterLink>
         </div>
 
         <div class="mt-5 grid grid-cols-3 gap-3 text-sm">
           <div>
-            <p class="text-neutral-500">Всего</p>
-            <p class="mt-1 text-2xl font-semibold text-white">{{ categoryQuality?.total_products ?? 0 }}</p>
+            <p class="text-admin-text-faint">Всего</p>
+            <p class="mt-1 text-2xl font-semibold text-admin-text">{{ categoryQuality?.total_products ?? 0 }}</p>
           </div>
           <div>
-            <p class="text-neutral-500">Готово</p>
-            <p class="mt-1 text-2xl font-semibold text-white">{{ categoryQuality?.categorized_products ?? 0 }}</p>
+            <p class="text-admin-text-faint">Готово</p>
+            <p class="mt-1 text-2xl font-semibold text-admin-text">{{ categoryQuality?.categorized_products ?? 0 }}</p>
           </div>
           <div>
-            <p class="text-neutral-500">Без категории</p>
-            <p class="mt-1 text-2xl font-semibold text-white">{{ uncategorizedCount }}</p>
+            <p class="text-admin-text-faint">Без категории</p>
+            <p class="mt-1 text-2xl font-semibold text-admin-text">{{ uncategorizedCount }}</p>
           </div>
         </div>
 
@@ -529,21 +529,21 @@ onMounted(() => {
             v-for="group in categoryQuality.groups.slice(0, 4)"
             :key="`${group.source}-${group.shop_id}-${group.category_raw}`"
             to="/categories/quality"
-            class="flex items-center justify-between gap-3 rounded-md border border-neutral-800 px-3 py-2 text-sm transition hover:border-neutral-600"
+            class="flex items-center justify-between gap-3 rounded-md border border-admin-border px-3 py-2 text-sm transition hover:border-admin-border-strong"
           >
-            <span class="min-w-0 truncate text-neutral-200">
+            <span class="min-w-0 truncate text-admin-text">
               {{ group.category_raw || 'Без исходной категории' }}
             </span>
-            <span class="shrink-0 text-neutral-500">{{ group.count }}</span>
+            <span class="shrink-0 text-admin-text-faint">{{ group.count }}</span>
           </RouterLink>
         </div>
-        <p v-else class="mt-5 text-sm text-neutral-500">Очередь категоризации пуста.</p>
+        <p v-else class="mt-5 text-sm text-admin-text-faint">Очередь категоризации пуста.</p>
       </section>
     </div>
 
     <div
       v-if="!isLoading && !errorMessage && activeWorkCount === 0 && qualityBlockerCount === 0"
-      class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-6 text-sm text-neutral-400"
+      class="rounded-lg border border-admin-border bg-admin-surface p-6 text-sm text-admin-text-muted"
     >
       Активных очередей и блокеров нет.
     </div>

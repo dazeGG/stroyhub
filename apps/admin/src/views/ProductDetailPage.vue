@@ -336,19 +336,19 @@ onMounted(() => {
       <div>
         <RouterLink
           to="/products"
-          class="inline-flex items-center gap-2 text-sm font-medium text-neutral-400 transition hover:text-white"
+          class="inline-flex items-center gap-2 text-sm font-medium text-admin-text-muted transition hover:text-admin-text"
         >
           <Icon :icon="icons.chevronLeft" class="size-4" aria-hidden="true" />
           Назад к исходным товарам
         </RouterLink>
-        <p class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+        <p class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-admin-link">
           <Icon :icon="icons.package" class="size-4" aria-hidden="true" />
           Карточка товара
         </p>
-        <h2 class="mt-2 max-w-4xl text-2xl font-semibold text-white">
+        <h2 class="mt-2 max-w-4xl text-2xl font-semibold text-admin-text">
           {{ product?.title || (productId ? `Товар #${productId}` : 'Товар') }}
         </h2>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-admin-text-muted">
           Магазин, исходная категория, последняя цена и наблюдения по сбору.
         </p>
       </div>
@@ -359,50 +359,50 @@ onMounted(() => {
       class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]"
       data-testid="product-detail"
     >
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-admin-text-faint">
           <Icon :icon="icons.package" class="size-4" aria-hidden="true" />
           Исходная карточка
         </p>
-        <div v-if="isLoadingProduct" class="mt-6 text-sm text-neutral-500">Загружаем товар...</div>
-        <div v-else class="mt-4 grid gap-4 text-sm text-neutral-400 sm:grid-cols-2">
+        <div v-if="isLoadingProduct" class="mt-6 text-sm text-admin-text-faint">Загружаем товар...</div>
+        <div v-else class="mt-4 grid gap-4 text-sm text-admin-text-muted sm:grid-cols-2">
           <div>
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Магазин</p>
-            <p class="mt-1 text-neutral-200">{{ product?.shop.name || '-' }}</p>
+            <p class="text-xs uppercase tracking-wide text-admin-text-faint">Магазин</p>
+            <p class="mt-1 text-admin-text">{{ product?.shop.name || '-' }}</p>
           </div>
           <div>
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Текущая цена</p>
-            <p class="mt-1 text-neutral-200">{{ formatLatestPrice(product) }}</p>
+            <p class="text-xs uppercase tracking-wide text-admin-text-faint">Текущая цена</p>
+            <p class="mt-1 text-admin-text">{{ formatLatestPrice(product) }}</p>
           </div>
           <div>
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Source ID</p>
-            <p class="mt-1 text-neutral-200">{{ product?.source_product_id || '-' }}</p>
+            <p class="text-xs uppercase tracking-wide text-admin-text-faint">Source ID</p>
+            <p class="mt-1 text-admin-text">{{ product?.source_product_id || '-' }}</p>
           </div>
           <div>
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Источник</p>
-            <p class="mt-1 text-neutral-200">{{ product?.source || '-' }}</p>
+            <p class="text-xs uppercase tracking-wide text-admin-text-faint">Источник</p>
+            <p class="mt-1 text-admin-text">{{ product?.source || '-' }}</p>
           </div>
           <div>
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Категория источника</p>
-            <p class="mt-1 text-neutral-200">{{ product?.category_raw || '-' }}</p>
+            <p class="text-xs uppercase tracking-wide text-admin-text-faint">Категория источника</p>
+            <p class="mt-1 text-admin-text">{{ product?.category_raw || '-' }}</p>
           </div>
           <div>
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Категория StroyHub</p>
-            <p class="mt-1 text-neutral-200">{{ categoryLabel }}</p>
+            <p class="text-xs uppercase tracking-wide text-admin-text-faint">Категория StroyHub</p>
+            <p class="mt-1 text-admin-text">{{ categoryLabel }}</p>
           </div>
           <div>
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Последний раз</p>
-            <p class="mt-1 text-neutral-200">{{ formatDateTime(product?.last_seen_at || null) }}</p>
+            <p class="text-xs uppercase tracking-wide text-admin-text-faint">Последний раз</p>
+            <p class="mt-1 text-admin-text">{{ formatDateTime(product?.last_seen_at || null) }}</p>
           </div>
           <div>
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Ручное правило</p>
+            <p class="text-xs uppercase tracking-wide text-admin-text-faint">Ручное правило</p>
             <p class="mt-1">
               <span
                 class="rounded-full border px-2 py-1 text-xs"
                 :class="
                   hasActiveOverride
-                    ? 'border-amber-400/30 bg-amber-400/10 text-amber-200'
-                    : 'border-neutral-700 bg-neutral-900 text-neutral-300'
+                    ? 'border-admin-border-strong bg-admin-surface-muted text-admin-link'
+                    : 'border-admin-border-strong bg-admin-surface-muted text-admin-text-muted'
                 "
               >
                 {{ hasActiveOverride ? 'Активен' : 'Нет' }}
@@ -411,8 +411,8 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="mt-6 border-t border-neutral-800 pt-5">
-          <p class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+        <div class="mt-6 border-t border-admin-border pt-5">
+          <p class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-admin-text-faint">
             <Icon :icon="icons.category" class="size-4" aria-hidden="true" />
             Ручная категория
           </p>
@@ -420,7 +420,7 @@ onMounted(() => {
             <select
               v-model="selectedCategoryId"
               aria-label="Ручная категория товара"
-              class="h-10 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+              class="h-10 rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
               :disabled="isLoadingCategories || isSavingCategory || !product"
             >
               <option value="">Выберите категорию</option>
@@ -429,7 +429,7 @@ onMounted(() => {
               </option>
             </select>
             <button
-              class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition enabled:hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
+              class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-primary px-4 text-sm font-semibold text-admin-primary-text transition enabled:hover:bg-admin-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
               :disabled="!selectedCategoryId || isSavingCategory || !product"
               type="button"
               @click="saveCategoryOverride"
@@ -438,7 +438,7 @@ onMounted(() => {
               Сохранить
             </button>
             <button
-              class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-800 px-4 text-sm font-medium text-neutral-200 transition enabled:hover:border-neutral-600 disabled:cursor-not-allowed disabled:opacity-40"
+              class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-admin-border px-4 text-sm font-medium text-admin-text transition enabled:hover:border-admin-border-strong disabled:cursor-not-allowed disabled:opacity-40"
               :disabled="!hasActiveOverride || isSavingCategory || !product"
               type="button"
               @click="revertCategoryOverride"
@@ -451,33 +451,33 @@ onMounted(() => {
       </div>
 
       <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-        <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-neutral-500">
+        <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
+          <p class="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-admin-text-faint">
             <Icon :icon="icons.timeline" class="size-4" aria-hidden="true" />
             Наблюдений
           </p>
-          <p class="mt-2 text-2xl font-semibold text-white">{{ snapshots.length }}</p>
+          <p class="mt-2 text-2xl font-semibold text-admin-text">{{ snapshots.length }}</p>
         </div>
-        <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-neutral-500">
+        <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
+          <p class="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-admin-text-faint">
             <Icon :icon="icons.currencyRubel" class="size-4" aria-hidden="true" />
             Повторов цены
           </p>
-          <p class="mt-2 text-2xl font-semibold text-white">{{ repeatedObservations }}</p>
+          <p class="mt-2 text-2xl font-semibold text-admin-text">{{ repeatedObservations }}</p>
         </div>
-        <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-neutral-500">
+        <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
+          <p class="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-admin-text-faint">
             <Icon :icon="icons.alertTriangle" class="size-4" aria-hidden="true" />
             Без цены
           </p>
-          <p class="mt-2 text-2xl font-semibold text-white">{{ nullPriceCount }}</p>
+          <p class="mt-2 text-2xl font-semibold text-admin-text">{{ nullPriceCount }}</p>
         </div>
       </div>
     </div>
 
-    <div class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
+    <div class="overflow-x-auto rounded-lg border border-admin-border bg-admin-surface">
       <div
-        class="grid min-w-[760px] grid-cols-[190px_180px_150px_170px_minmax(160px,1fr)] border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
+        class="grid min-w-[760px] grid-cols-[190px_180px_150px_170px_minmax(160px,1fr)] border-b border-admin-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-admin-text-faint"
       >
         <span>Parsed at</span>
         <span>Цена</span>
@@ -486,57 +486,57 @@ onMounted(() => {
         <span>Snapshot ID</span>
       </div>
 
-      <div v-if="isLoadingHistory" class="min-w-[760px] px-4 py-14 text-center text-sm text-neutral-500">
-        <Icon :icon="icons.history" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+      <div v-if="isLoadingHistory" class="min-w-[760px] px-4 py-14 text-center text-sm text-admin-text-faint">
+        <Icon :icon="icons.history" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
         Загружаем историю...
       </div>
 
       <div
         v-else-if="historyErrorMessage"
-        class="min-w-[760px] px-4 py-14 text-center text-sm text-red-200"
+        class="min-w-[760px] px-4 py-14 text-center text-sm text-admin-danger"
       >
-        <Icon :icon="icons.alertTriangle" class="mx-auto mb-3 size-6 text-red-300" aria-hidden="true" />
+        <Icon :icon="icons.alertTriangle" class="mx-auto mb-3 size-6 text-admin-danger" aria-hidden="true" />
         Не удалось загрузить историю цен: {{ historyErrorMessage }}
       </div>
 
       <div
         v-else-if="snapshots.length === 0"
-        class="min-w-[760px] px-4 py-14 text-center text-sm text-neutral-500"
+        class="min-w-[760px] px-4 py-14 text-center text-sm text-admin-text-faint"
       >
-        <Icon :icon="icons.timeline" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+        <Icon :icon="icons.timeline" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
         Для этой карточки пока нет ценовых наблюдений.
       </div>
 
-      <div v-else class="min-w-[760px] divide-y divide-neutral-800">
+      <div v-else class="min-w-[760px] divide-y divide-admin-border">
         <div
           v-for="(snapshot, index) in snapshots"
           :key="snapshot.id"
           class="grid grid-cols-[190px_180px_150px_170px_minmax(160px,1fr)] px-4 py-4 text-sm"
           data-testid="price-snapshot-row"
         >
-          <div class="text-neutral-200">{{ formatDateTime(snapshot.parsed_at) }}</div>
-          <div class="font-medium text-white">{{ formatSnapshotPrice(snapshot) }}</div>
+          <div class="text-admin-text">{{ formatDateTime(snapshot.parsed_at) }}</div>
+          <div class="font-medium text-admin-text">{{ formatSnapshotPrice(snapshot) }}</div>
           <div>
             <span
               class="rounded-full border px-2 py-1 text-xs"
               :class="
                 snapshot.price === null
-                  ? 'border-red-400/30 bg-red-400/10 text-red-200'
+                  ? 'border-admin-danger-border bg-admin-danger-soft text-admin-danger'
                   : snapshotStatus(snapshot, index) === 'Цена изменилась'
-                    ? 'border-amber-400/30 bg-amber-400/10 text-amber-200'
-                    : 'border-neutral-700 bg-neutral-900 text-neutral-300'
+                    ? 'border-admin-border-strong bg-admin-surface-muted text-admin-link'
+                    : 'border-admin-border-strong bg-admin-surface-muted text-admin-text-muted'
               "
             >
               {{ snapshotStatus(snapshot, index) }}
             </span>
           </div>
-          <div class="text-neutral-400">{{ formatDateTime(snapshot.source_updated_at) }}</div>
-          <div class="text-neutral-500">#{{ snapshot.id }}</div>
+          <div class="text-admin-text-muted">{{ formatDateTime(snapshot.source_updated_at) }}</div>
+          <div class="text-admin-text-faint">#{{ snapshot.id }}</div>
         </div>
       </div>
     </div>
 
-    <p v-if="productId" class="text-sm text-neutral-500">
+    <p v-if="productId" class="text-sm text-admin-text-faint">
       Изменений цены: {{ priceChanges }}.
     </p>
   </section>
