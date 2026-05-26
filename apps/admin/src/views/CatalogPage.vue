@@ -370,12 +370,12 @@ onMounted(() => {
   <section class="space-y-6">
     <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
       <div>
-        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-admin-link">
           <Icon :icon="icons.package" class="size-4" aria-hidden="true" />
           Исходные товары
         </p>
-        <h2 class="mt-2 text-2xl font-semibold text-white">Инспекция исходных карточек</h2>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+        <h2 class="mt-2 text-2xl font-semibold text-admin-text">Инспекция исходных карточек</h2>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-admin-text-muted">
           Ищем собранные карточки, сверяем категории и смотрим последние наблюдения по ценам.
         </p>
       </div>
@@ -387,12 +387,12 @@ onMounted(() => {
         <label class="relative">
           <Icon
             :icon="icons.search"
-            class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-600"
+            class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-admin-text-faint"
             aria-hidden="true"
           />
           <input
             v-model="searchQuery"
-            class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-900 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+            class="h-10 w-full rounded-md border border-admin-border bg-admin-surface-muted pl-9 pr-3 text-sm text-admin-text outline-none transition placeholder:text-admin-text-faint focus:border-admin-focus"
             placeholder="Поиск по названию"
             type="search"
           />
@@ -400,7 +400,7 @@ onMounted(() => {
         <select
           v-model="selectedCategoryId"
           aria-label="Фильтр по категории"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           :disabled="isLoadingFilters"
         >
           <option value="">Все категории</option>
@@ -412,7 +412,7 @@ onMounted(() => {
         <select
           v-model="selectedShopId"
           aria-label="Фильтр по магазину"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           :disabled="isLoadingFilters"
         >
           <option value="">Все магазины</option>
@@ -423,7 +423,7 @@ onMounted(() => {
         <select
           v-model="sort"
           aria-label="Сортировка каталога"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
         >
           <option value="-last_seen_at">Сначала свежие</option>
           <option value="last_seen_at">Сначала старые</option>
@@ -437,9 +437,9 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
+    <div class="overflow-x-auto rounded-lg border border-admin-border bg-admin-surface">
       <div
-        class="grid min-w-[920px] grid-cols-[minmax(280px,2fr)_170px_150px_150px_140px] border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
+        class="grid min-w-[920px] grid-cols-[minmax(280px,2fr)_170px_150px_150px_140px] border-b border-admin-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-admin-text-faint"
       >
         <span>Товар</span>
         <span>Магазин</span>
@@ -448,30 +448,30 @@ onMounted(() => {
         <span>Последний раз</span>
       </div>
 
-      <div v-if="isLoadingProducts && products.length === 0" class="min-w-[920px] px-4 py-14 text-center text-sm text-neutral-500">
-        <Icon :icon="icons.package" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+      <div v-if="isLoadingProducts && products.length === 0" class="min-w-[920px] px-4 py-14 text-center text-sm text-admin-text-faint">
+        <Icon :icon="icons.package" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
         Загружаем каталог...
       </div>
 
       <div
         v-else-if="errorMessage"
-        class="min-w-[920px] px-4 py-14 text-center text-sm text-red-200"
+        class="min-w-[920px] px-4 py-14 text-center text-sm text-admin-danger"
       >
-        <Icon :icon="icons.alertTriangle" class="mx-auto mb-3 size-6 text-red-300" aria-hidden="true" />
+        <Icon :icon="icons.alertTriangle" class="mx-auto mb-3 size-6 text-admin-danger" aria-hidden="true" />
         Не удалось загрузить каталог: {{ errorMessage }}
       </div>
 
       <div
         v-else-if="products.length === 0"
-        class="min-w-[920px] px-4 py-14 text-center text-sm text-neutral-500"
+        class="min-w-[920px] px-4 py-14 text-center text-sm text-admin-text-faint"
       >
-        <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+        <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
         По этим фильтрам товаров не найдено.
       </div>
 
       <div
         v-else
-        class="min-w-[920px] divide-y divide-neutral-800 transition-opacity"
+        class="min-w-[920px] divide-y divide-admin-border transition-opacity"
         :class="isLoadingProducts ? 'opacity-60' : 'opacity-100'"
       >
         <div
@@ -481,30 +481,30 @@ onMounted(() => {
           data-testid="catalog-row"
         >
           <div class="min-w-0 pr-5">
-            <p class="truncate font-medium text-white" :title="product.title">{{ product.title }}</p>
-            <p class="mt-1 truncate text-xs text-neutral-500" :title="product.normalized_title">
+            <p class="truncate font-medium text-admin-text" :title="product.title">{{ product.title }}</p>
+            <p class="mt-1 truncate text-xs text-admin-text-faint" :title="product.normalized_title">
               {{ product.source }} · {{ product.source_product_id || 'без source id' }}
             </p>
           </div>
           <div class="min-w-0 pr-5">
-            <p class="truncate text-neutral-200" :title="product.shop.name">{{ product.shop.name }}</p>
-            <p class="mt-1 truncate text-xs text-neutral-500" :title="product.shop.source_id">
+            <p class="truncate text-admin-text" :title="product.shop.name">{{ product.shop.name }}</p>
+            <p class="mt-1 truncate text-xs text-admin-text-faint" :title="product.shop.source_id">
               {{ product.shop.source_id }}
             </p>
           </div>
           <div class="min-w-0 pr-5">
-            <p class="truncate text-neutral-200" :title="categoryLabel(product)">
+            <p class="truncate text-admin-text" :title="categoryLabel(product)">
               {{ categoryLabel(product) }}
             </p>
-            <p class="mt-1 truncate text-xs text-neutral-500" :title="product.category_raw || 'Без исходной категории'">
+            <p class="mt-1 truncate text-xs text-admin-text-faint" :title="product.category_raw || 'Без исходной категории'">
               {{ product.category_raw || 'Без исходной категории' }}
             </p>
           </div>
-          <div class="pr-5 text-neutral-200">{{ formatPrice(product) }}</div>
-          <div class="min-w-0 text-neutral-400">
+          <div class="pr-5 text-admin-text">{{ formatPrice(product) }}</div>
+          <div class="min-w-0 text-admin-text-muted">
             <p>{{ formatDateTime(product.last_seen_at) }}</p>
             <RouterLink
-              class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200"
+              class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-admin-link hover:text-admin-link-hover"
               data-testid="catalog-price-link"
               :to="{ name: 'product-detail', params: { productId: product.id } }"
             >
@@ -517,7 +517,7 @@ onMounted(() => {
     </div>
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <p class="text-sm text-neutral-500">
+      <p class="text-sm text-admin-text-faint">
         Страница {{ currentPage }} · показано {{ products.length }} из {{ totalProducts }}
       </p>
       <UPagination

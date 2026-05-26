@@ -106,19 +106,19 @@ function statusLabel(status: string): string {
 
 function statusClass(status: string): string {
   if (status === 'failed') {
-    return 'border-red-400/30 bg-red-400/10 text-red-200'
+    return 'border-admin-danger-border bg-admin-danger-soft text-admin-danger'
   }
   if (status === 'partial') {
-    return 'border-amber-400/30 bg-amber-400/10 text-amber-200'
+    return 'border-admin-border-strong bg-admin-surface-muted text-admin-link'
   }
   if (status === 'success') {
-    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+    return 'border-admin-success-border bg-admin-success-soft text-admin-success'
   }
   if (status === 'disabled') {
-    return 'border-neutral-700 bg-neutral-900 text-neutral-500'
+    return 'border-admin-border-strong bg-admin-surface-muted text-admin-text-faint'
   }
 
-  return 'border-neutral-700 bg-neutral-900 text-neutral-300'
+  return 'border-admin-border-strong bg-admin-surface-muted text-admin-text-muted'
 }
 
 function canRetryShop(shop: ShopListItem): boolean {
@@ -211,12 +211,12 @@ onMounted(() => {
   <section class="space-y-6">
     <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
       <div>
-        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-admin-link">
           <Icon :icon="icons.activity" class="size-4" aria-hidden="true" />
           Статус скрейпов
         </p>
-        <h2 class="mt-2 text-2xl font-semibold text-white">Здоровье источников</h2>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+        <h2 class="mt-2 text-2xl font-semibold text-admin-text">Здоровье источников</h2>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-admin-text-muted">
           Смотрим последние запуски, упавшие магазины, устаревшие источники и расписание следующих запусков.
         </p>
       </div>
@@ -228,7 +228,7 @@ onMounted(() => {
         <select
           v-model="selectedSource"
           aria-label="Фильтр скрейпов по источнику"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
         >
           <option value="">Все источники</option>
           <option v-for="source in sourceOptions" :key="source" :value="source">
@@ -238,7 +238,7 @@ onMounted(() => {
         <select
           v-model="selectedStatus"
           aria-label="Фильтр скрейпов по статусу"
-          class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+          class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
         >
           <option value="">Все статусы</option>
           <option v-for="status in statusOptions" :key="status" :value="status">
@@ -249,46 +249,46 @@ onMounted(() => {
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.buildingStore" class="size-4" aria-hidden="true" />
           Магазины
         </p>
-        <p class="mt-3 text-3xl font-semibold text-white">{{ shops.length }}</p>
+        <p class="mt-3 text-3xl font-semibold text-admin-text">{{ shops.length }}</p>
       </div>
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.alertTriangle" class="size-4" aria-hidden="true" />
           Failed / partial
         </p>
-        <p class="mt-3 text-3xl font-semibold" :class="failedOrPartialRuns > 0 ? 'text-red-200' : 'text-white'">
+        <p class="mt-3 text-3xl font-semibold" :class="failedOrPartialRuns > 0 ? 'text-admin-danger' : 'text-admin-text'">
           {{ failedOrPartialRuns }}
         </p>
       </div>
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.calendarDue" class="size-4" aria-hidden="true" />
           Due now
         </p>
-        <p class="mt-3 text-3xl font-semibold" :class="dueShops > 0 ? 'text-amber-200' : 'text-white'">
+        <p class="mt-3 text-3xl font-semibold" :class="dueShops > 0 ? 'text-admin-link' : 'text-admin-text'">
           {{ dueShops }}
         </p>
       </div>
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.clock" class="size-4" aria-hidden="true" />
           Последний запуск
         </p>
-        <p class="mt-3 text-lg font-semibold text-white">
+        <p class="mt-3 text-lg font-semibold text-admin-text">
           {{ mostRecentRun ? formatDateTime(mostRecentRun.started_at) : '-' }}
         </p>
       </div>
     </div>
 
     <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
-      <div class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
+      <div class="overflow-x-auto rounded-lg border border-admin-border bg-admin-surface">
         <div
-          class="grid min-w-[1020px] grid-cols-[minmax(220px,1.5fr)_110px_130px_170px_170px_minmax(150px,1fr)_150px] border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
+          class="grid min-w-[1020px] grid-cols-[minmax(220px,1.5fr)_110px_130px_170px_170px_minmax(150px,1fr)_150px] border-b border-admin-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-admin-text-faint"
         >
           <span>Магазин</span>
           <span>Источник</span>
@@ -299,20 +299,20 @@ onMounted(() => {
           <span>Действие</span>
         </div>
 
-        <div v-if="isLoading" class="min-w-[1020px] px-4 py-14 text-center text-sm text-neutral-500">
-          <Icon :icon="icons.activity" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+        <div v-if="isLoading" class="min-w-[1020px] px-4 py-14 text-center text-sm text-admin-text-faint">
+          <Icon :icon="icons.activity" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
           Загружаем магазины...
         </div>
 
         <div
           v-else-if="shops.length === 0"
-          class="min-w-[1020px] px-4 py-14 text-center text-sm text-neutral-500"
+          class="min-w-[1020px] px-4 py-14 text-center text-sm text-admin-text-faint"
         >
-          <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+          <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
           По этим фильтрам магазинов не найдено.
         </div>
 
-        <div v-else class="min-w-[1020px] divide-y divide-neutral-800">
+        <div v-else class="min-w-[1020px] divide-y divide-admin-border">
           <div
             v-for="shop in shops"
             :key="shop.id"
@@ -320,61 +320,61 @@ onMounted(() => {
             data-testid="scrape-shop-row"
           >
             <div class="min-w-0 pr-5">
-              <p class="truncate font-medium text-white" :title="shop.name">{{ shop.name }}</p>
-              <p class="mt-1 truncate text-xs text-neutral-500" :title="shop.source_id">{{ shop.source_id }}</p>
+              <p class="truncate font-medium text-admin-text" :title="shop.name">{{ shop.name }}</p>
+              <p class="mt-1 truncate text-xs text-admin-text-faint" :title="shop.source_id">{{ shop.source_id }}</p>
             </div>
-            <div class="text-neutral-300">{{ shop.source }}</div>
+            <div class="text-admin-text-muted">{{ shop.source }}</div>
             <div>
               <span class="rounded-full border px-2 py-1 text-xs" :class="statusClass(shop.scrape_status)">
                 {{ statusLabel(shop.scrape_status) }}
               </span>
               <p
                 v-if="shop.enqueue_failed"
-                class="mt-2 truncate text-xs text-red-300"
+                class="mt-2 truncate text-xs text-admin-danger"
                 :title="enqueueFailureTitle(shop)"
               >
                 enqueue: {{ shop.enqueue_failed.reason }}
               </p>
             </div>
-            <div class="text-neutral-400">{{ formatDateTime(shop.last_scraped_at) }}</div>
-            <div class="text-neutral-400">{{ formatDateTime(shop.next_scrape_at) }}</div>
-            <div class="min-w-0 pr-5 text-neutral-500">
+            <div class="text-admin-text-muted">{{ formatDateTime(shop.last_scraped_at) }}</div>
+            <div class="text-admin-text-muted">{{ formatDateTime(shop.next_scrape_at) }}</div>
+            <div class="min-w-0 pr-5 text-admin-text-faint">
               <p class="truncate" :title="shop.address || '-'">{{ shop.address || '-' }}</p>
             </div>
             <div>
               <button
                 v-if="canRetryShop(shop)"
                 type="button"
-                class="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-xs font-medium text-amber-100 transition hover:border-amber-300 hover:bg-amber-300/15 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-admin-border-strong bg-admin-surface-muted px-3 text-xs font-medium text-admin-link transition hover:border-admin-primary hover:bg-admin-surface-hover hover:text-admin-link-hover disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="retryingShopId === shop.id"
                 @click="retryScrape(shop)"
               >
                 <Icon :icon="icons.refresh" class="size-3.5" aria-hidden="true" />
                 {{ retryingShopId === shop.id ? 'Ставим...' : 'Перезапуск' }}
               </button>
-              <span v-else class="text-xs text-neutral-600">-</span>
+              <span v-else class="text-xs text-admin-text-faint">-</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40">
-        <div class="flex items-center gap-2 border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface">
+        <div class="flex items-center gap-2 border-b border-admin-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-admin-text-faint">
           <Icon :icon="icons.timeline" class="size-4" aria-hidden="true" />
           Recent runs
         </div>
 
-        <div v-if="isLoading" class="px-4 py-14 text-center text-sm text-neutral-500">
-          <Icon :icon="icons.timeline" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+        <div v-if="isLoading" class="px-4 py-14 text-center text-sm text-admin-text-faint">
+          <Icon :icon="icons.timeline" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
           Загружаем запуски...
         </div>
 
-        <div v-else-if="recentRuns.length === 0" class="px-4 py-14 text-center text-sm text-neutral-500">
-          <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+        <div v-else-if="recentRuns.length === 0" class="px-4 py-14 text-center text-sm text-admin-text-faint">
+          <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
           Запусков по этим фильтрам нет.
         </div>
 
-        <div v-else class="divide-y divide-neutral-800">
+        <div v-else class="divide-y divide-admin-border">
           <div
             v-for="run in recentRuns"
             :key="run.id"
@@ -383,8 +383,8 @@ onMounted(() => {
           >
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p class="font-medium text-white">#{{ run.id }} · {{ run.source }}</p>
-                <p class="mt-1 text-xs text-neutral-500">
+                <p class="font-medium text-admin-text">#{{ run.id }} · {{ run.source }}</p>
+                <p class="mt-1 text-xs text-admin-text-faint">
                   shop {{ run.shop_id || '-' }} · {{ formatDuration(run) }}
                 </p>
               </div>
@@ -392,13 +392,13 @@ onMounted(() => {
                 {{ statusLabel(run.status) }}
               </span>
             </div>
-            <div class="mt-3 grid gap-2 text-xs text-neutral-500 sm:grid-cols-2">
+            <div class="mt-3 grid gap-2 text-xs text-admin-text-faint sm:grid-cols-2">
               <p>started: {{ formatDateTime(run.started_at) }}</p>
               <p>finished: {{ formatDateTime(run.finished_at) }}</p>
               <p>seen: {{ run.items_seen }}</p>
               <p>saved: {{ run.items_saved }}</p>
             </div>
-            <p v-if="run.error" class="mt-3 rounded-md bg-red-400/10 px-3 py-2 text-xs text-red-100">
+            <p v-if="run.error" class="mt-3 rounded-md bg-admin-danger-soft px-3 py-2 text-xs text-admin-danger">
               {{ run.error }}
             </p>
           </div>

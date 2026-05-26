@@ -212,70 +212,70 @@ onMounted(() => {
       <div>
         <RouterLink
           to="/canonical-products"
-          class="inline-flex items-center gap-2 text-sm font-medium text-neutral-400 transition hover:text-white"
+          class="inline-flex items-center gap-2 text-sm font-medium text-admin-text-muted transition hover:text-admin-text"
         >
           <Icon :icon="icons.arrowLeft" class="size-4" aria-hidden="true" />
           К списку нормализованных
         </RouterLink>
-        <p class="mt-5 flex items-center gap-2 text-sm font-medium text-amber-300">
+        <p class="mt-5 flex items-center gap-2 text-sm font-medium text-admin-link">
           <Icon :icon="icons.package" class="size-4" aria-hidden="true" />
           Нормализованный товар
         </p>
-        <h2 class="mt-2 text-2xl font-semibold text-white">
+        <h2 class="mt-2 text-2xl font-semibold text-admin-text">
           {{ product?.title || 'Загрузка товара' }}
         </h2>
       </div>
 
       <div class="grid gap-3 sm:grid-cols-3 xl:min-w-[560px]">
-        <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">Офферов</p>
-          <p class="mt-2 text-2xl font-semibold text-white">{{ acceptedOffersCount }}</p>
+        <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
+          <p class="text-xs uppercase tracking-wide text-admin-text-faint">Офферов</p>
+          <p class="mt-2 text-2xl font-semibold text-admin-text">{{ acceptedOffersCount }}</p>
         </div>
-        <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">Кандидатов</p>
-          <p class="mt-2 text-2xl font-semibold text-white">{{ product?.match_counts.candidate ?? 0 }}</p>
+        <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
+          <p class="text-xs uppercase tracking-wide text-admin-text-faint">Кандидатов</p>
+          <p class="mt-2 text-2xl font-semibold text-admin-text">{{ product?.match_counts.candidate ?? 0 }}</p>
         </div>
-        <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">Отклонено</p>
-          <p class="mt-2 text-2xl font-semibold text-white">{{ product?.match_counts.rejected ?? 0 }}</p>
+        <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
+          <p class="text-xs uppercase tracking-wide text-admin-text-faint">Отклонено</p>
+          <p class="mt-2 text-2xl font-semibold text-admin-text">{{ product?.match_counts.rejected ?? 0 }}</p>
         </div>
       </div>
     </div>
 
-    <div v-if="errorMessage" class="rounded-lg border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-100">
+    <div v-if="errorMessage" class="rounded-lg border border-admin-danger-border bg-admin-danger-soft p-4 text-sm text-admin-danger">
       {{ errorMessage }}
     </div>
 
-    <div v-if="isLoading" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">
-      <Icon :icon="icons.package" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+    <div v-if="isLoading" class="rounded-lg border border-admin-border bg-admin-surface p-8 text-center text-sm text-admin-text-faint">
+      <Icon :icon="icons.package" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
       Загружаем нормализованный товар...
     </div>
 
     <template v-else-if="product">
       <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <form class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5" @submit.prevent="saveProduct">
+        <form class="rounded-lg border border-admin-border bg-admin-surface p-5" @submit.prevent="saveProduct">
           <div class="grid gap-4 md:grid-cols-2">
             <label class="block md:col-span-2">
-              <span class="text-xs uppercase tracking-wide text-neutral-500">Название</span>
+              <span class="text-xs uppercase tracking-wide text-admin-text-faint">Название</span>
               <input
                 v-model="form.title"
-                class="mt-2 h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                class="mt-2 h-10 w-full rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
                 required
               >
             </label>
             <label class="block md:col-span-2">
-              <span class="text-xs uppercase tracking-wide text-neutral-500">Нормализованное название</span>
+              <span class="text-xs uppercase tracking-wide text-admin-text-faint">Нормализованное название</span>
               <input
                 v-model="form.normalized_title"
-                class="mt-2 h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                class="mt-2 h-10 w-full rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
                 required
               >
             </label>
             <label class="block">
-              <span class="text-xs uppercase tracking-wide text-neutral-500">Категория</span>
+              <span class="text-xs uppercase tracking-wide text-admin-text-faint">Категория</span>
               <select
                 v-model="form.category_id"
-                class="mt-2 h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                class="mt-2 h-10 w-full rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
               >
                 <option value="">Без категории</option>
                 <option v-for="category in categoryOptions" :key="category.id" :value="String(category.id)">
@@ -284,48 +284,48 @@ onMounted(() => {
               </select>
             </label>
             <label class="block">
-              <span class="text-xs uppercase tracking-wide text-neutral-500">Статус</span>
+              <span class="text-xs uppercase tracking-wide text-admin-text-faint">Статус</span>
               <select
                 v-model="form.match_status"
-                class="mt-2 h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                class="mt-2 h-10 w-full rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
               >
                 <option value="active">active</option>
                 <option value="inactive">inactive</option>
               </select>
             </label>
             <label class="block">
-              <span class="text-xs uppercase tracking-wide text-neutral-500">Бренд</span>
+              <span class="text-xs uppercase tracking-wide text-admin-text-faint">Бренд</span>
               <input
                 v-model="form.brand"
-                class="mt-2 h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                class="mt-2 h-10 w-full rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
               >
             </label>
             <label class="block">
-              <span class="text-xs uppercase tracking-wide text-neutral-500">Модель</span>
+              <span class="text-xs uppercase tracking-wide text-admin-text-faint">Модель</span>
               <input
                 v-model="form.model"
-                class="mt-2 h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                class="mt-2 h-10 w-full rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
               >
             </label>
             <label class="block md:col-span-2">
-              <span class="text-xs uppercase tracking-wide text-neutral-500">Единица</span>
+              <span class="text-xs uppercase tracking-wide text-admin-text-faint">Единица</span>
               <input
                 v-model="form.unit_raw"
-                class="mt-2 h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                class="mt-2 h-10 w-full rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
               >
             </label>
             <label class="block md:col-span-2">
-              <span class="text-xs uppercase tracking-wide text-neutral-500">Атрибуты JSON</span>
+              <span class="text-xs uppercase tracking-wide text-admin-text-faint">Атрибуты JSON</span>
               <textarea
                 v-model="attributesText"
-                class="mt-2 min-h-40 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 font-mono text-sm text-white outline-none transition focus:border-amber-400"
+                class="mt-2 min-h-40 w-full rounded-md border border-admin-border bg-admin-surface px-3 py-2 font-mono text-sm text-admin-text outline-none transition focus:border-admin-focus"
               />
             </label>
           </div>
 
           <button
             type="submit"
-            class="mt-5 inline-flex items-center justify-center gap-2 rounded-md bg-amber-300 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60"
+            class="mt-5 inline-flex items-center justify-center gap-2 rounded-md bg-admin-primary px-4 py-2 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-wait disabled:opacity-60"
             :disabled="isSaving"
           >
             <Icon :icon="icons.check" class="size-4" aria-hidden="true" />
@@ -334,56 +334,56 @@ onMounted(() => {
         </form>
 
         <aside class="space-y-4">
-          <section class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-            <h3 class="text-sm font-semibold text-white">Принятые офферы</h3>
+          <section class="rounded-lg border border-admin-border bg-admin-surface p-5">
+            <h3 class="text-sm font-semibold text-admin-text">Принятые офферы</h3>
             <div v-if="product.accepted_offer_groups.length" class="mt-4 space-y-4">
               <div v-for="group in product.accepted_offer_groups" :key="`${group.source}:${group.shop_id}`">
-                <p class="text-sm font-semibold text-amber-200">{{ group.shop_name }}</p>
-                <p class="text-xs text-neutral-500">{{ group.source }} · {{ group.shop_source_id }}</p>
+                <p class="text-sm font-semibold text-admin-link">{{ group.shop_name }}</p>
+                <p class="text-xs text-admin-text-faint">{{ group.source }} · {{ group.shop_source_id }}</p>
                 <div class="mt-3 space-y-3">
-                  <div v-for="item in group.items" :key="item.match_id" class="border-t border-neutral-800 pt-3">
-                    <RouterLink :to="`/products/${item.id}`" class="text-sm font-semibold text-white transition hover:text-amber-200">
+                  <div v-for="item in group.items" :key="item.match_id" class="border-t border-admin-border pt-3">
+                    <RouterLink :to="`/products/${item.id}`" class="text-sm font-semibold text-admin-text transition hover:text-admin-link-hover">
                       {{ item.title }}
                     </RouterLink>
-                    <p class="mt-1 text-sm text-neutral-300">{{ formatLatestPrice(item) }}</p>
-                    <p class="mt-1 text-xs text-neutral-500">{{ item.category_raw || 'Без raw категории' }} · {{ formatDateTime(item.last_seen_at) }}</p>
+                    <p class="mt-1 text-sm text-admin-text-muted">{{ formatLatestPrice(item) }}</p>
+                    <p class="mt-1 text-xs text-admin-text-faint">{{ item.category_raw || 'Без raw категории' }} · {{ formatDateTime(item.last_seen_at) }}</p>
                   </div>
                 </div>
               </div>
             </div>
-            <p v-else class="mt-4 text-sm text-neutral-500">Принятых source-карточек пока нет.</p>
+            <p v-else class="mt-4 text-sm text-admin-text-faint">Принятых source-карточек пока нет.</p>
           </section>
 
-          <section class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-            <h3 class="text-sm font-semibold text-white">Кандидаты и отклоненные</h3>
+          <section class="rounded-lg border border-admin-border bg-admin-surface p-5">
+            <h3 class="text-sm font-semibold text-admin-text">Кандидаты и отклоненные</h3>
             <div class="mt-4 space-y-4">
               <div>
-                <p class="text-xs uppercase tracking-wide text-neutral-500">Кандидаты</p>
+                <p class="text-xs uppercase tracking-wide text-admin-text-faint">Кандидаты</p>
                 <div v-if="product.candidate_source_products.length" class="mt-2 space-y-2">
                   <RouterLink
                     v-for="item in product.candidate_source_products"
                     :key="item.match_id"
                     :to="`/products/${item.id}`"
-                    class="block rounded-md border border-neutral-800 px-3 py-2 text-sm text-neutral-200 transition hover:border-amber-300"
+                    class="block rounded-md border border-admin-border px-3 py-2 text-sm text-admin-text transition hover:border-admin-primary"
                   >
                     {{ item.title }} · {{ confidencePercent(item.confidence) }}
                   </RouterLink>
                 </div>
-                <p v-else class="mt-2 text-sm text-neutral-500">Кандидатов нет.</p>
+                <p v-else class="mt-2 text-sm text-admin-text-faint">Кандидатов нет.</p>
               </div>
               <div>
-                <p class="text-xs uppercase tracking-wide text-neutral-500">Отклоненные</p>
+                <p class="text-xs uppercase tracking-wide text-admin-text-faint">Отклоненные</p>
                 <div v-if="product.rejected_source_products.length" class="mt-2 space-y-2">
                   <RouterLink
                     v-for="item in product.rejected_source_products"
                     :key="item.match_id"
                     :to="`/products/${item.id}`"
-                    class="block rounded-md border border-neutral-800 px-3 py-2 text-sm text-neutral-200 transition hover:border-neutral-600"
+                    class="block rounded-md border border-admin-border px-3 py-2 text-sm text-admin-text transition hover:border-admin-border-strong"
                   >
                     {{ item.title }} · {{ confidencePercent(item.confidence) }}
                   </RouterLink>
                 </div>
-                <p v-else class="mt-2 text-sm text-neutral-500">Отклоненных матчей нет.</p>
+                <p v-else class="mt-2 text-sm text-admin-text-faint">Отклоненных матчей нет.</p>
               </div>
             </div>
           </section>

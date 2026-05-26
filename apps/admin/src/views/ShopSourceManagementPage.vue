@@ -132,30 +132,30 @@ function sourceTypeLabel(sourceType: string): string {
 
 function statusClass(status: string): string {
   if (status === 'failed') {
-    return 'border-red-400/30 bg-red-400/10 text-red-200'
+    return 'border-admin-danger-border bg-admin-danger-soft text-admin-danger'
   }
   if (status === 'partial' || status === 'hold') {
-    return 'border-amber-400/30 bg-amber-400/10 text-amber-200'
+    return 'border-admin-border-strong bg-admin-surface-muted text-admin-link'
   }
   if (status === 'success' || status === 'active') {
-    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+    return 'border-admin-success-border bg-admin-success-soft text-admin-success'
   }
   if (status === 'disabled' || status === 'out_of_scope') {
-    return 'border-neutral-700 bg-neutral-900 text-neutral-500'
+    return 'border-admin-border-strong bg-admin-surface-muted text-admin-text-faint'
   }
 
-  return 'border-neutral-700 bg-neutral-900 text-neutral-300'
+  return 'border-admin-border-strong bg-admin-surface-muted text-admin-text-muted'
 }
 
 function sourceTypeClass(sourceType: string): string {
   if (sourceType === 'official_api') {
-    return 'border-sky-400/30 bg-sky-400/10 text-sky-200'
+    return 'border-admin-border-strong bg-admin-surface-muted text-admin-text'
   }
   if (sourceType === 'official_html') {
-    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+    return 'border-admin-success-border bg-admin-success-soft text-admin-success'
   }
 
-  return 'border-neutral-700 bg-neutral-900 text-neutral-300'
+  return 'border-admin-border-strong bg-admin-surface-muted text-admin-text-muted'
 }
 
 function canRetryShop(shop: ShopListItem): boolean {
@@ -527,47 +527,47 @@ onMounted(() => {
   <section class="space-y-6">
     <div>
       <div>
-        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-admin-link">
           <Icon :icon="icons.buildingStore" class="size-4" aria-hidden="true" />
           Магазины и источники
         </p>
-        <h2 class="mt-2 text-2xl font-semibold text-white">Управление магазинами</h2>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+        <h2 class="mt-2 text-2xl font-semibold text-admin-text">Управление магазинами</h2>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-admin-text-muted">
           Магазины объединяют source-записи из 2GIS, официальных API и HTML-каталогов. Здесь только метаданные, статусы и связи источников.
         </p>
       </div>
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.buildingStore" class="size-4" aria-hidden="true" />
           Магазины
         </p>
-        <p class="mt-3 text-3xl font-semibold text-white">{{ identities.length }}</p>
+        <p class="mt-3 text-3xl font-semibold text-admin-text">{{ identities.length }}</p>
       </div>
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.link" class="size-4" aria-hidden="true" />
           Связанные источники
         </p>
-        <p class="mt-3 text-3xl font-semibold text-white">{{ groupedSourceCount }}</p>
+        <p class="mt-3 text-3xl font-semibold text-admin-text">{{ groupedSourceCount }}</p>
       </div>
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.linkOff" class="size-4" aria-hidden="true" />
           Без магазина
         </p>
-        <p class="mt-3 text-3xl font-semibold" :class="ungroupedSourceCount > 0 ? 'text-amber-200' : 'text-white'">
+        <p class="mt-3 text-3xl font-semibold" :class="ungroupedSourceCount > 0 ? 'text-admin-link' : 'text-admin-text'">
           {{ ungroupedSourceCount }}
         </p>
       </div>
-      <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5">
-        <p class="inline-flex items-center gap-2 text-sm text-neutral-500">
+      <div class="rounded-lg border border-admin-border bg-admin-surface p-5">
+        <p class="inline-flex items-center gap-2 text-sm text-admin-text-faint">
           <Icon :icon="icons.alertTriangle" class="size-4" aria-hidden="true" />
           Требуют внимания
         </p>
-        <p class="mt-3 text-3xl font-semibold" :class="failingSourceCount + heldIdentityCount > 0 ? 'text-red-200' : 'text-white'">
+        <p class="mt-3 text-3xl font-semibold" :class="failingSourceCount + heldIdentityCount > 0 ? 'text-admin-danger' : 'text-admin-text'">
           {{ failingSourceCount + heldIdentityCount }}
         </p>
       </div>
@@ -576,12 +576,12 @@ onMounted(() => {
     <section class="space-y-3">
       <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h3 class="text-base font-semibold text-white">Магазины</h3>
-          <p class="mt-1 text-sm text-neutral-500">Карточки магазинов, их статус и приоритетный источник.</p>
+          <h3 class="text-base font-semibold text-admin-text">Магазины</h3>
+          <p class="mt-1 text-sm text-admin-text-faint">Карточки магазинов, их статус и приоритетный источник.</p>
         </div>
         <button
           type="button"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-primary px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover"
           @click="() => openCreateModal()"
         >
           <Icon :icon="icons.plus" class="size-4" aria-hidden="true" />
@@ -589,15 +589,15 @@ onMounted(() => {
         </button>
       </div>
 
-      <div v-if="isLoading" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-400">
+      <div v-if="isLoading" class="rounded-lg border border-admin-border bg-admin-surface p-4 text-sm text-admin-text-muted">
         Загружаем магазины...
       </div>
-      <div v-else-if="identities.length === 0" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">
+      <div v-else-if="identities.length === 0" class="rounded-lg border border-admin-border bg-admin-surface p-8 text-center text-sm text-admin-text-faint">
         Магазины ещё не созданы.
       </div>
-      <div v-else class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
+      <div v-else class="overflow-x-auto rounded-lg border border-admin-border bg-admin-surface">
         <table class="w-full min-w-[920px] text-left text-sm">
-          <thead class="border-b border-neutral-800 text-xs uppercase tracking-wide text-neutral-500">
+          <thead class="border-b border-admin-border text-xs uppercase tracking-wide text-admin-text-faint">
             <tr>
               <th class="px-4 py-3 font-medium">Магазин</th>
               <th class="px-4 py-3 font-medium">Сайт</th>
@@ -607,14 +607,14 @@ onMounted(() => {
               <th class="px-4 py-3 font-medium">Действия</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-neutral-800">
-            <tr v-for="identity in identities" :key="identity.id" class="align-top hover:bg-neutral-900/70">
+          <tbody class="divide-y divide-admin-border">
+            <tr v-for="identity in identities" :key="identity.id" class="align-top hover:bg-admin-surface-hover">
               <td class="px-4 py-4">
-                <p class="font-medium text-white">{{ identity.display_name }}</p>
-                <p class="mt-1 text-xs text-neutral-500">{{ placeholder(identity.address, 'Адрес не указан') }}</p>
+                <p class="font-medium text-admin-text">{{ identity.display_name }}</p>
+                <p class="mt-1 text-xs text-admin-text-faint">{{ placeholder(identity.address, 'Адрес не указан') }}</p>
               </td>
               <td class="px-4 py-4">
-                <span class="text-neutral-300">{{ placeholder(identity.website_url, 'Сайт не указан') }}</span>
+                <span class="text-admin-text-muted">{{ placeholder(identity.website_url, 'Сайт не указан') }}</span>
               </td>
               <td class="px-4 py-4">
                 <span class="rounded-full border px-2.5 py-1 text-xs font-medium" :class="statusClass(identity.status)">
@@ -622,19 +622,19 @@ onMounted(() => {
                 </span>
               </td>
               <td class="px-4 py-4">
-                <p class="max-w-[280px] text-neutral-300">{{ linkedSourceSummary(identity) }}</p>
-                <p class="mt-1 text-xs text-neutral-500">
+                <p class="max-w-[280px] text-admin-text-muted">{{ linkedSourceSummary(identity) }}</p>
+                <p class="mt-1 text-xs text-admin-text-faint">
                   preferred: {{ identity.preferred_source || 'не выбран' }}
                 </p>
               </td>
               <td class="px-4 py-4">
-                <p class="max-w-[260px] text-neutral-400">{{ placeholder(identity.notes, 'Заметок нет') }}</p>
+                <p class="max-w-[260px] text-admin-text-muted">{{ placeholder(identity.notes, 'Заметок нет') }}</p>
               </td>
               <td class="px-4 py-4">
                 <div class="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    class="inline-flex h-8 items-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-xs font-medium text-amber-100 transition hover:border-amber-300 hover:bg-amber-300/15 hover:text-amber-50"
+                    class="inline-flex h-8 items-center gap-2 rounded-md border border-admin-border-strong bg-admin-surface-muted px-3 text-xs font-medium text-admin-link transition hover:border-admin-primary hover:bg-admin-surface-hover hover:text-admin-link-hover"
                     @click="openEditModal(identity)"
                   >
                     <Icon :icon="icons.pencil" class="size-3.5" aria-hidden="true" />
@@ -642,7 +642,7 @@ onMounted(() => {
                   </button>
                   <button
                     type="button"
-                    class="inline-flex h-8 items-center gap-2 rounded-md border border-red-400/30 bg-red-400/10 px-3 text-xs font-medium text-red-100 transition hover:border-red-300 hover:bg-red-300/15 hover:text-red-50"
+                    class="inline-flex h-8 items-center gap-2 rounded-md border border-admin-danger-border bg-admin-danger-soft px-3 text-xs font-medium text-admin-danger transition hover:border-admin-danger-border hover:bg-admin-danger-soft hover:text-admin-danger"
                     @click="openDeleteModal(identity)"
                   >
                     <Icon :icon="icons.trash" class="size-3.5" aria-hidden="true" />
@@ -659,14 +659,14 @@ onMounted(() => {
     <section class="space-y-3">
       <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h3 class="text-base font-semibold text-white">Источники</h3>
-          <p class="mt-1 text-sm text-neutral-500">Отдельные scrape targets: 2GIS, официальный API и официальный HTML-каталог.</p>
+          <h3 class="text-base font-semibold text-admin-text">Источники</h3>
+          <p class="mt-1 text-sm text-admin-text-faint">Отдельные scrape targets: 2GIS, официальный API и официальный HTML-каталог.</p>
         </div>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:min-w-[960px] xl:grid-cols-[repeat(5,minmax(0,1fr))_auto]">
           <select
             v-model="selectedSource"
             aria-label="Фильтр магазинов по источнику"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           >
             <option value="">Все источники</option>
             <option v-for="source in sourceOptions" :key="source" :value="source">{{ source }}</option>
@@ -674,7 +674,7 @@ onMounted(() => {
           <select
             v-model="selectedStatus"
             aria-label="Фильтр магазинов по scrape status"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           >
             <option value="">Все статусы</option>
             <option v-for="status in scrapeStatusOptions" :key="status" :value="status">
@@ -684,7 +684,7 @@ onMounted(() => {
           <select
             v-model="selectedSourceType"
             aria-label="Фильтр магазинов по типу источника"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           >
             <option value="">Все типы</option>
             <option v-for="option in sourceTypeOptions" :key="option.value" :value="option.value">
@@ -694,7 +694,7 @@ onMounted(() => {
           <select
             v-model="selectedRelationship"
             aria-label="Фильтр магазинов по связи"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           >
             <option value="">Все связи</option>
             <option value="linked">Сгруппированные</option>
@@ -703,7 +703,7 @@ onMounted(() => {
           <select
             v-model.number="selectedIdentityId"
             aria-label="Фильтр по магазину"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           >
             <option value="">Все магазины</option>
             <option v-for="identity in identities" :key="identity.id" :value="identity.id">
@@ -712,7 +712,7 @@ onMounted(() => {
           </select>
           <RouterLink
             to="/shops/candidates"
-            class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 text-sm font-semibold text-amber-100 transition hover:border-amber-300 hover:bg-amber-300/15 hover:text-amber-50"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-admin-border-strong bg-admin-surface-muted px-4 text-sm font-semibold text-admin-link transition hover:border-admin-primary hover:bg-admin-surface-hover hover:text-admin-link-hover"
           >
             <Icon :icon="icons.databaseImport" class="size-4" aria-hidden="true" />
             Кандидаты
@@ -720,15 +720,15 @@ onMounted(() => {
         </div>
       </div>
 
-      <div v-if="isLoading" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-400">
+      <div v-if="isLoading" class="rounded-lg border border-admin-border bg-admin-surface p-4 text-sm text-admin-text-muted">
         Загружаем источники...
       </div>
-      <div v-else-if="shops.length === 0" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">
+      <div v-else-if="shops.length === 0" class="rounded-lg border border-admin-border bg-admin-surface p-8 text-center text-sm text-admin-text-faint">
         По этим фильтрам источников нет.
       </div>
-      <div v-else class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
+      <div v-else class="overflow-x-auto rounded-lg border border-admin-border bg-admin-surface">
         <table class="w-full min-w-[1160px] text-left text-sm">
-          <thead class="border-b border-neutral-800 text-xs uppercase tracking-wide text-neutral-500">
+          <thead class="border-b border-admin-border text-xs uppercase tracking-wide text-admin-text-faint">
             <tr>
               <th class="px-4 py-3 font-medium">Источник</th>
               <th class="px-4 py-3 font-medium">Source ID / URL</th>
@@ -738,31 +738,31 @@ onMounted(() => {
               <th class="px-4 py-3 font-medium">Связь</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-neutral-800">
-            <tr v-for="shop in shops" :key="shop.id" class="align-top hover:bg-neutral-900/70">
+          <tbody class="divide-y divide-admin-border">
+            <tr v-for="shop in shops" :key="shop.id" class="align-top hover:bg-admin-surface-hover">
               <td class="px-4 py-4">
                 <div class="flex flex-wrap items-center gap-2">
-                  <span class="font-medium text-white">{{ shop.source }}</span>
+                  <span class="font-medium text-admin-text">{{ shop.source }}</span>
                   <span class="rounded-full border px-2 py-0.5 text-xs" :class="sourceTypeClass(shop.source_type)">
                     {{ sourceTypeLabel(shop.source_type) }}
                   </span>
-                  <span v-if="shop.is_preferred_source" class="rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-0.5 text-xs text-amber-200">
+                  <span v-if="shop.is_preferred_source" class="rounded-full border border-admin-border-strong bg-admin-surface-muted px-2 py-0.5 text-xs text-admin-link">
                     preferred
                   </span>
                 </div>
-                <p class="mt-2 text-xs text-neutral-500">{{ shop.name }}</p>
+                <p class="mt-2 text-xs text-admin-text-faint">{{ shop.name }}</p>
               </td>
               <td class="px-4 py-4">
-                <p class="max-w-[280px] truncate text-neutral-300" :title="shop.url || shop.source_id">
+                <p class="max-w-[280px] truncate text-admin-text-muted" :title="shop.url || shop.source_id">
                   {{ shop.url || shop.source_id }}
                 </p>
-                <p class="mt-1 max-w-[280px] truncate text-xs text-neutral-500" :title="shop.source_id">
+                <p class="mt-1 max-w-[280px] truncate text-xs text-admin-text-faint" :title="shop.source_id">
                   {{ shop.source_id }}
                 </p>
               </td>
               <td class="px-4 py-4">
-                <p class="font-medium text-white">{{ placeholder(shop.identity?.display_name, 'Не привязан') }}</p>
-                <p class="mt-1 max-w-[240px] truncate text-xs text-neutral-500">
+                <p class="font-medium text-admin-text">{{ placeholder(shop.identity?.display_name, 'Не привязан') }}</p>
+                <p class="mt-1 max-w-[240px] truncate text-xs text-admin-text-faint">
                   {{ placeholder(shop.address, 'Адрес не указан') }}
                 </p>
               </td>
@@ -770,10 +770,10 @@ onMounted(() => {
                 <span class="rounded-full border px-2.5 py-1 text-xs font-medium" :class="statusClass(shop.scrape_status)">
                   {{ statusLabel(shop.scrape_status) }}
                 </span>
-                <p class="mt-2 text-xs text-neutral-500">ошибок: {{ shop.error_count }}</p>
+                <p class="mt-2 text-xs text-admin-text-faint">ошибок: {{ shop.error_count }}</p>
                 <p
                   v-if="shop.enqueue_failed"
-                  class="mt-2 max-w-[220px] truncate text-xs text-red-300"
+                  class="mt-2 max-w-[220px] truncate text-xs text-admin-danger"
                   :title="enqueueFailureTitle(shop)"
                 >
                   enqueue: {{ shop.enqueue_failed.reason }}
@@ -781,28 +781,28 @@ onMounted(() => {
                 <button
                   v-if="canRetryShop(shop)"
                   type="button"
-                  class="mt-3 inline-flex h-8 items-center justify-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-xs font-medium text-amber-100 transition hover:border-amber-300 hover:bg-amber-300/15 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="mt-3 inline-flex h-8 items-center justify-center gap-2 rounded-md border border-admin-border-strong bg-admin-surface-muted px-3 text-xs font-medium text-admin-link transition hover:border-admin-primary hover:bg-admin-surface-hover hover:text-admin-link-hover disabled:cursor-not-allowed disabled:opacity-50"
                   :disabled="retryingShopId === shop.id"
                   @click="retryScrape(shop)"
                 >
                   <Icon :icon="icons.refresh" class="size-3.5" aria-hidden="true" />
                   {{ retryingShopId === shop.id ? 'Ставим...' : 'Перезапустить' }}
                 </button>
-                <div v-if="shop.twogis_large_catalog" class="mt-3 max-w-[220px] rounded-md border border-amber-300/20 bg-amber-300/10 p-2 text-xs text-amber-100">
+                <div v-if="shop.twogis_large_catalog" class="mt-3 max-w-[220px] rounded-md border border-admin-border-strong bg-admin-surface-muted p-2 text-xs text-admin-link">
                   <div class="flex items-center justify-between gap-2">
                     <span class="font-medium">2GIS large</span>
                     <span class="rounded-full border px-2 py-0.5" :class="statusClass(shop.twogis_large_catalog.enabled ? 'running' : 'disabled')">
                       {{ shop.twogis_large_catalog.completed ? 'готово' : shop.twogis_large_catalog.enabled ? 'включено' : 'пауза' }}
                     </span>
                   </div>
-                  <p class="mt-2 text-amber-100/80">{{ largeCatalogProgress(shop) }}</p>
-                  <p v-if="shop.twogis_large_catalog.last_stop_reason" class="mt-1 truncate text-amber-100/60" :title="shop.twogis_large_catalog.last_stop_reason">
+                  <p class="mt-2 text-admin-link">{{ largeCatalogProgress(shop) }}</p>
+                  <p v-if="shop.twogis_large_catalog.last_stop_reason" class="mt-1 truncate text-admin-link" :title="shop.twogis_large_catalog.last_stop_reason">
                     {{ shop.twogis_large_catalog.last_stop_reason }}
                   </p>
                   <button
                     v-if="!shop.twogis_large_catalog.completed"
                     type="button"
-                    class="mt-2 inline-flex h-8 w-full items-center justify-center rounded-md border border-amber-300/30 px-3 text-xs font-medium text-amber-100 transition hover:border-amber-200 hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="mt-2 inline-flex h-8 w-full items-center justify-center rounded-md border border-admin-border-strong px-3 text-xs font-medium text-admin-link transition hover:border-admin-primary hover:bg-admin-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="largeCatalogActionShopId === shop.id"
                     @click="shop.twogis_large_catalog.enabled ? disableLargeCatalog(shop) : enableLargeCatalog(shop)"
                   >
@@ -810,7 +810,7 @@ onMounted(() => {
                   </button>
                 </div>
               </td>
-              <td class="px-4 py-4 text-xs text-neutral-400">
+              <td class="px-4 py-4 text-xs text-admin-text-muted">
                 <p>последний: {{ formatDateTime(shop.last_scraped_at) }}</p>
                 <p class="mt-1">следующий: {{ formatDateTime(shop.next_scrape_at) }}</p>
               </td>
@@ -818,14 +818,14 @@ onMounted(() => {
                 <div v-if="shop.identity" class="flex flex-col gap-2">
                   <RouterLink
                     :to="{ path: '/products', query: { shop: shop.id } }"
-                    class="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
+                    class="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-admin-border-strong px-3 text-xs font-medium text-admin-text-muted transition hover:border-admin-primary hover:text-admin-link-hover"
                   >
                     <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
                     Исходные товары
                   </RouterLink>
                   <button
                     type="button"
-                    class="inline-flex h-8 w-fit items-center rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-red-300 hover:text-red-200 disabled:opacity-50"
+                    class="inline-flex h-8 w-fit items-center rounded-md border border-admin-border-strong px-3 text-xs font-medium text-admin-text-muted transition hover:border-admin-danger-border hover:text-admin-danger disabled:opacity-50"
                     :disabled="linkingShopId === shop.id"
                     @click="unlinkSource(shop)"
                   >
@@ -836,7 +836,7 @@ onMounted(() => {
                   <select
                     v-model.number="linkTargets[shop.id]"
                     :aria-label="`Магазин для источника ${shop.source_id}`"
-                    class="h-9 rounded-md border border-neutral-800 bg-neutral-950 px-2 text-xs text-white outline-none transition focus:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="h-9 rounded-md border border-admin-border bg-admin-surface px-2 text-xs text-admin-text outline-none transition focus:border-admin-focus disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="linkingShopId === shop.id"
                     @change="linkSource(shop)"
                   >
@@ -848,7 +848,7 @@ onMounted(() => {
                   <div class="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      class="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-xs font-medium text-amber-100 transition hover:border-amber-300 hover:bg-amber-300/15 hover:text-amber-50"
+                      class="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-admin-border-strong bg-admin-surface-muted px-3 text-xs font-medium text-admin-link transition hover:border-admin-primary hover:bg-admin-surface-hover hover:text-admin-link-hover"
                       @click="openCreateModal(shop)"
                     >
                       <Icon :icon="icons.plus" class="size-3.5" aria-hidden="true" />
@@ -856,7 +856,7 @@ onMounted(() => {
                     </button>
                     <RouterLink
                       :to="{ path: '/products', query: { shop: shop.id } }"
-                      class="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-neutral-700 px-3 text-xs font-medium text-neutral-300 transition hover:border-amber-300 hover:text-amber-100"
+                      class="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-admin-border-strong px-3 text-xs font-medium text-admin-text-muted transition hover:border-admin-primary hover:text-admin-link-hover"
                     >
                       <Icon :icon="icons.package" class="size-3.5" aria-hidden="true" />
                       Исходные товары
@@ -870,16 +870,16 @@ onMounted(() => {
       </div>
     </section>
 
-    <div v-if="isCreateModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/80 p-4">
-      <form class="w-full max-w-2xl rounded-lg border border-neutral-800 bg-neutral-950 p-5 shadow-2xl" @submit.prevent="createIdentity">
+    <div v-if="isCreateModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-admin-overlay p-4">
+      <form class="w-full max-w-2xl rounded-lg border border-admin-border bg-admin-surface p-5 shadow-2xl" @submit.prevent="createIdentity">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <h3 class="text-lg font-semibold text-white">Создать магазин</h3>
-            <p class="mt-1 text-sm text-neutral-500">Карточка магазина появится без ручного каталога и цен.</p>
+            <h3 class="text-lg font-semibold text-admin-text">Создать магазин</h3>
+            <p class="mt-1 text-sm text-admin-text-faint">Карточка магазина появится без ручного каталога и цен.</p>
           </div>
           <button
             type="button"
-            class="inline-flex size-9 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-900 hover:text-white"
+            class="inline-flex size-9 items-center justify-center rounded-md text-admin-text-muted transition hover:bg-admin-surface-muted hover:text-admin-text"
             aria-label="Закрыть окно создания магазина"
             @click="closeCreateModal"
           >
@@ -891,25 +891,25 @@ onMounted(() => {
           <input
             v-model="createForm.display_name"
             aria-label="Название нового магазина"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
             placeholder="Название магазина"
           >
           <input
             v-model="createForm.website_url"
             aria-label="Сайт нового магазина"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
             placeholder="https://example.ru/catalog/"
           >
           <input
             v-model="createForm.address"
             aria-label="Адрес нового магазина"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
             placeholder="Адрес"
           >
           <select
             v-model="createForm.status"
             aria-label="Статус нового магазина"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           >
             <option v-for="option in statusOptions" :key="option.value" :value="option.value">
               {{ option.label }}
@@ -920,16 +920,16 @@ onMounted(() => {
           v-model="createForm.notes"
           aria-label="Заметка нового магазина"
           rows="3"
-          class="mt-3 w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-white outline-none transition focus:border-amber-400"
+          class="mt-3 w-full rounded-md border border-admin-border bg-admin-surface-muted px-3 py-2 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           placeholder="Заметки для оператора"
         />
         <div class="mt-5 flex justify-end gap-3">
-          <button type="button" class="h-10 rounded-md border border-neutral-700 px-4 text-sm font-medium text-neutral-300 transition hover:border-neutral-500 hover:text-white" @click="closeCreateModal">
+          <button type="button" class="h-10 rounded-md border border-admin-border-strong px-4 text-sm font-medium text-admin-text-muted transition hover:border-admin-border-strong hover:text-admin-text" @click="closeCreateModal">
             Отмена
           </button>
           <button
             type="submit"
-            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-primary px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="savingIdentityId === 0"
           >
             <Icon :icon="icons.plus" class="size-4" aria-hidden="true" />
@@ -939,16 +939,16 @@ onMounted(() => {
       </form>
     </div>
 
-    <div v-if="editingIdentity" class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/80 p-4">
-      <form class="w-full max-w-2xl rounded-lg border border-neutral-800 bg-neutral-950 p-5 shadow-2xl" @submit.prevent="saveIdentity(editingIdentity)">
+    <div v-if="editingIdentity" class="fixed inset-0 z-50 flex items-center justify-center bg-admin-overlay p-4">
+      <form class="w-full max-w-2xl rounded-lg border border-admin-border bg-admin-surface p-5 shadow-2xl" @submit.prevent="saveIdentity(editingIdentity)">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <h3 class="text-lg font-semibold text-white">Редактировать магазин</h3>
-            <p class="mt-1 text-sm text-neutral-500">{{ editingIdentity.display_name }}</p>
+            <h3 class="text-lg font-semibold text-admin-text">Редактировать магазин</h3>
+            <p class="mt-1 text-sm text-admin-text-faint">{{ editingIdentity.display_name }}</p>
           </div>
           <button
             type="button"
-            class="inline-flex size-9 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-900 hover:text-white"
+            class="inline-flex size-9 items-center justify-center rounded-md text-admin-text-muted transition hover:bg-admin-surface-muted hover:text-admin-text"
             aria-label="Закрыть окно редактирования магазина"
             @click="closeEditModal"
           >
@@ -960,24 +960,24 @@ onMounted(() => {
           <input
             v-model="identityForm(editingIdentity).display_name"
             aria-label="Название магазина"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           >
           <input
             v-model="identityForm(editingIdentity).website_url"
             aria-label="Сайт магазина"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
             placeholder="Сайт магазина"
           >
           <input
             v-model="identityForm(editingIdentity).address"
             aria-label="Адрес магазина"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
             placeholder="Адрес"
           >
           <select
             v-model="identityForm(editingIdentity).status"
             aria-label="Статус магазина"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           >
             <option v-for="option in statusOptions" :key="option.value" :value="option.value">
               {{ option.label }}
@@ -986,7 +986,7 @@ onMounted(() => {
           <select
             v-model="identityForm(editingIdentity).preferred_source"
             aria-label="Приоритетный источник магазина"
-            class="h-10 rounded-md border border-neutral-800 bg-neutral-900 px-3 text-sm text-white outline-none transition focus:border-amber-400 sm:col-span-2"
+            class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus sm:col-span-2"
           >
             <option value="">Без приоритетного источника</option>
             <option
@@ -1002,16 +1002,16 @@ onMounted(() => {
           v-model="identityForm(editingIdentity).notes"
           aria-label="Заметки магазина"
           rows="3"
-          class="mt-3 w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-white outline-none transition focus:border-amber-400"
+          class="mt-3 w-full rounded-md border border-admin-border bg-admin-surface-muted px-3 py-2 text-sm text-admin-text outline-none transition focus:border-admin-focus"
           placeholder="Заметки для оператора"
         />
         <div class="mt-5 flex justify-end gap-3">
-          <button type="button" class="h-10 rounded-md border border-neutral-700 px-4 text-sm font-medium text-neutral-300 transition hover:border-neutral-500 hover:text-white" @click="closeEditModal">
+          <button type="button" class="h-10 rounded-md border border-admin-border-strong px-4 text-sm font-medium text-admin-text-muted transition hover:border-admin-border-strong hover:text-admin-text" @click="closeEditModal">
             Отмена
           </button>
           <button
             type="submit"
-            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-primary px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="savingIdentityId === editingIdentity.id"
           >
             <Icon :icon="icons.check" class="size-4" aria-hidden="true" />
@@ -1021,18 +1021,18 @@ onMounted(() => {
       </form>
     </div>
 
-    <div v-if="deletingIdentity" class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/80 p-4">
-      <div class="w-full max-w-lg rounded-lg border border-neutral-800 bg-neutral-950 p-5 shadow-2xl">
+    <div v-if="deletingIdentity" class="fixed inset-0 z-50 flex items-center justify-center bg-admin-overlay p-4">
+      <div class="w-full max-w-lg rounded-lg border border-admin-border bg-admin-surface p-5 shadow-2xl">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <h3 class="text-lg font-semibold text-white">Удалить магазин</h3>
-            <p class="mt-1 text-sm leading-6 text-neutral-400">
+            <h3 class="text-lg font-semibold text-admin-text">Удалить магазин</h3>
+            <p class="mt-1 text-sm leading-6 text-admin-text-muted">
               {{ deletingIdentity.display_name }} исчезнет из списка магазинов. Источники, товары и история цен останутся, но будут отвязаны.
             </p>
           </div>
           <button
             type="button"
-            class="inline-flex size-9 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-900 hover:text-white"
+            class="inline-flex size-9 items-center justify-center rounded-md text-admin-text-muted transition hover:bg-admin-surface-muted hover:text-admin-text"
             aria-label="Закрыть окно удаления магазина"
             @click="closeDeleteModal"
           >
@@ -1042,14 +1042,14 @@ onMounted(() => {
         <div class="mt-5 flex justify-end gap-3">
           <button
             type="button"
-            class="h-10 rounded-md border border-neutral-700 px-4 text-sm font-medium text-neutral-300 transition hover:border-neutral-500 hover:text-white"
+            class="h-10 rounded-md border border-admin-border-strong px-4 text-sm font-medium text-admin-text-muted transition hover:border-admin-border-strong hover:text-admin-text"
             @click="closeDeleteModal"
           >
             Отмена
           </button>
           <button
             type="button"
-            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-red-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-danger px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-danger disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="deletingIdentityId === deletingIdentity.id"
             @click="deleteIdentity(deletingIdentity)"
           >

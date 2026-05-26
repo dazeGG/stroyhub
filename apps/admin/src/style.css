@@ -1,8 +1,38 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+@theme {
+  --color-admin-bg: var(--admin-bg);
+  --color-admin-surface: var(--admin-surface);
+  --color-admin-surface-muted: var(--admin-surface-muted);
+  --color-admin-surface-subtle: var(--admin-surface-subtle);
+  --color-admin-surface-hover: var(--admin-surface-hover);
+  --color-admin-active: var(--admin-active);
+  --color-admin-border: var(--admin-border);
+  --color-admin-border-strong: var(--admin-border-strong);
+  --color-admin-text: var(--admin-text);
+  --color-admin-text-muted: var(--admin-text-muted);
+  --color-admin-text-faint: var(--admin-text-faint);
+  --color-admin-primary: var(--admin-primary);
+  --color-admin-primary-hover: var(--admin-primary-hover);
+  --color-admin-primary-text: var(--admin-primary-text);
+  --color-admin-link: var(--admin-link);
+  --color-admin-link-hover: var(--admin-link-hover);
+  --color-admin-focus: var(--admin-focus);
+  --color-admin-overlay: var(--admin-overlay);
+  --color-admin-success: var(--admin-success);
+  --color-admin-success-soft: var(--admin-success-soft);
+  --color-admin-success-border: var(--admin-success-border);
+  --color-admin-warning: var(--admin-warning);
+  --color-admin-warning-soft: var(--admin-warning-soft);
+  --color-admin-warning-border: var(--admin-warning-border);
+  --color-admin-danger: var(--admin-danger);
+  --color-admin-danger-soft: var(--admin-danger-soft);
+  --color-admin-danger-border: var(--admin-danger-border);
+}
+
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family:
     ui-sans-serif,
     system-ui,
@@ -10,7 +40,34 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  background: #0a0a0a;
+  --admin-bg: oklch(0.977 0.003 255);
+  --admin-surface: oklch(0.997 0.001 255);
+  --admin-surface-muted: oklch(0.956 0.003 255);
+  --admin-surface-subtle: oklch(0.936 0.004 255);
+  --admin-surface-hover: oklch(0.918 0.004 255);
+  --admin-active: oklch(0.15 0.004 255);
+  --admin-border: oklch(0.86 0.005 255);
+  --admin-border-strong: oklch(0.7 0.006 255);
+  --admin-text: oklch(0.18 0.004 255);
+  --admin-text-muted: oklch(0.43 0.006 255);
+  --admin-text-faint: oklch(0.58 0.006 255);
+  --admin-primary: oklch(0.17 0.004 255);
+  --admin-primary-hover: oklch(0.26 0.005 255);
+  --admin-primary-text: oklch(0.98 0.002 255);
+  --admin-link: oklch(0.18 0.004 255);
+  --admin-link-hover: oklch(0.35 0.005 255);
+  --admin-focus: oklch(0.22 0.005 255);
+  --admin-overlay: oklch(0.18 0.004 255 / 0.42);
+  --admin-success: oklch(0.42 0.11 154);
+  --admin-success-soft: oklch(0.95 0.035 154);
+  --admin-success-border: oklch(0.78 0.075 154);
+  --admin-warning: oklch(0.48 0.105 80);
+  --admin-warning-soft: oklch(0.955 0.04 80);
+  --admin-warning-border: oklch(0.82 0.08 80);
+  --admin-danger: oklch(0.46 0.145 25);
+  --admin-danger-soft: oklch(0.955 0.035 25);
+  --admin-danger-border: oklch(0.79 0.08 25);
+  background: var(--admin-bg);
 }
 
 body {
@@ -21,7 +78,7 @@ body {
 
 select:not([multiple]) {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 8L10 12L14 8' stroke='%23d4d4d4' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 8L10 12L14 8' stroke='%236b6f76' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-position: right 0.75rem center;
   background-repeat: no-repeat;
   background-size: 1rem;
@@ -66,7 +123,7 @@ select:not([multiple]) {
 }
 
 .admin-markdown {
-  color: #d4d4d4;
+  color: var(--admin-text-muted);
   font-size: 0.95rem;
   line-height: 1.75;
 }
@@ -74,7 +131,7 @@ select:not([multiple]) {
 .admin-markdown h1,
 .admin-markdown h2,
 .admin-markdown h3 {
-  color: #ffffff;
+  color: var(--admin-text);
   font-weight: 650;
   letter-spacing: 0;
   line-height: 1.25;
@@ -86,7 +143,7 @@ select:not([multiple]) {
 }
 
 .admin-markdown h2 {
-  border-top: 1px solid #262626;
+  border-top: 1px solid var(--admin-border);
   font-size: 1.25rem;
   margin: 2rem 0 0.75rem;
   padding-top: 1.25rem;
@@ -114,26 +171,26 @@ select:not([multiple]) {
 }
 
 .admin-markdown a {
-  color: #fcd34d;
+  color: var(--admin-link);
   text-decoration: none;
 }
 
 .admin-markdown a:hover {
-  color: #fde68a;
+  color: var(--admin-link-hover);
 }
 
 .admin-markdown code {
-  background: #171717;
-  border: 1px solid #262626;
+  background: var(--admin-surface-muted);
+  border: 1px solid var(--admin-border);
   border-radius: 0.375rem;
-  color: #f5f5f5;
+  color: var(--admin-text);
   font-size: 0.88em;
   padding: 0.1rem 0.35rem;
 }
 
 .admin-markdown pre {
-  background: #050505;
-  border: 1px solid #262626;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
   border-radius: 0.5rem;
   overflow-x: auto;
   padding: 1rem;
@@ -146,7 +203,7 @@ select:not([multiple]) {
 }
 
 .admin-markdown img {
-  border: 1px solid #262626;
+  border: 1px solid var(--admin-border);
   border-radius: 0.625rem;
   margin: 1.25rem 0;
   max-width: 100%;

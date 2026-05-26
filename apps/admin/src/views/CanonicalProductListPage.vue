@@ -90,12 +90,12 @@ function statusLabel(status: string): string {
 
 function statusClass(status: string): string {
   if (status === 'active') {
-    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+    return 'border-admin-success-border bg-admin-success-soft text-admin-success'
   }
   if (status === 'inactive') {
-    return 'border-neutral-700 bg-neutral-950 text-neutral-400'
+    return 'border-admin-border-strong bg-admin-surface text-admin-text-muted'
   }
-  return 'border-amber-400/30 bg-amber-400/10 text-amber-200'
+  return 'border-admin-border-strong bg-admin-surface-muted text-admin-link'
 }
 
 function matchStatusFromRoute(value: unknown): MatchStatusFilter {
@@ -314,48 +314,48 @@ onMounted(() => {
   <section class="space-y-6">
     <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
       <div>
-        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-admin-link">
           <Icon :icon="icons.tags" class="size-4" aria-hidden="true" />
           Нормализованные товары
         </p>
-        <h2 class="mt-2 text-2xl font-semibold text-white">Нормализованный каталог</h2>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+        <h2 class="mt-2 text-2xl font-semibold text-admin-text">Нормализованный каталог</h2>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-admin-text-muted">
           Список товаров, которые уже прошли нормализацию. Здесь показываем только связанные принятые офферы.
         </p>
       </div>
 
       <div class="grid gap-3 sm:grid-cols-3 2xl:min-w-[640px]" data-testid="canonical-products-metrics">
-        <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">На странице</p>
-          <p class="mt-1 text-xs text-neutral-600">показано сейчас</p>
-          <p class="mt-2 text-2xl font-semibold text-white">{{ products.length }}</p>
+        <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
+          <p class="text-xs uppercase tracking-wide text-admin-text-faint">На странице</p>
+          <p class="mt-1 text-xs text-admin-text-faint">показано сейчас</p>
+          <p class="mt-2 text-2xl font-semibold text-admin-text">{{ products.length }}</p>
         </div>
-        <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">Принятых офферов</p>
-          <p class="mt-1 text-xs text-neutral-600">по этой странице</p>
-          <p class="mt-2 text-2xl font-semibold text-white">{{ acceptedOffersCount }}</p>
+        <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
+          <p class="text-xs uppercase tracking-wide text-admin-text-faint">Принятых офферов</p>
+          <p class="mt-1 text-xs text-admin-text-faint">по этой странице</p>
+          <p class="mt-2 text-2xl font-semibold text-admin-text">{{ acceptedOffersCount }}</p>
         </div>
-        <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">Всего найдено</p>
-          <p class="mt-1 text-xs text-neutral-600">по текущим фильтрам</p>
-          <p class="mt-2 text-2xl font-semibold text-white">{{ totalProducts }}</p>
+        <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
+          <p class="text-xs uppercase tracking-wide text-admin-text-faint">Всего найдено</p>
+          <p class="mt-1 text-xs text-admin-text-faint">по текущим фильтрам</p>
+          <p class="mt-2 text-2xl font-semibold text-admin-text">{{ totalProducts }}</p>
         </div>
       </div>
     </div>
 
     <div
-      class="grid gap-3 rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 lg:grid-cols-[minmax(220px,1.3fr)_minmax(180px,1fr)_170px]"
+      class="grid gap-3 rounded-lg border border-admin-border bg-admin-surface p-4 lg:grid-cols-[minmax(220px,1.3fr)_minmax(180px,1fr)_170px]"
       data-testid="canonical-products-filters"
     >
       <label class="relative">
         <Icon
           :icon="icons.search"
-          class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-600"
+          class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-admin-text-faint"
           aria-hidden="true"
         />
         <input
           v-model="searchQuery"
-          class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+          class="h-10 w-full rounded-md border border-admin-border bg-admin-surface pl-9 pr-3 text-sm text-admin-text outline-none transition placeholder:text-admin-text-faint focus:border-admin-focus"
           placeholder="Поиск по названию"
           type="search"
           aria-label="Поиск по названию нормализованного товара"
@@ -365,7 +365,7 @@ onMounted(() => {
       <select
         v-model="selectedCategoryId"
         aria-label="Фильтр по категории"
-        class="h-10 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+        class="h-10 rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
         :disabled="isLoadingFilters"
       >
         <option value="">Все категории</option>
@@ -377,7 +377,7 @@ onMounted(() => {
       <select
         v-model="selectedMatchStatus"
         aria-label="Фильтр по статусу"
-        class="h-10 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+        class="h-10 rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
       >
         <option value="active">Активные</option>
         <option value="inactive">Отключенные</option>
@@ -385,13 +385,13 @@ onMounted(() => {
       </select>
     </div>
 
-    <div v-if="filterErrorMessage" class="rounded-lg border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-100">
+    <div v-if="filterErrorMessage" class="rounded-lg border border-admin-danger-border bg-admin-danger-soft p-4 text-sm text-admin-danger">
       {{ filterErrorMessage }}
     </div>
 
-    <div class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
+    <div class="overflow-x-auto rounded-lg border border-admin-border bg-admin-surface">
       <div
-        class="grid min-w-[930px] grid-cols-[minmax(320px,2fr)_190px_140px_130px_150px] border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
+        class="grid min-w-[930px] grid-cols-[minmax(320px,2fr)_190px_140px_130px_150px] border-b border-admin-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-admin-text-faint"
       >
         <span>Товар</span>
         <span>Категория</span>
@@ -400,30 +400,30 @@ onMounted(() => {
         <span>Обновлен</span>
       </div>
 
-      <div v-if="isLoadingProducts && products.length === 0" class="min-w-[930px] px-4 py-14 text-center text-sm text-neutral-500">
-        <Icon :icon="icons.tags" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+      <div v-if="isLoadingProducts && products.length === 0" class="min-w-[930px] px-4 py-14 text-center text-sm text-admin-text-faint">
+        <Icon :icon="icons.tags" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
         Загружаем нормализованные товары...
       </div>
 
       <div
         v-else-if="errorMessage"
-        class="min-w-[930px] px-4 py-14 text-center text-sm text-red-200"
+        class="min-w-[930px] px-4 py-14 text-center text-sm text-admin-danger"
       >
-        <Icon :icon="icons.alertTriangle" class="mx-auto mb-3 size-6 text-red-300" aria-hidden="true" />
+        <Icon :icon="icons.alertTriangle" class="mx-auto mb-3 size-6 text-admin-danger" aria-hidden="true" />
         Не удалось загрузить список: {{ errorMessage }}
       </div>
 
       <div
         v-else-if="products.length === 0"
-        class="min-w-[930px] px-4 py-14 text-center text-sm text-neutral-500"
+        class="min-w-[930px] px-4 py-14 text-center text-sm text-admin-text-faint"
       >
-        <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
+        <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
         По этим фильтрам нормализованных товаров нет.
       </div>
 
       <div
         v-else
-        class="min-w-[930px] divide-y divide-neutral-800 transition-opacity"
+        class="min-w-[930px] divide-y divide-admin-border transition-opacity"
         :class="isLoadingProducts ? 'opacity-60' : 'opacity-100'"
       >
         <div
@@ -435,24 +435,24 @@ onMounted(() => {
           <div class="min-w-0 pr-5">
             <RouterLink
               :to="{ name: 'canonical-product-detail', params: { canonicalProductId: product.id } }"
-              class="block truncate font-semibold text-white transition hover:text-amber-200"
+              class="block truncate font-semibold text-admin-text transition hover:text-admin-link-hover"
               :title="product.title"
             >
               {{ product.title }}
             </RouterLink>
-            <p class="mt-1 truncate text-xs text-neutral-500" :title="product.normalized_title">
+            <p class="mt-1 truncate text-xs text-admin-text-faint" :title="product.normalized_title">
               {{ product.normalized_title }}
             </p>
-            <p v-if="product.brand || product.model || product.unit_raw" class="mt-1 truncate text-xs text-neutral-600">
+            <p v-if="product.brand || product.model || product.unit_raw" class="mt-1 truncate text-xs text-admin-text-faint">
               {{ [product.brand, product.model, product.unit_raw].filter(Boolean).join(' · ') }}
             </p>
           </div>
 
           <div class="min-w-0 pr-5">
-            <p class="truncate text-neutral-200" :title="categoryLabel(product)">
+            <p class="truncate text-admin-text" :title="categoryLabel(product)">
               {{ categoryLabel(product) }}
             </p>
-            <p v-if="product.category" class="mt-1 truncate text-xs text-neutral-600">
+            <p v-if="product.category" class="mt-1 truncate text-xs text-admin-text-faint">
               {{ product.category.slug }}
             </p>
           </div>
@@ -464,14 +464,14 @@ onMounted(() => {
           </div>
 
           <div class="pr-5">
-            <p class="text-xs text-neutral-600">Принято</p>
-            <p class="mt-1 text-lg font-semibold leading-none text-white">{{ product.match_counts.accepted }}</p>
+            <p class="text-xs text-admin-text-faint">Принято</p>
+            <p class="mt-1 text-lg font-semibold leading-none text-admin-text">{{ product.match_counts.accepted }}</p>
           </div>
 
-          <div class="min-w-0 text-neutral-400">
+          <div class="min-w-0 text-admin-text-muted">
             <p>{{ formatDateTime(product.updated_at) }}</p>
             <RouterLink
-              class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200"
+              class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-admin-link hover:text-admin-link-hover"
               :to="{ name: 'canonical-product-detail', params: { canonicalProductId: product.id } }"
             >
               <Icon :icon="icons.pencil" class="size-3.5" aria-hidden="true" />
@@ -483,7 +483,7 @@ onMounted(() => {
     </div>
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <p class="text-sm text-neutral-500">
+      <p class="text-sm text-admin-text-faint">
         Страница {{ currentPage }} · показано {{ products.length }} из {{ totalProducts }}
       </p>
       <UPagination

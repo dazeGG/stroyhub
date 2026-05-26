@@ -1,6 +1,6 @@
 # StroyHub Admin
 
-Vue-based admin/review UI for the M12 milestone.
+Vue-based admin/review UI for StroyHub operators.
 
 ## Stack
 
@@ -37,6 +37,15 @@ pnpm dev
 
 The Vite dev server proxies `/api/*` requests to `http://127.0.0.1:8001/*`.
 Set `VITE_API_BASE_URL` to override the default API base path.
+
+## Design Tokens
+
+Admin colors are defined in `src/style.css` as local `admin-*` Tailwind theme tokens backed by CSS custom properties. Do not override the default Tailwind palette; use the StroyHub tokens for admin semantics.
+
+- Use `admin-bg`, `admin-surface`, `admin-surface-muted`, and `admin-border` for the light black-and-white shell, panels, tables, and form controls.
+- Use `admin-text`, `admin-text-muted`, and `admin-text-faint` for copy hierarchy.
+- Use `admin-primary` for primary actions. The primary/accent color is black.
+- Use `admin-success`, `admin-warning`, and `admin-danger` only for status feedback or risk states, not for general decoration.
 
 ## Checks
 

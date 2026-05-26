@@ -266,9 +266,9 @@ function actionLabel(action: string | null): string {
 
 function batchStatusClass(status: CatalogWorkflowAutoAcceptItem['status']): string {
   if (status === 'accepted' || status === 'would_accept') {
-    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100'
+    return 'border-admin-success-border bg-admin-success-soft text-admin-success'
   }
-  return 'border-neutral-700 bg-neutral-950 text-neutral-300'
+  return 'border-admin-border-strong bg-admin-surface text-admin-text-muted'
 }
 
 function batchStatusLabel(status: CatalogWorkflowAutoAcceptItem['status']): string {
@@ -327,7 +327,7 @@ function reviewSignals(item: CatalogWorkflowQueueItem): ReviewSignal[] {
       key: `${item.id}:attributes`,
       label: 'Атрибуты',
       value: attributes.map((attribute) => attribute.value).join(', '),
-      tone: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-100',
+      tone: 'border-admin-success-border bg-admin-success-soft text-admin-success',
     })
   }
 
@@ -337,7 +337,7 @@ function reviewSignals(item: CatalogWorkflowQueueItem): ReviewSignal[] {
       key: `${item.id}:category`,
       label: 'Категория',
       value: item.category?.name ?? categorySlug ?? 'назначена',
-      tone: 'border-sky-400/25 bg-sky-400/10 text-sky-100',
+      tone: 'border-admin-border-strong bg-admin-surface-muted text-admin-text',
     })
   }
 
@@ -347,7 +347,7 @@ function reviewSignals(item: CatalogWorkflowQueueItem): ReviewSignal[] {
       key: `${item.id}:normalization-action`,
       label: 'Действие',
       value: actionLabel(action),
-      tone: 'border-amber-400/30 bg-amber-400/10 text-amber-100',
+      tone: 'border-admin-border-strong bg-admin-surface-muted text-admin-link',
     })
   }
 
@@ -356,7 +356,7 @@ function reviewSignals(item: CatalogWorkflowQueueItem): ReviewSignal[] {
       key: `${item.id}:${reason.stage}:${reason.status ?? 'signal'}`,
       label: stageLabels[reason.stage] ?? reason.stage,
       value: reasonText(reason),
-      tone: 'border-neutral-700 bg-neutral-950 text-neutral-300',
+      tone: 'border-admin-border-strong bg-admin-surface text-admin-text-muted',
     })
   }
 
@@ -366,7 +366,7 @@ function reviewSignals(item: CatalogWorkflowQueueItem): ReviewSignal[] {
         key: `${item.id}:empty`,
         label: 'Сигнал',
         value: 'Нет данных пайплайна',
-        tone: 'border-neutral-700 bg-neutral-950 text-neutral-300',
+        tone: 'border-admin-border-strong bg-admin-surface text-admin-text-muted',
       }]
 }
 
@@ -380,7 +380,7 @@ function reviewConflicts(item: CatalogWorkflowQueueItem): ReviewSignal[] {
       key: `${item.id}:missing-price`,
       label: 'Цена',
       value: 'нет цены',
-      tone: 'border-red-400/25 bg-red-400/10 text-red-100',
+      tone: 'border-admin-danger-border bg-admin-danger-soft text-admin-danger',
     })
   }
 
@@ -389,7 +389,7 @@ function reviewConflicts(item: CatalogWorkflowQueueItem): ReviewSignal[] {
       key: `${item.id}:missing-category`,
       label: 'Категория',
       value: item.category_raw ? `только исходная: ${item.category_raw}` : 'не назначена',
-      tone: 'border-red-400/25 bg-red-400/10 text-red-100',
+      tone: 'border-admin-danger-border bg-admin-danger-soft text-admin-danger',
     })
   }
 
@@ -398,7 +398,7 @@ function reviewConflicts(item: CatalogWorkflowQueueItem): ReviewSignal[] {
       key: `${item.id}:not-product`,
       label: 'Тип карточки',
       value: 'не товар',
-      tone: 'border-red-400/25 bg-red-400/10 text-red-100',
+      tone: 'border-admin-danger-border bg-admin-danger-soft text-admin-danger',
     })
   }
 
@@ -407,7 +407,7 @@ function reviewConflicts(item: CatalogWorkflowQueueItem): ReviewSignal[] {
       key: `${item.id}:blocker:${blocker}`,
       label: 'Блокер',
       value: blocker,
-      tone: 'border-red-400/25 bg-red-400/10 text-red-100',
+      tone: 'border-admin-danger-border bg-admin-danger-soft text-admin-danger',
     })
   }
 
@@ -417,7 +417,7 @@ function reviewConflicts(item: CatalogWorkflowQueueItem): ReviewSignal[] {
         key: `${item.id}:no-conflict`,
         label: 'Конфликтов нет',
         value: 'явных блокеров не найдено',
-        tone: 'border-neutral-700 bg-neutral-950 text-neutral-300',
+        tone: 'border-admin-border-strong bg-admin-surface text-admin-text-muted',
       }]
 }
 
@@ -727,12 +727,12 @@ onMounted(() => {
   <section class="space-y-6">
     <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <div>
-        <p class="inline-flex items-center gap-2 text-sm font-medium text-amber-300">
+        <p class="inline-flex items-center gap-2 text-sm font-medium text-admin-link">
           <Icon :icon="activeMeta.icon" class="size-4" aria-hidden="true" />
           {{ activeMeta.eyebrow }}
         </p>
-        <h2 class="mt-2 text-2xl font-semibold text-white">{{ activeMeta.label }}</h2>
-        <p class="mt-2 text-sm leading-6 text-neutral-400">
+        <h2 class="mt-2 text-2xl font-semibold text-admin-text">{{ activeMeta.label }}</h2>
+        <p class="mt-2 text-sm leading-6 text-admin-text-muted">
           {{ isLoading ? 'Загрузка...' : `${total} карточек в текущей очереди` }}
         </p>
       </div>
@@ -740,7 +740,7 @@ onMounted(() => {
       <div class="flex flex-col gap-2 sm:flex-row">
         <RouterLink
           to="/"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-800 px-4 text-sm font-semibold text-neutral-300 transition hover:border-neutral-700 hover:text-white"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-admin-border px-4 text-sm font-semibold text-admin-text-muted transition hover:border-admin-border-strong hover:text-admin-text"
         >
           <Icon :icon="icons.layoutDashboard" class="size-4" aria-hidden="true" />
           Сводка
@@ -748,7 +748,7 @@ onMounted(() => {
         <button
           v-if="canBatchAccept"
           type="button"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-primary px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-wait disabled:opacity-60"
           :disabled="isBatching"
           @click="previewBatchAccept"
         >
@@ -764,21 +764,21 @@ onMounted(() => {
         :key="item.queue"
         :to="`/workflows/queues/${item.queue}`"
         class="inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition"
-        :class="queue === item.queue ? 'border-amber-300 bg-amber-300 text-neutral-950' : 'border-neutral-800 bg-neutral-900/40 text-neutral-300 hover:border-neutral-700 hover:text-white'"
+        :class="queue === item.queue ? 'border-admin-primary bg-admin-primary text-admin-primary-text' : 'border-admin-border bg-admin-surface text-admin-text-muted hover:border-admin-border-strong hover:text-admin-text'"
       >
         <Icon :icon="item.icon" class="size-4" aria-hidden="true" />
         {{ item.label }}
       </RouterLink>
     </div>
 
-    <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
+    <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
       <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
         <label class="relative block">
-          <Icon :icon="icons.search" class="pointer-events-none absolute left-3 top-3 size-4 text-neutral-600" aria-hidden="true" />
+          <Icon :icon="icons.search" class="pointer-events-none absolute left-3 top-3 size-4 text-admin-text-faint" aria-hidden="true" />
           <input
             v-model="searchQuery"
             type="search"
-            class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+            class="h-10 w-full rounded-md border border-admin-border bg-admin-surface pl-9 pr-3 text-sm text-admin-text outline-none transition placeholder:text-admin-text-faint focus:border-admin-focus"
             placeholder="Поиск по названию"
             aria-label="Поиск по названию"
             @keyup.enter="loadQueue"
@@ -786,7 +786,7 @@ onMounted(() => {
         </label>
         <button
           type="button"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-700 px-4 text-sm font-semibold text-neutral-200 transition hover:border-amber-300 hover:text-amber-100"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-admin-border-strong px-4 text-sm font-semibold text-admin-text transition hover:border-admin-primary hover:text-admin-link-hover"
           @click="loadQueue"
         >
           <Icon :icon="icons.filter" class="size-4" aria-hidden="true" />
@@ -797,27 +797,27 @@ onMounted(() => {
 
     <div
       v-if="batchPreview"
-      class="rounded-lg border border-amber-400/30 bg-amber-400/10 p-4"
+      class="rounded-lg border border-admin-border-strong bg-admin-surface-muted p-4"
     >
       <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div class="grid gap-3 sm:grid-cols-3">
           <div>
-            <p class="text-xs uppercase tracking-wide text-amber-200/80">На странице</p>
-            <p class="mt-1 text-xl font-semibold text-amber-50">{{ batchPreview.page_size }}</p>
+            <p class="text-xs uppercase tracking-wide text-admin-link">На странице</p>
+            <p class="mt-1 text-xl font-semibold text-admin-link">{{ batchPreview.page_size }}</p>
           </div>
           <div>
-            <p class="text-xs uppercase tracking-wide text-amber-200/80">Принять</p>
-            <p class="mt-1 text-xl font-semibold text-amber-50">{{ batchPreview.would_accept }}</p>
+            <p class="text-xs uppercase tracking-wide text-admin-link">Принять</p>
+            <p class="mt-1 text-xl font-semibold text-admin-link">{{ batchPreview.would_accept }}</p>
           </div>
           <div>
-            <p class="text-xs uppercase tracking-wide text-amber-200/80">Пропустить</p>
-            <p class="mt-1 text-xl font-semibold text-amber-50">{{ batchPreview.skipped }}</p>
+            <p class="text-xs uppercase tracking-wide text-admin-link">Пропустить</p>
+            <p class="mt-1 text-xl font-semibold text-admin-link">{{ batchPreview.skipped }}</p>
           </div>
         </div>
 
         <button
           type="button"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-admin-primary px-4 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="isBatching || batchPreview.would_accept === 0"
           @click="applyBatchAccept"
         >
@@ -826,15 +826,15 @@ onMounted(() => {
         </button>
       </div>
 
-      <div v-if="batchPreview.items.length" class="mt-4 grid gap-2 border-t border-amber-400/20 pt-4">
+      <div v-if="batchPreview.items.length" class="mt-4 grid gap-2 border-t border-admin-border-strong pt-4">
         <div
           v-for="result in batchPreview.items"
           :key="`${result.source_product_id}:${result.status}`"
-          class="grid gap-3 rounded-md border border-amber-300/20 bg-neutral-950/60 p-3 text-sm md:grid-cols-[1fr_auto]"
+          class="grid gap-3 rounded-md border border-admin-border-strong bg-admin-surface-subtle p-3 text-sm md:grid-cols-[1fr_auto]"
         >
           <div class="min-w-0">
-            <p class="truncate font-semibold text-white">{{ result.title }}</p>
-            <p class="mt-1 text-xs text-neutral-400">
+            <p class="truncate font-semibold text-admin-text">{{ result.title }}</p>
+            <p class="mt-1 text-xs text-admin-text-muted">
               {{ actionLabel(result.action) }} · {{ result.reason }}
             </p>
           </div>
@@ -850,7 +850,7 @@ onMounted(() => {
 
     <div
       v-if="errorMessage"
-      class="rounded-lg border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-100"
+      class="rounded-lg border border-admin-danger-border bg-admin-danger-soft p-4 text-sm text-admin-danger"
     >
       {{ errorMessage }}
     </div>
@@ -859,13 +859,13 @@ onMounted(() => {
       <div
         v-for="index in 4"
         :key="index"
-        class="h-40 animate-pulse rounded-lg border border-neutral-800 bg-neutral-900/40"
+        class="h-40 animate-pulse rounded-lg border border-admin-border bg-admin-surface"
       />
     </div>
 
     <div
       v-else-if="items.length === 0 && !errorMessage"
-      class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-6 text-sm text-neutral-400"
+      class="rounded-lg border border-admin-border bg-admin-surface p-6 text-sm text-admin-text-muted"
     >
       {{ activeMeta.empty }}
     </div>
@@ -874,36 +874,36 @@ onMounted(() => {
       <article
         v-for="item in items"
         :key="item.id"
-        class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
+        class="rounded-lg border border-admin-border bg-admin-surface p-4"
       >
         <div class="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
-              <span class="rounded-md border border-neutral-700 px-2 py-1 text-xs font-medium text-neutral-300">
+              <span class="rounded-md border border-admin-border-strong px-2 py-1 text-xs font-medium text-admin-text-muted">
                 {{ item.source }}
               </span>
-              <span class="text-xs text-neutral-500">{{ item.shop.name }}</span>
-              <span class="text-xs text-neutral-600">{{ formatDateTime(item.last_seen_at) }}</span>
+              <span class="text-xs text-admin-text-faint">{{ item.shop.name }}</span>
+              <span class="text-xs text-admin-text-faint">{{ formatDateTime(item.last_seen_at) }}</span>
             </div>
 
-            <h3 class="mt-3 text-base font-semibold text-white">{{ item.title }}</h3>
-            <p class="mt-1 break-words text-sm text-neutral-500">{{ item.normalized_title }}</p>
+            <h3 class="mt-3 text-base font-semibold text-admin-text">{{ item.title }}</h3>
+            <p class="mt-1 break-words text-sm text-admin-text-faint">{{ item.normalized_title }}</p>
 
-            <div class="mt-3 flex flex-wrap gap-2 text-xs text-neutral-300">
-              <span class="rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1">
+            <div class="mt-3 flex flex-wrap gap-2 text-xs text-admin-text-muted">
+              <span class="rounded-md border border-admin-border bg-admin-surface px-2 py-1">
                 {{ item.category?.name ?? item.category_raw ?? 'Без категории' }}
               </span>
-              <span class="rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1">
+              <span class="rounded-md border border-admin-border bg-admin-surface px-2 py-1">
                 {{ formatPrice(item) }}
               </span>
-              <span class="rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1">
+              <span class="rounded-md border border-admin-border bg-admin-surface px-2 py-1">
                 {{ primaryActionLabel(item) }}
               </span>
             </div>
 
             <div v-if="isReviewWorkspace" class="mt-5 grid gap-4 xl:grid-cols-2">
               <section>
-                <p class="text-xs uppercase tracking-wide text-neutral-600">Сигналы</p>
+                <p class="text-xs uppercase tracking-wide text-admin-text-faint">Сигналы</p>
                 <div class="mt-2 flex flex-wrap gap-2">
                   <span
                     v-for="signal in reviewSignals(item)"
@@ -918,7 +918,7 @@ onMounted(() => {
               </section>
 
               <section>
-                <p class="text-xs uppercase tracking-wide text-neutral-600">Конфликты</p>
+                <p class="text-xs uppercase tracking-wide text-admin-text-faint">Конфликты</p>
                 <div class="mt-2 flex flex-wrap gap-2">
                   <span
                     v-for="conflict in reviewConflicts(item)"
@@ -934,44 +934,44 @@ onMounted(() => {
             </div>
 
             <div v-if="isReviewWorkspace" class="mt-5">
-              <p class="text-xs uppercase tracking-wide text-neutral-600">Извлеченные атрибуты</p>
+              <p class="text-xs uppercase tracking-wide text-admin-text-faint">Извлеченные атрибуты</p>
               <div v-if="attributeRows(item).length" class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 <div
                   v-for="attribute in attributeRows(item)"
                   :key="attribute.key"
-                  class="rounded-md border border-neutral-800 bg-neutral-950 p-3"
+                  class="rounded-md border border-admin-border bg-admin-surface p-3"
                 >
-                  <p class="text-xs font-semibold uppercase tracking-wide text-neutral-600">{{ attribute.label }}</p>
-                  <p class="mt-1 text-sm font-semibold text-white">{{ attribute.value }}</p>
-                  <p v-if="attribute.detail" class="mt-1 text-xs text-neutral-500">{{ attribute.detail }}</p>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-admin-text-faint">{{ attribute.label }}</p>
+                  <p class="mt-1 text-sm font-semibold text-admin-text">{{ attribute.value }}</p>
+                  <p v-if="attribute.detail" class="mt-1 text-xs text-admin-text-faint">{{ attribute.detail }}</p>
                 </div>
               </div>
-              <p v-else class="mt-2 text-sm text-neutral-500">Атрибуты не извлечены.</p>
+              <p v-else class="mt-2 text-sm text-admin-text-faint">Атрибуты не извлечены.</p>
             </div>
 
             <div v-if="item.candidate_matches.length" class="mt-5 grid gap-3">
-              <p class="text-xs uppercase tracking-wide text-neutral-600">Возможные связи</p>
+              <p class="text-xs uppercase tracking-wide text-admin-text-faint">Возможные связи</p>
               <div
                 v-for="match in item.candidate_matches"
                 :key="match.id"
-                class="rounded-md border border-neutral-800 bg-neutral-950 p-3"
+                class="rounded-md border border-admin-border bg-admin-surface p-3"
               >
                 <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                   <div class="min-w-0">
                     <RouterLink
                       :to="`/canonical-products/${match.canonical_product_id}`"
-                      class="text-sm font-semibold text-white transition hover:text-amber-200"
+                      class="text-sm font-semibold text-admin-text transition hover:text-admin-link-hover"
                     >
                       {{ match.canonical_title }}
                     </RouterLink>
-                    <p class="mt-1 break-words text-xs text-neutral-500">
+                    <p class="mt-1 break-words text-xs text-admin-text-faint">
                       {{ match.canonical_normalized_title }} · {{ match.method }} · {{ confidencePercent(match.confidence) }}
                     </p>
                   </div>
                   <div v-if="isReviewWorkspace && canResolveAsProduct(item)" class="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-emerald-300 px-3 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-wait disabled:opacity-60"
+                      class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-admin-success px-3 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-success disabled:cursor-wait disabled:opacity-60"
                       :disabled="Boolean(busyAction)"
                       @click="acceptCandidateMatch(item, match)"
                     >
@@ -980,7 +980,7 @@ onMounted(() => {
                     </button>
                     <button
                       type="button"
-                      class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 text-sm font-semibold text-neutral-300 transition hover:border-red-300 hover:text-red-100 disabled:cursor-wait disabled:opacity-60"
+                      class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-admin-border-strong px-3 text-sm font-semibold text-admin-text-muted transition hover:border-admin-danger-border hover:text-admin-danger disabled:cursor-wait disabled:opacity-60"
                       :disabled="Boolean(busyAction)"
                       @click="rejectCandidateMatch(item, match)"
                     >
@@ -991,7 +991,7 @@ onMounted(() => {
                   <RouterLink
                     v-else
                     :to="`/canonical-products/${match.canonical_product_id}`"
-                    class="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 text-sm font-semibold text-neutral-300 transition hover:border-neutral-600 hover:text-white"
+                    class="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-admin-border-strong px-3 text-sm font-semibold text-admin-text-muted transition hover:border-admin-border-strong hover:text-admin-text"
                   >
                     <Icon :icon="icons.tags" class="size-4" aria-hidden="true" />
                     Каталог
@@ -1000,14 +1000,14 @@ onMounted(() => {
 
                 <div v-if="isReviewWorkspace" class="mt-3 grid gap-3 text-xs lg:grid-cols-2">
                   <div>
-                    <p class="font-semibold uppercase tracking-wide text-emerald-200/80">За связь</p>
-                    <ul class="mt-1 space-y-1 text-neutral-300">
+                    <p class="font-semibold uppercase tracking-wide text-admin-success">За связь</p>
+                    <ul class="mt-1 space-y-1 text-admin-text-muted">
                       <li v-for="evidence in matchEvidence(match)" :key="evidence">{{ evidence }}</li>
                     </ul>
                   </div>
                   <div>
-                    <p class="font-semibold uppercase tracking-wide text-red-200/80">Риски</p>
-                    <ul class="mt-1 space-y-1 text-neutral-300">
+                    <p class="font-semibold uppercase tracking-wide text-admin-danger">Риски</p>
+                    <ul class="mt-1 space-y-1 text-admin-text-muted">
                       <li v-for="conflict in matchConflicts(match)" :key="conflict">{{ conflict }}</li>
                     </ul>
                   </div>
@@ -1016,22 +1016,22 @@ onMounted(() => {
             </div>
           </div>
 
-          <aside class="border-t border-neutral-800 pt-4 2xl:border-l 2xl:border-t-0 2xl:pl-5 2xl:pt-0">
-            <p class="text-xs uppercase tracking-wide text-neutral-600">Предлагаемое решение</p>
-            <p class="mt-2 text-sm font-semibold text-white">{{ suggestedNormalizedProduct(item) }}</p>
-            <p class="mt-2 text-sm text-neutral-400">{{ primarySignalText(item) }}</p>
+          <aside class="border-t border-admin-border pt-4 2xl:border-l 2xl:border-t-0 2xl:pl-5 2xl:pt-0">
+            <p class="text-xs uppercase tracking-wide text-admin-text-faint">Предлагаемое решение</p>
+            <p class="mt-2 text-sm font-semibold text-admin-text">{{ suggestedNormalizedProduct(item) }}</p>
+            <p class="mt-2 text-sm text-admin-text-muted">{{ primarySignalText(item) }}</p>
             <RouterLink
               :to="`/products/${item.id}`"
-              class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-amber-200 hover:text-amber-100"
+              class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-admin-link hover:text-admin-link-hover"
             >
               Открыть карточку
               <Icon :icon="icons.chevronRight" class="size-4" aria-hidden="true" />
             </RouterLink>
 
-            <div v-if="isReviewWorkspace" class="mt-4 space-y-4 border-t border-neutral-800 pt-4">
+            <div v-if="isReviewWorkspace" class="mt-4 space-y-4 border-t border-admin-border pt-4">
               <textarea
                 v-model="reasonByProductId[item.id]"
-                class="min-h-20 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+                class="min-h-20 w-full rounded-md border border-admin-border bg-admin-surface px-3 py-2 text-sm text-admin-text outline-none transition placeholder:text-admin-text-faint focus:border-admin-focus"
                 placeholder="Причина решения"
                 aria-label="Причина решения"
               />
@@ -1039,7 +1039,7 @@ onMounted(() => {
               <button
                 v-if="canResolveAsProduct(item)"
                 type="button"
-                class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-300 px-3 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60"
+                class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-admin-primary px-3 py-2 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-wait disabled:opacity-60"
                 :disabled="Boolean(busyAction)"
                 @click="createCanonicalFromItem(item)"
               >
@@ -1048,12 +1048,12 @@ onMounted(() => {
               </button>
 
               <div v-if="canResolveAsProduct(item)" class="space-y-2">
-                <label class="block text-xs uppercase tracking-wide text-neutral-600">
+                <label class="block text-xs uppercase tracking-wide text-admin-text-faint">
                   Исправить категорию
                 </label>
                 <select
                   v-model="categoryByProductId[item.id]"
-                  class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                  class="h-10 w-full rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
                   :disabled="isLoadingCategories"
                   aria-label="Выбор категории"
                 >
@@ -1064,7 +1064,7 @@ onMounted(() => {
                 </select>
                 <button
                   type="button"
-                  class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 py-2 text-sm font-semibold text-neutral-300 transition hover:border-amber-300 hover:text-amber-100 disabled:cursor-wait disabled:opacity-60"
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-admin-border-strong px-3 py-2 text-sm font-semibold text-admin-text-muted transition hover:border-admin-primary hover:text-admin-link-hover disabled:cursor-wait disabled:opacity-60"
                   :disabled="Boolean(busyAction) || isLoadingCategories"
                   @click="saveCategoryOverride(item)"
                 >
@@ -1074,21 +1074,21 @@ onMounted(() => {
               </div>
 
               <div class="space-y-2">
-                <label class="block text-xs uppercase tracking-wide text-neutral-600">
+                <label class="block text-xs uppercase tracking-wide text-admin-text-faint">
                   Связать вручную
                 </label>
                 <div class="grid gap-2">
                   <input
                     v-model="canonicalSearchByProductId[item.id]"
                     type="search"
-                    class="h-10 rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
+                    class="h-10 rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition placeholder:text-admin-text-faint focus:border-admin-focus"
                     :placeholder="item.normalized_title"
                     aria-label="Поиск нормализованного товара"
                     @keyup.enter="searchCanonicalProductsForItem(item)"
                   >
                   <button
                     type="button"
-                    class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-700 px-3 text-sm font-semibold text-neutral-300 transition hover:border-amber-300 hover:text-white disabled:cursor-wait disabled:opacity-60"
+                    class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-admin-border-strong px-3 text-sm font-semibold text-admin-text-muted transition hover:border-admin-primary hover:text-admin-text disabled:cursor-wait disabled:opacity-60"
                     :disabled="Boolean(busyAction)"
                     @click="searchCanonicalProductsForItem(item)"
                   >
@@ -1100,7 +1100,7 @@ onMounted(() => {
                 <select
                   v-if="canonicalResultsByProductId[item.id]?.length"
                   v-model="selectedCanonicalByProductId[item.id]"
-                  class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 text-sm text-white outline-none transition focus:border-amber-400"
+                  class="h-10 w-full rounded-md border border-admin-border bg-admin-surface px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
                   aria-label="Выбор нормализованного товара"
                 >
                   <option value="">Выберите товар</option>
@@ -1116,7 +1116,7 @@ onMounted(() => {
                 <button
                   v-if="canonicalResultsByProductId[item.id]?.length"
                   type="button"
-                  class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber-300 px-3 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200 disabled:cursor-wait disabled:opacity-60"
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-admin-primary px-3 py-2 text-sm font-semibold text-admin-primary-text transition hover:bg-admin-primary-hover disabled:cursor-wait disabled:opacity-60"
                   :disabled="Boolean(busyAction) || !selectedCanonicalByProductId[item.id]"
                   @click="linkCanonicalProduct(item)"
                 >
@@ -1125,19 +1125,19 @@ onMounted(() => {
                 </button>
               </div>
 
-              <div class="space-y-2 border-t border-neutral-800 pt-4">
-                <label class="block text-xs uppercase tracking-wide text-neutral-600">
+              <div class="space-y-2 border-t border-admin-border pt-4">
+                <label class="block text-xs uppercase tracking-wide text-admin-text-faint">
                   Проблема данных
                 </label>
                 <textarea
                   v-model="dataProblemReasonByProductId[item.id]"
-                  class="min-h-16 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-red-300"
+                  class="min-h-16 w-full rounded-md border border-admin-border bg-admin-surface px-3 py-2 text-sm text-admin-text outline-none transition placeholder:text-admin-text-faint focus:border-admin-danger-border"
                   placeholder="Что не так с карточкой"
                   aria-label="Причина проблемы данных"
                 />
                 <button
                   type="button"
-                  class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-red-400/40 px-3 py-2 text-sm font-semibold text-red-100 transition hover:border-red-300 disabled:cursor-wait disabled:opacity-60"
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-admin-danger-border px-3 py-2 text-sm font-semibold text-admin-danger transition hover:border-admin-danger-border disabled:cursor-wait disabled:opacity-60"
                   :disabled="Boolean(busyAction)"
                   @click="markItemDataProblem(item)"
                 >
