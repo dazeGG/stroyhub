@@ -6,13 +6,15 @@ import { RouterLink } from 'vue-router'
 
 import {
   approveShopSourceCandidate,
+  fetchOperationStatus,
   fetchShopSourceCandidates,
   materializeOfficialStrategy,
   refreshShopSourceCandidates,
   verifyShopSourceCandidateTwogisData,
   type ShopSourceCandidate,
   type ShopSourceCandidateGroup,
-  type ShopSourceCandidateRefreshResponse,
+  type ShopSourceCandidateRefreshResult,
+  type ShopSourceCandidateVerificationResult,
   type ShopSourceCandidateStatus,
 } from '../lib/api'
 import { icons } from '../lib/icons'
@@ -29,7 +31,7 @@ const materializingOfficialSource = ref<string | null>(null)
 const errorMessage = ref('')
 const saveMessage = ref('')
 const toast = useToast()
-const lastRefresh = ref<ShopSourceCandidateRefreshResponse | null>(null)
+const lastRefresh = ref<ShopSourceCandidateRefreshResult | null>(null)
 
 let candidateRequest: AbortController | null = null
 
@@ -142,15 +144,12 @@ async function refreshCandidates(): Promise<void> {
   saveMessage.value = ''
 
   try {
-    const response = await refreshShopSourceCandidates()
-    lastRefresh.value = response
-    if (selectedStatus.value) {
-      await loadCandidates()
-    } else {
-      candidates.value = response.items
-      candidateGroups.value = response.groups
-    }
-    saveMessage.value = `Обновлено из 2GIS: проверено ${response.checked}, новых ${response.created}`
+    const operation = await refreshShopSourceCandidates()
+    saveMessage.value = `Обновление из 2GIS поставлено в очередь: ${operation.task_id}`
+    const result = await waitForOperation<ShopSourceCandidateRefreshResult>(operation.task_id)
+    lastRefresh.value = result
+    await loadCandidates()
+    saveMessage.value = `Обновлено из 2GIS: проверено ${result.checked}, новых ${result.created}`
     toastSuccess(toast, 'Кандидаты обновлены', saveMessage.value)
   } catch (error) {
     errorMessage.value = messageFromError(error, 'Не удалось обновить кандидатов')
@@ -221,9 +220,11 @@ async function verifyCandidate(candidate: ShopSourceCandidate): Promise<void> {
   saveMessage.value = ''
 
   try {
-    const response = await verifyShopSourceCandidateTwogisData(candidate.id)
-    updateCandidateInPlace(response.candidate)
-    const message = formatVerificationMessage(response)
+    const operation = await verifyShopSourceCandidateTwogisData(candidate.id)
+    saveMessage.value = `${candidate.display_name}: проверка 2GIS поставлена в очередь`
+    const result = await waitForOperation<ShopSourceCandidateVerificationResult>(operation.task_id)
+    await loadCandidates()
+    const message = formatVerificationMessage(result)
     saveMessage.value = `${candidate.display_name}: ${message}`
     toastSuccess(toast, 'Данные 2GIS проверены', saveMessage.value)
   } catch (error) {
@@ -234,30 +235,8 @@ async function verifyCandidate(candidate: ShopSourceCandidate): Promise<void> {
   }
 }
 
-function updateCandidateInPlace(updated: ShopSourceCandidate): void {
-  candidates.value = candidates.value.map((candidate) =>
-    candidate.id === updated.id ? updated : candidate,
-  )
-  candidateGroups.value = candidateGroups.value.map((group) => {
-    if (!group.candidate_ids.includes(updated.id)) {
-      return group
-    }
-
-    const items = group.items.map((candidate) =>
-      candidate.id === updated.id ? updated : candidate,
-    )
-    return {
-      ...group,
-      has_prices: items.some((candidate) => candidate.has_prices),
-      has_website: items.some((candidate) => candidate.has_website),
-      priority: Math.max(...items.map((candidate) => candidate.priority)),
-      items,
-    }
-  })
-}
-
 function formatVerificationMessage(
-  response: Awaited<ReturnType<typeof verifyShopSourceCandidateTwogisData>>,
+  response: ShopSourceCandidateVerificationResult,
 ): string {
   const website = response.website_found
     ? `сайт подтвержден${response.website_url ? `: ${response.website_url}` : ''}`
@@ -276,6 +255,26 @@ function formatScrapeMessage(scrapeResult: ShopSourceCandidate['scrape_result'])
     return `Товары загружены, сохранено ${scrapeResult.products_saved ?? 0}.`
   }
   return `Загрузка завершилась со статусом ${scrapeResult?.status || 'unknown'}.`
+}
+
+async function waitForOperation<T>(taskId: string): Promise<T> {
+  for (let attempt = 0; attempt < 90; attempt += 1) {
+    const operation = await fetchOperationStatus<T>(taskId)
+    if (operation.status === 'success' && operation.result !== undefined) {
+      return operation.result
+    }
+    if (operation.status === 'failed') {
+      throw new Error(operation.error || 'Операция завершилась с ошибкой')
+    }
+
+    await delay(attempt < 5 ? 1000 : 2000)
+  }
+
+  throw new Error('Операция не завершилась за отведенное время')
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds))
 }
 
 onMounted(() => {

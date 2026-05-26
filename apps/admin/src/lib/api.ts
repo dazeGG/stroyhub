@@ -406,18 +406,32 @@ export interface ShopSourceCandidateListResponse {
   groups: ShopSourceCandidateGroup[]
 }
 
-export interface ShopSourceCandidateRefreshResponse {
+export interface AsyncOperationAcceptedResponse {
+  operation: string
+  status: 'queued'
+  task_id: string
+  candidate_id?: number | null
+}
+
+export interface OperationStatusResponse<T = unknown> {
+  task_id: string
+  status: 'queued' | 'running' | 'success' | 'failed'
+  celery_state: string
+  result?: T
+  error?: string
+}
+
+export interface ShopSourceCandidateRefreshResult {
   checked: number
   created: number
   updated: number
   stale: number
   skipped_approved: number
-  items: ShopSourceCandidate[]
-  groups: ShopSourceCandidateGroup[]
+  items: number
 }
 
-export interface ShopSourceCandidateVerificationResponse {
-  candidate: ShopSourceCandidate
+export interface ShopSourceCandidateVerificationResult {
+  candidate_id: number
   website_found: boolean
   products_found: boolean
   website_url: string | null
@@ -955,8 +969,8 @@ export function fetchShopSourceCandidates(
 
 export function refreshShopSourceCandidates(
   signal?: AbortSignal,
-): Promise<ShopSourceCandidateRefreshResponse> {
-  return writeJson<ShopSourceCandidateRefreshResponse>(
+): Promise<AsyncOperationAcceptedResponse> {
+  return writeJson<AsyncOperationAcceptedResponse>(
     '/shop-source-candidates/refresh',
     { method: 'POST' },
     signal,
@@ -981,12 +995,19 @@ export function approveShopSourceCandidate(
 export function verifyShopSourceCandidateTwogisData(
   candidateId: number,
   signal?: AbortSignal,
-): Promise<ShopSourceCandidateVerificationResponse> {
-  return writeJson<ShopSourceCandidateVerificationResponse>(
+): Promise<AsyncOperationAcceptedResponse> {
+  return writeJson<AsyncOperationAcceptedResponse>(
     `/shop-source-candidates/${candidateId}/verify-twogis-data`,
     { method: 'POST' },
     signal,
   )
+}
+
+export function fetchOperationStatus<T = unknown>(
+  taskId: string,
+  signal?: AbortSignal,
+): Promise<OperationStatusResponse<T>> {
+  return fetchJson<OperationStatusResponse<T>>(`/operations/${taskId}`, signal)
 }
 
 export function materializeOfficialStrategy(
