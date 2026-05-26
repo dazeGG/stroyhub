@@ -3,6 +3,7 @@ name: stroyhub
 services:
   api:
     image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    restart: unless-stopped
     working_dir: /app
     environment:
       STROYHUB_DATABASE_URL: postgresql+psycopg://stroyhub:stroyhub@postgres:5432/stroyhub
@@ -14,8 +15,12 @@ services:
       - >
         uv sync --all-extras &&
         uv run alembic upgrade head &&
-        uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000
-        --reload --reload-dir apps/api --reload-dir packages
+        if [ "$${STROYHUB_API_RELOAD:-0}" = "1" ]; then
+          exec .venv/bin/uvicorn apps.api.main:app --host 0.0.0.0 --port 8000
+          --reload --reload-dir apps/api --reload-dir packages;
+        else
+          exec .venv/bin/uvicorn apps.api.main:app --host 0.0.0.0 --port 8000;
+        fi
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
@@ -68,6 +73,7 @@ services:
 
   admin_api:
     image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    restart: unless-stopped
     working_dir: /app
     environment:
       STROYHUB_DATABASE_URL: postgresql+psycopg://stroyhub:stroyhub@postgres:5432/stroyhub
@@ -78,8 +84,12 @@ services:
       - -c
       - >
         uv sync --all-extras &&
-        uv run uvicorn apps.admin_api.main:app --host 0.0.0.0 --port 8001
-        --reload --reload-dir apps/admin_api --reload-dir packages
+        if [ "$${STROYHUB_ADMIN_API_RELOAD:-0}" = "1" ]; then
+          exec .venv/bin/uvicorn apps.admin_api.main:app --host 0.0.0.0 --port 8001
+          --reload --reload-dir apps/admin_api --reload-dir packages;
+        else
+          exec .venv/bin/uvicorn apps.admin_api.main:app --host 0.0.0.0 --port 8001;
+        fi
     ports:
       - "${ADMIN_API_PORT:-8001}:8001"
     volumes:
