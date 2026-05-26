@@ -5,6 +5,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from stroyhub.catalog.product_match_generation import ProductMatchCandidateGenerator
 from stroyhub.db.repositories import (
     CanonicalProductCreate,
     CanonicalProductRepository,
@@ -187,6 +188,7 @@ class ProductMatchDecisionService:
                 reviewed_by=data.actor,
                 reason=_decision_reason(data, action="accept"),
             )
+            self._generate_followup_candidates(canonical_product_id)
             return _decision(updated)
 
         match = ProductMatchRepository(self._session).create(
@@ -201,6 +203,7 @@ class ProductMatchDecisionService:
                 reason=_decision_reason(data, action="accept"),
             )
         )
+        self._generate_followup_candidates(canonical_product_id)
         return _decision(match)
 
     def _canonical_product(self, canonical_product_id: int) -> CanonicalProduct:
@@ -234,6 +237,11 @@ class ProductMatchDecisionService:
                 ProductMatch.canonical_product_id == canonical_product_id,
                 ProductMatch.source_product_id == source_product_id,
             )
+        )
+
+    def _generate_followup_candidates(self, canonical_product_id: int) -> None:
+        ProductMatchCandidateGenerator(self._session).generate_for_canonical(
+            canonical_product_id
         )
 
 

@@ -149,7 +149,22 @@ def test_create_canonical_from_source_and_accept_links_in_one_transaction(
     client: TestClient,
     db_session: Session,
 ) -> None:
-    source_product = _source_product(db_session, source_id="create-and-accept")
+    category = Category(slug="create-followup-category", name="Create Followup Category")
+    db_session.add(category)
+    db_session.flush()
+    title = "Create Followup Cement M500 50kg"
+    source_product = _source_product(
+        db_session,
+        source_id="create-and-accept",
+        title=title,
+        category_id=category.id,
+    )
+    duplicate_source_product = _source_product(
+        db_session,
+        source_id="create-followup-candidate",
+        title=title,
+        category_id=category.id,
+    )
 
     response = client.post(
         f"/product-matches/from-source/{source_product.id}/accept",
@@ -163,6 +178,16 @@ def test_create_canonical_from_source_and_accept_links_in_one_transaction(
     assert canonical.title == source_product.title
     assert payload["status"] == "accepted"
     assert payload["reason"] == {"action": "accept", "note": "new normalized product"}
+
+    followup_candidate = db_session.scalar(
+        select(ProductMatch).where(
+            ProductMatch.canonical_product_id == canonical.id,
+            ProductMatch.source_product_id == duplicate_source_product.id,
+        )
+    )
+    assert followup_candidate is not None
+    assert followup_candidate.status == "candidate"
+    assert followup_candidate.method == "exact_normalized_title"
 
 
 def test_accept_candidate_match_records_manual_method(
@@ -394,7 +419,7 @@ def test_generate_candidates_skips_ineligible_and_blocked_products(
     db_session: Session,
 ) -> None:
     canonical = _canonical(db_session, title="Blocked Unique Cement M500 50kg")
-    _source_product(
+    ineligible_product = _source_product(
         db_session,
         source_id="generate-ineligible",
         title="Blocked Unique Cement M500 50kg",
@@ -402,20 +427,38 @@ def test_generate_candidates_skips_ineligible_and_blocked_products(
         raw={"catalog_eligibility": {"status": "ineligible"}},
         is_not_product=True,
     )
-    _source_product(
+    blocked_product = _source_product(
         db_session,
         source_id="generate-blocked",
         title="Blocked Unique Cement M500 25kg",
         category_id=canonical.category_id,
     )
 
-    response = client.post(
+    ineligible_response = client.post(
         "/product-matches/generate-candidates",
-        json={"source": "2gis", "category_id": canonical.category_id, "min_confidence": 0},
+        json={
+            "source": "2gis",
+            "shop_id": ineligible_product.shop_id,
+            "category_id": canonical.category_id,
+            "min_confidence": 0,
+        },
+    )
+    blocked_response = client.post(
+        "/product-matches/generate-candidates",
+        json={
+            "source": "2gis",
+            "shop_id": blocked_product.shop_id,
+            "category_id": canonical.category_id,
+            "min_confidence": 0,
+        },
     )
 
-    assert response.status_code == 200
-    assert response.json()["candidates_created"] == 0
+    assert ineligible_response.status_code == 200
+    assert ineligible_response.json()["source_products_considered"] == 0
+    assert ineligible_response.json()["candidates_created"] == 0
+    assert blocked_response.status_code == 200
+    assert blocked_response.json()["source_products_considered"] == 1
+    assert blocked_response.json()["candidates_created"] == 0
 
 
 def test_generate_candidates_respects_category_blocking(
@@ -433,7 +476,7 @@ def test_generate_candidates_respects_category_blocking(
             category_id=other_category.id,
         )
     )
-    _source_product(
+    source_product = _source_product(
         db_session,
         source_id="generate-category-blocked",
         title="Category Block Cement M500 50kg",
@@ -442,10 +485,11 @@ def test_generate_candidates_respects_category_blocking(
 
     response = client.post(
         "/product-matches/generate-candidates",
-        json={"source": "2gis", "category_id": category.id, "min_confidence": 0.9},
+        json={"source": "2gis", "shop_id": source_product.shop_id, "min_confidence": 0.9},
     )
 
     assert response.status_code == 200
+    assert response.json()["source_products_considered"] == 1
     assert response.json()["reference_products_considered"] >= 1
     assert response.json()["candidates_created"] == 0
     assert response.json()["candidates_seen"] == 0

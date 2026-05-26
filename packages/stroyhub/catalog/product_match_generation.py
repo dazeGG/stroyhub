@@ -51,14 +51,60 @@ class ProductMatchCandidateGenerator:
 
     def generate(self, filters: ProductMatchGenerationFilters) -> ProductMatchGenerationResult:
         source_products = self._eligible_unmatched_source_products(filters)
-        references, canonical_id_by_reference_id = self._reference_products()
+        references, canonical_id_by_reference_id = self._reference_products(filters)
+        return self._generate_from_references(
+            source_products=source_products,
+            references=references,
+            canonical_id_by_reference_id=canonical_id_by_reference_id,
+            filters=filters,
+        )
+
+    def generate_for_canonical(
+        self,
+        canonical_product_id: int,
+        filters: ProductMatchGenerationFilters | None = None,
+    ) -> ProductMatchGenerationResult:
+        canonical = self._session.get(CanonicalProduct, canonical_product_id)
+        if canonical is None or canonical.match_status != "active":
+            return ProductMatchGenerationResult(
+                source_products_considered=0,
+                reference_products_considered=0,
+                candidates_seen=0,
+                candidates_created=0,
+                candidates_skipped_existing=0,
+            )
+
+        selected_filters = filters or ProductMatchGenerationFilters(
+            category_id=canonical.category_id,
+            limit=1000,
+        )
+        source_products = self._eligible_unmatched_source_products(selected_filters)
+        references = self._reference_products_for_canonical(canonical)
+        canonical_id_by_reference_id = {
+            reference.id: canonical.id for reference in references
+        }
+        return self._generate_from_references(
+            source_products=source_products,
+            references=references,
+            canonical_id_by_reference_id=canonical_id_by_reference_id,
+            filters=selected_filters,
+        )
+
+    def _generate_from_references(
+        self,
+        *,
+        source_products: list[SourceProduct],
+        references: list[_ComparableProduct],
+        canonical_id_by_reference_id: dict[int, int],
+        filters: ProductMatchGenerationFilters,
+    ) -> ProductMatchGenerationResult:
         prepared_references = [
             (reference, prepare_match_product(reference))
             for reference in references
         ]
         existing_pairs = self._existing_pairs(
             source_product_ids=[product.id for product in source_products],
-            canonical_product_ids=list(canonical_id_by_reference_id.values()),
+            canonical_product_ids=list(set(canonical_id_by_reference_id.values())),
         )
         candidates_seen = 0
         candidates_created = 0
@@ -137,13 +183,22 @@ class ProductMatchCandidateGenerator:
             if is_matchable_source_product(product.raw, is_not_product=product.is_not_product)
         ]
 
-    def _reference_products(self) -> tuple[list[_ComparableProduct], dict[int, int]]:
+    def _reference_products(
+        self,
+        filters: ProductMatchGenerationFilters,
+    ) -> tuple[list[_ComparableProduct], dict[int, int]]:
         references: list[_ComparableProduct] = []
         canonical_id_by_reference_id: dict[int, int] = {}
 
-        for canonical in self._session.scalars(
-            select(CanonicalProduct).where(CanonicalProduct.match_status == "active")
-        ):
+        canonical_statement = select(CanonicalProduct).where(
+            CanonicalProduct.match_status == "active"
+        )
+        if filters.category_id is not None:
+            canonical_statement = canonical_statement.where(
+                CanonicalProduct.category_id == filters.category_id
+            )
+
+        for canonical in self._session.scalars(canonical_statement):
             reference = _canonical_comparable(canonical)
             references.append(reference)
             canonical_id_by_reference_id[reference.id] = canonical.id
@@ -151,17 +206,44 @@ class ProductMatchCandidateGenerator:
         accepted_statement = (
             select(SourceProduct, ProductMatch.canonical_product_id)
             .join(ProductMatch, ProductMatch.source_product_id == SourceProduct.id)
+            .join(CanonicalProduct, ProductMatch.canonical_product_id == CanonicalProduct.id)
             .where(
                 ProductMatch.status == "accepted",
                 SourceProduct.is_active.is_(True),
+                CanonicalProduct.match_status == "active",
             )
         )
+        if filters.category_id is not None:
+            accepted_statement = accepted_statement.where(
+                CanonicalProduct.category_id == filters.category_id
+            )
+
         for product, canonical_product_id in self._session.execute(accepted_statement):
             reference = _source_comparable(product)
             references.append(reference)
             canonical_id_by_reference_id[reference.id] = canonical_product_id
 
         return references, canonical_id_by_reference_id
+
+    def _reference_products_for_canonical(
+        self,
+        canonical: CanonicalProduct,
+    ) -> list[_ComparableProduct]:
+        references = [_canonical_comparable(canonical)]
+        accepted_statement = (
+            select(SourceProduct)
+            .join(ProductMatch, ProductMatch.source_product_id == SourceProduct.id)
+            .where(
+                ProductMatch.canonical_product_id == canonical.id,
+                ProductMatch.status == "accepted",
+                SourceProduct.is_active.is_(True),
+            )
+        )
+        references.extend(
+            _source_comparable(product)
+            for product in self._session.scalars(accepted_statement)
+        )
+        return references
 
     def _existing_pairs(
         self,

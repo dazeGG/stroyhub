@@ -320,7 +320,7 @@ def test_normalization_queue_endpoint_filters_each_state_before_pagination(
 
     response = client.get(
         "/product-normalization/queue",
-        params={"state": state, "limit": 1, "offset": 0},
+        params={"state": state, "category_id": category.id, "limit": 1, "offset": 0},
     )
 
     assert response.status_code == 200

@@ -230,6 +230,12 @@ These endpoints record admin decisions that link source product cards to
 canonical products. They preserve source product rows and write audit metadata
 to `product_matches.reviewed_at`, `reviewed_by`, and `reason`.
 
+After an admin accepts a source card for a canonical product, the service also
+generates reviewable candidate matches from that canonical product to other
+eligible unmatched source cards. This keeps newly created canonical products
+visible to the normalization queue immediately instead of waiting for a separate
+candidate-generation pass.
+
 ### `POST /product-matches/generate-candidates`
 
 Runs durable candidate generation for eligible unmatched source products. The
