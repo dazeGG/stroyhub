@@ -217,10 +217,26 @@ Use a quick fix when:
 - a title keyword rule covers a narrow, obvious group without harming existing
   tests.
 
+### Product Normalization Inbox
+
+Use `/products/normalization` for persisted canonical-product decisions. The
+`Можно нормализовать` and candidate-match states support a guarded auto-accept
+preview for exact normalized-title candidates; candidate-match rows also support
+manual accept/reject actions.
+
+Auto-accept rules:
+
+1. Use `Можно нормализовать` for the day-to-day inbox flow, or candidate-match
+   when inspecting candidate pairs directly. Narrow by source, shop, or category
+   when reviewing a focused batch.
+2. Run the preview first; it does not mutate `product_matches`.
+3. Apply only when the preview count matches the expected exact-title batch.
+4. Manually review skipped or token-similarity candidates.
+
 ### Match Candidates
 
-Use `/matches` as a read-only review aid for the in-memory matcher. It does not
-persist reviewer decisions in M12.
+Use `/matches` as a read-only review aid for the in-memory matcher when tuning
+matching rules and blockers.
 
 Review steps:
 

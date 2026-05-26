@@ -6,6 +6,7 @@ import { RouterLink } from 'vue-router'
 
 import {
   acceptProductMatch,
+  autoAcceptProductMatchCandidates,
   createCanonicalFromSourceAndAccept,
   fetchCanonicalProducts,
   fetchCategories,
@@ -14,6 +15,8 @@ import {
   rejectProductMatch,
   type CanonicalProductListItem,
   type CategoryTreeItem,
+  type ProductMatchAutoAcceptRequest,
+  type ProductMatchAutoAcceptResponse,
   type ProductMatchDecision,
   type ProductNormalizationCandidateMatch,
   type ProductNormalizationQueueItem,
@@ -36,7 +39,7 @@ interface CategoryOption {
 
 const statusOptions: StatusOption[] = [
   { value: 'needs_review', label: 'На проверку', hint: 'нужен человек' },
-  { value: 'eligible_unmatched', label: 'Без пары', hint: 'можно нормализовать' },
+  { value: 'eligible_unmatched', label: 'Можно нормализовать', hint: 'без пары' },
   { value: 'candidate_match', label: 'Есть кандидат', hint: 'сравнить матч' },
   { value: 'accepted', label: 'Связаны', hint: 'уже в каталоге' },
   { value: 'ineligible', label: 'Заблокированы', hint: 'не товар или цена от' },
@@ -53,6 +56,8 @@ const shops = ref<ShopListItem[]>([])
 const categories = ref<CategoryTreeItem[]>([])
 const isLoading = ref(false)
 const busyAction = ref('')
+const isAutoAccepting = ref(false)
+const autoAcceptPreview = ref<ProductMatchAutoAcceptResponse | null>(null)
 const toast = useToast()
 const reasonByProductId = reactive<Record<number, string>>({})
 const canonicalSearchByProductId = reactive<Record<number, string>>({})
@@ -85,6 +90,10 @@ const blockedCount = computed(() => {
 
 const workQueueCount = computed(() => {
   return items.value.filter((item) => item.state !== 'ineligible' && item.state !== 'accepted').length
+})
+
+const canAutoAccept = computed(() => {
+  return selectedState.value === 'eligible_unmatched' || selectedState.value === 'candidate_match'
 })
 
 function stateLabel(state: ProductNormalizationState): string {
@@ -176,6 +185,16 @@ function decisionDescription(decision: ProductMatchDecision): string {
   }
   const note = typeof decision.reason?.note === 'string' ? ` · ${decision.reason.note}` : ''
   return `${actionLabels[action] ?? action}${note}`
+}
+
+function skippedAutoAcceptCount(result: ProductMatchAutoAcceptResponse): number {
+  return result.skipped_already_accepted
+    + result.skipped_ambiguous
+    + result.skipped_ineligible
+    + result.skipped_category_mismatch
+    + result.skipped_low_confidence
+    + result.skipped_method
+    + result.skipped_previously_rejected
 }
 
 function flattenCategories(itemsToFlatten: CategoryTreeItem[], level = 0): CategoryOption[] {
@@ -343,7 +362,85 @@ async function rejectCandidateMatch(
   }
 }
 
+function autoAcceptRequest(dryRun: boolean): ProductMatchAutoAcceptRequest {
+  return {
+    source: selectedSource.value || undefined,
+    shopId: selectedShopId.value ? Number(selectedShopId.value) : undefined,
+    categoryId: selectedCategoryId.value ? Number(selectedCategoryId.value) : undefined,
+    q: searchQuery.value.trim() || undefined,
+    minConfidence: 1,
+    methods: ['exact_normalized_title'],
+    limit: 250,
+    dryRun,
+    reason: 'Автопринято из inbox нормализации',
+  }
+}
+
+async function previewAutoAcceptCandidates(): Promise<void> {
+  isAutoAccepting.value = true
+  autoAcceptPreview.value = null
+
+  try {
+    const response = await autoAcceptProductMatchCandidates(autoAcceptRequest(true))
+    autoAcceptPreview.value = response
+    if (response.would_accept === 0) {
+      toastWarning(
+        toast,
+        'Нет безопасных автосвязей',
+        'Для текущих фильтров нет точных однозначных кандидатов.',
+      )
+    } else {
+      toastSuccess(
+        toast,
+        'Проверка завершена',
+        `Можно принять автоматически: ${response.would_accept}`,
+      )
+    }
+  } catch (error) {
+    toastError(
+      toast,
+      'Не удалось проверить автосвязи',
+      error,
+      'Не удалось проверить автосвязи',
+    )
+  } finally {
+    isAutoAccepting.value = false
+  }
+}
+
+async function applyAutoAcceptCandidates(): Promise<void> {
+  if (!autoAcceptPreview.value || autoAcceptPreview.value.would_accept === 0) {
+    return
+  }
+
+  isAutoAccepting.value = true
+  try {
+    const response = await autoAcceptProductMatchCandidates(autoAcceptRequest(false))
+    autoAcceptPreview.value = null
+    toastSuccess(
+      toast,
+      'Кандидаты приняты',
+      `Связано: ${response.accepted}. Новых кандидатов: ${response.followup_candidates_created}.`,
+    )
+    await loadQueue()
+  } catch (error) {
+    toastError(
+      toast,
+      'Не удалось применить автосвязи',
+      error,
+      'Не удалось применить автосвязи',
+    )
+  } finally {
+    isAutoAccepting.value = false
+  }
+}
+
+function clearAutoAcceptPreview(): void {
+  autoAcceptPreview.value = null
+}
+
 function resetFilters(): void {
+  clearAutoAcceptPreview()
   selectedSource.value = ''
   selectedShopId.value = ''
   selectedCategoryId.value = ''
@@ -352,6 +449,7 @@ function resetFilters(): void {
 }
 
 watch(selectedSource, () => {
+  clearAutoAcceptPreview()
   if (selectedSource.value && selectedShopId.value) {
     const selectedShop = shops.value.find((shop) => String(shop.id) === selectedShopId.value)
     if (selectedShop && selectedShop.source !== selectedSource.value) {
@@ -364,6 +462,7 @@ watch(selectedSource, () => {
 })
 
 watch([selectedState, selectedShopId, selectedCategoryId], () => {
+  clearAutoAcceptPreview()
   void loadQueue()
 })
 
@@ -426,7 +525,7 @@ onMounted(() => {
             class="h-10 w-full rounded-md border border-neutral-800 bg-neutral-950 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-amber-400"
             placeholder="Поиск по названию"
             aria-label="Поиск по названию исходного товара"
-            @keyup.enter="loadQueue"
+            @keyup.enter="clearAutoAcceptPreview(); loadQueue()"
           >
         </label>
 
@@ -466,7 +565,7 @@ onMounted(() => {
         <button
           type="button"
           class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-amber-200"
-          @click="loadQueue"
+          @click="clearAutoAcceptPreview(); loadQueue()"
         >
           <Icon :icon="icons.filter" class="size-4" aria-hidden="true" />
           Найти
@@ -480,6 +579,74 @@ onMounted(() => {
           <Icon :icon="icons.x" class="size-4" aria-hidden="true" />
           Сбросить
         </button>
+      </div>
+    </div>
+
+    <div
+      v-if="canAutoAccept"
+      class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4"
+      data-testid="product-match-auto-accept"
+    >
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <p class="inline-flex items-center gap-2 text-sm font-semibold text-white">
+            <Icon :icon="icons.check" class="size-4 text-emerald-300" aria-hidden="true" />
+            Автопринятие точных кандидатов
+          </p>
+          <p class="mt-1 max-w-3xl text-sm leading-6 text-neutral-400">
+            Проверяем текущие фильтры: 100% exact title, одна пара на карточку, совпадающая категория.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-emerald-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-wait disabled:opacity-60"
+          :disabled="isAutoAccepting"
+          @click="previewAutoAcceptCandidates"
+        >
+          <Icon :icon="icons.search" class="size-4" aria-hidden="true" />
+          {{ isAutoAccepting ? 'Проверяем...' : 'Проверить точные' }}
+        </button>
+      </div>
+
+      <div
+        v-if="autoAcceptPreview"
+        class="mt-4 grid gap-3 border-t border-neutral-800 pt-4 xl:grid-cols-[1fr_auto]"
+      >
+        <dl class="grid gap-3 sm:grid-cols-3">
+          <div class="rounded-md border border-neutral-800 bg-neutral-950 p-3">
+            <dt class="text-xs uppercase tracking-wide text-neutral-600">Кандидатов</dt>
+            <dd class="mt-1 text-xl font-semibold text-white">{{ autoAcceptPreview.candidates_seen }}</dd>
+          </div>
+          <div class="rounded-md border border-emerald-400/30 bg-emerald-400/10 p-3">
+            <dt class="text-xs uppercase tracking-wide text-emerald-200/80">Можно принять</dt>
+            <dd class="mt-1 text-xl font-semibold text-emerald-100">{{ autoAcceptPreview.would_accept }}</dd>
+          </div>
+          <div class="rounded-md border border-neutral-800 bg-neutral-950 p-3">
+            <dt class="text-xs uppercase tracking-wide text-neutral-600">Пропущено</dt>
+            <dd class="mt-1 text-xl font-semibold text-neutral-200">{{ skippedAutoAcceptCount(autoAcceptPreview) }}</dd>
+          </div>
+        </dl>
+
+        <div class="flex flex-col gap-2 sm:flex-row xl:items-start">
+          <button
+            type="button"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-emerald-300 px-4 text-sm font-semibold text-neutral-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="isAutoAccepting || autoAcceptPreview.would_accept === 0"
+            @click="applyAutoAcceptCandidates"
+          >
+            <Icon :icon="icons.check" class="size-4" aria-hidden="true" />
+            {{ isAutoAccepting ? 'Применяем...' : `Принять ${autoAcceptPreview.would_accept}` }}
+          </button>
+          <button
+            type="button"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-700 px-4 text-sm font-semibold text-neutral-300 transition hover:border-neutral-600 hover:text-white"
+            @click="clearAutoAcceptPreview"
+          >
+            <Icon :icon="icons.x" class="size-4" aria-hidden="true" />
+            Скрыть
+          </button>
+        </div>
       </div>
     </div>
 

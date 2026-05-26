@@ -268,6 +268,70 @@ Example response:
 }
 ```
 
+### `POST /product-matches/auto-accept-candidates`
+
+Previews or applies safe automatic acceptance for existing candidate matches.
+The default mode is `dry_run = true`; no rows are changed until the admin sends
+`dry_run = false`.
+
+Safety rules:
+
+- candidate status only;
+- source product is active and matchable;
+- canonical product is active;
+- source and canonical categories are known and equal;
+- method is `exact_normalized_title` by default;
+- confidence is at least the requested threshold, default `1.000`;
+- the source product has exactly one candidate in the selected filter scope;
+- the same source/canonical pair was not previously rejected.
+
+Request:
+
+```json
+{
+  "source": "2gis",
+  "shop_id": null,
+  "category_id": 7,
+  "q": null,
+  "min_confidence": "1.000",
+  "methods": ["exact_normalized_title"],
+  "limit": 100,
+  "dry_run": true,
+  "actor": "admin",
+  "reason": "safe exact batch"
+}
+```
+
+Example response:
+
+```json
+{
+  "dry_run": true,
+  "candidates_seen": 1,
+  "would_accept": 1,
+  "accepted": 0,
+  "skipped_already_accepted": 0,
+  "skipped_ambiguous": 0,
+  "skipped_ineligible": 0,
+  "skipped_category_mismatch": 0,
+  "skipped_low_confidence": 0,
+  "skipped_method": 0,
+  "skipped_previously_rejected": 0,
+  "followup_candidates_created": 0,
+  "items": [
+    {
+      "match_id": 41,
+      "canonical_product_id": 12,
+      "canonical_title": "Цемент М500 50 кг",
+      "source_product_id": 98,
+      "source_title": "Цемент М500 50 кг",
+      "confidence": "1.000",
+      "method": "exact_normalized_title"
+    }
+  ]
+}
+```
+
 ### `POST /product-matches/accept`
 
 Accepts a source product into an existing canonical product. If the same

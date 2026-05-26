@@ -229,6 +229,46 @@ export interface ProductMatchDecision {
   reason: Record<string, unknown> | null
 }
 
+export type ProductMatchAutoAcceptMethod = 'exact_normalized_title' | 'exact_title'
+
+export interface ProductMatchAutoAcceptRequest {
+  source?: string
+  shopId?: number
+  categoryId?: number
+  q?: string
+  minConfidence?: number
+  methods?: ProductMatchAutoAcceptMethod[]
+  limit?: number
+  dryRun?: boolean
+  reason?: string
+}
+
+export interface ProductMatchAutoAcceptItem {
+  match_id: number
+  canonical_product_id: number
+  canonical_title: string
+  source_product_id: number
+  source_title: string
+  confidence: string
+  method: string
+}
+
+export interface ProductMatchAutoAcceptResponse {
+  dry_run: boolean
+  candidates_seen: number
+  would_accept: number
+  accepted: number
+  skipped_already_accepted: number
+  skipped_ambiguous: number
+  skipped_ineligible: number
+  skipped_category_mismatch: number
+  skipped_low_confidence: number
+  skipped_method: number
+  skipped_previously_rejected: number
+  followup_candidates_created: number
+  items: ProductMatchAutoAcceptItem[]
+}
+
 export interface ProductPriceSnapshot {
   id: number
   price: string | null
@@ -763,6 +803,31 @@ export function acceptProductMatch(
         source_product_id: sourceProductId,
         actor: 'admin',
         reason: reason || null,
+      }),
+    },
+    signal,
+  )
+}
+
+export function autoAcceptProductMatchCandidates(
+  payload: ProductMatchAutoAcceptRequest,
+  signal?: AbortSignal,
+): Promise<ProductMatchAutoAcceptResponse> {
+  return writeJson<ProductMatchAutoAcceptResponse>(
+    '/product-matches/auto-accept-candidates',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        source: payload.source || null,
+        shop_id: payload.shopId ?? null,
+        category_id: payload.categoryId ?? null,
+        q: payload.q?.trim() || null,
+        min_confidence: payload.minConfidence ?? 1,
+        methods: payload.methods ?? ['exact_normalized_title'],
+        limit: payload.limit ?? 250,
+        dry_run: payload.dryRun ?? true,
+        actor: 'admin',
+        reason: payload.reason || null,
       }),
     },
     signal,

@@ -496,6 +496,163 @@ def test_generate_candidates_respects_category_blocking(
     assert canonical.id > 0
 
 
+def test_auto_accept_candidates_dry_run_does_not_change_matches(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    canonical = _canonical(db_session, title="Auto Dry Run Cement M500 50kg")
+    source_product = _source_product(
+        db_session,
+        source_id="auto-dry-run-source",
+        title="Auto Dry Run Cement M500 50kg",
+        category_id=canonical.category_id,
+    )
+    match = ProductMatchRepository(db_session).create(
+        ProductMatchCreate(
+            canonical_product_id=canonical.id,
+            source_product_id=source_product.id,
+            confidence=Decimal("1.000"),
+            method="exact_normalized_title",
+            status="candidate",
+        )
+    )
+
+    response = client.post(
+        "/product-matches/auto-accept-candidates",
+        json={
+            "source": "2gis",
+            "shop_id": source_product.shop_id,
+            "q": "Dry Run Cement",
+            "dry_run": True,
+        },
+    )
+
+    db_session.expire(match)
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["dry_run"] is True
+    assert payload["would_accept"] == 1
+    assert payload["accepted"] == 0
+    assert payload["items"][0]["match_id"] == match.id
+    assert match.status == "candidate"
+
+
+def test_auto_accept_candidates_accepts_safe_exact_match(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    canonical = _canonical(db_session, title="Auto Accept Cement M500 50kg")
+    source_product = _source_product(
+        db_session,
+        source_id="auto-accept-source",
+        title="Auto Accept Cement M500 50kg",
+        category_id=canonical.category_id,
+    )
+    match = ProductMatchRepository(db_session).create(
+        ProductMatchCreate(
+            canonical_product_id=canonical.id,
+            source_product_id=source_product.id,
+            confidence=Decimal("1.000"),
+            method="exact_normalized_title",
+            status="candidate",
+        )
+    )
+
+    response = client.post(
+        "/product-matches/auto-accept-candidates",
+        json={
+            "source": "2gis",
+            "shop_id": source_product.shop_id,
+            "dry_run": False,
+            "actor": "admin",
+            "reason": "safe exact batch",
+        },
+    )
+
+    db_session.expire(match)
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["dry_run"] is False
+    assert payload["would_accept"] == 1
+    assert payload["accepted"] == 1
+    assert match.status == "accepted"
+    assert match.method == "exact_normalized_title"
+    assert match.confidence == Decimal("1.000")
+    assert match.reviewed_by == "admin"
+    assert match.reason == {
+        "action": "auto_accept",
+        "min_confidence": "1.000",
+        "methods": ["exact_normalized_title"],
+        "note": "safe exact batch",
+    }
+
+
+def test_auto_accept_candidates_skips_ambiguous_source_products(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    category = Category(slug="auto-ambiguous-category", name="Auto Ambiguous Category")
+    db_session.add(category)
+    db_session.flush()
+    first_canonical = CanonicalProductRepository(db_session).create(
+        CanonicalProductCreate(
+            title="Auto Ambiguous Cement M500 50kg",
+            normalized_title="auto ambiguous cement m500 50kg",
+            category_id=category.id,
+        )
+    )
+    second_canonical = CanonicalProductRepository(db_session).create(
+        CanonicalProductCreate(
+            title="Auto Ambiguous Cement M500 50kg duplicate",
+            normalized_title="auto ambiguous cement m500 50kg duplicate",
+            category_id=category.id,
+        )
+    )
+    source_product = _source_product(
+        db_session,
+        source_id="auto-ambiguous-source",
+        title="Auto Ambiguous Cement M500 50kg",
+        category_id=category.id,
+    )
+    first_match = ProductMatchRepository(db_session).create(
+        ProductMatchCreate(
+            canonical_product_id=first_canonical.id,
+            source_product_id=source_product.id,
+            confidence=Decimal("1.000"),
+            method="exact_normalized_title",
+            status="candidate",
+        )
+    )
+    second_match = ProductMatchRepository(db_session).create(
+        ProductMatchCreate(
+            canonical_product_id=second_canonical.id,
+            source_product_id=source_product.id,
+            confidence=Decimal("1.000"),
+            method="exact_normalized_title",
+            status="candidate",
+        )
+    )
+
+    response = client.post(
+        "/product-matches/auto-accept-candidates",
+        json={
+            "source": "2gis",
+            "shop_id": source_product.shop_id,
+            "dry_run": False,
+        },
+    )
+
+    db_session.expire(first_match)
+    db_session.expire(second_match)
+    assert response.status_code == 200
+    assert response.json()["candidates_seen"] == 2
+    assert response.json()["would_accept"] == 0
+    assert response.json()["accepted"] == 0
+    assert response.json()["skipped_ambiguous"] == 1
+    assert first_match.status == "candidate"
+    assert second_match.status == "candidate"
+
+
 def _canonical(session: Session, *, title: str) -> CanonicalProduct:
     category = Category(slug=f"category-{title.casefold().replace(' ', '-')}", name=title)
     session.add(category)

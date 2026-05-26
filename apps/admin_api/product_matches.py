@@ -1,10 +1,14 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Any, NoReturn
+from typing import Annotated, Any, Literal, NoReturn
 
 from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
+from stroyhub.catalog.product_match_auto_accept import (
+    ProductMatchAutoAcceptFilters,
+    ProductMatchAutoAcceptService,
+)
 from stroyhub.catalog.product_match_decisions import (
     ProductMatchDecisionConflict,
     ProductMatchDecisionInput,
@@ -21,6 +25,7 @@ from apps.admin_api.errors import ApiError, api_error_responses
 from apps.admin_api.validation import ActorName, ReasonText
 
 router = APIRouter(prefix="/product-matches", tags=["product-matches"])
+AutoAcceptMethod = Literal["exact_normalized_title", "exact_title"]
 
 
 class ProductMatchDecisionRequest(BaseModel):
@@ -36,6 +41,19 @@ class ProductMatchGenerateCandidatesRequest(BaseModel):
     category_id: int | None = None
     min_confidence: float = Field(default=0.75, ge=0, le=1)
     limit: int = Field(default=100, ge=1, le=1000)
+
+
+class ProductMatchAutoAcceptRequest(BaseModel):
+    source: str | None = None
+    shop_id: int | None = Field(default=None, gt=0)
+    category_id: int | None = Field(default=None, gt=0)
+    q: str | None = None
+    min_confidence: Decimal = Field(default=Decimal("1.000"), ge=0, le=1)
+    methods: tuple[AutoAcceptMethod, ...] = ("exact_normalized_title",)
+    limit: int = Field(default=100, ge=1, le=1000)
+    dry_run: bool = True
+    actor: ActorName | None = "admin"
+    reason: ReasonText | None = None
 
 
 class ProductMatchReviewRequest(BaseModel):
@@ -68,6 +86,36 @@ class ProductMatchGenerateCandidatesResponse(BaseModel):
     candidates_skipped_existing: int
 
 
+class ProductMatchAutoAcceptItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    match_id: int
+    canonical_product_id: int
+    canonical_title: str
+    source_product_id: int
+    source_title: str
+    confidence: Decimal
+    method: str
+
+
+class ProductMatchAutoAcceptResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    dry_run: bool
+    candidates_seen: int
+    would_accept: int
+    accepted: int
+    skipped_already_accepted: int
+    skipped_ambiguous: int
+    skipped_ineligible: int
+    skipped_category_mismatch: int
+    skipped_low_confidence: int
+    skipped_method: int
+    skipped_previously_rejected: int
+    followup_candidates_created: int
+    items: tuple[ProductMatchAutoAcceptItemResponse, ...]
+
+
 @router.post("/generate-candidates", response_model=ProductMatchGenerateCandidatesResponse)
 def generate_product_match_candidates(
     payload: ProductMatchGenerateCandidatesRequest,
@@ -84,6 +132,30 @@ def generate_product_match_candidates(
     )
     session.commit()
     return ProductMatchGenerateCandidatesResponse.model_validate(result)
+
+
+@router.post("/auto-accept-candidates", response_model=ProductMatchAutoAcceptResponse)
+def auto_accept_product_match_candidates(
+    payload: ProductMatchAutoAcceptRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> ProductMatchAutoAcceptResponse:
+    result = ProductMatchAutoAcceptService(session).run(
+        ProductMatchAutoAcceptFilters(
+            source=payload.source,
+            shop_id=payload.shop_id,
+            category_id=payload.category_id,
+            q=payload.q,
+            min_confidence=payload.min_confidence,
+            methods=tuple(payload.methods),
+            limit=payload.limit,
+            dry_run=payload.dry_run,
+            actor=payload.actor,
+            reason=payload.reason,
+        )
+    )
+    if not payload.dry_run:
+        session.commit()
+    return ProductMatchAutoAcceptResponse.model_validate(result)
 
 
 @router.post(
