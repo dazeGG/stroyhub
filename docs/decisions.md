@@ -325,3 +325,34 @@ accepted automatically. Embeddings, destructive cross-shop merges, automatic
 price-unit normalization, and admin accept/reject workflows remain out of scope
 for this schema step. Migration implementation is tracked in
 [#63](https://github.com/dazeGG/stroyhub/issues/63).
+
+## 2026-05-26: Make Catalog Quality Operations the Product Readiness Gate
+
+Context:
+M15 completed the public MVP site and API foundation, but the admin workflow was
+still too close to technical entities such as source products, canonical
+products, matches, and candidates. That makes the operator experience confusing
+and makes it too easy to mix ready catalog data with review work.
+
+Decision:
+Use M16 to rebuild admin, admin API, worker orchestration, categorization, and
+normalization around a catalog-quality pipeline:
+
+```text
+source ingestion -> cleanup -> categorization -> normalization -> quality control
+```
+
+The primary operator states are new item, ready to accept, needs review, data
+problem, in catalog, and possible duplicate. The long-lived workflow contract is
+documented in [catalog-quality-operations.md](catalog-quality-operations.md).
+
+ML remains a future enhancer during M16. Production decisions should first be
+rule-based, explainable, protected by hard blockers, and backed by recorded
+operator decisions.
+
+Consequences:
+M15 can stay closed as the public MVP surface/foundation. Product readiness
+before deployment now depends on M16, because the public catalog is only useful
+when the data-quality pipeline can keep normalized products, categories, and
+offers trustworthy. Admin UI and API work should be task-first rather than
+database-entity-first.

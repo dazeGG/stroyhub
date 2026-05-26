@@ -9,6 +9,12 @@ is accepted for migration work in issue
 [#63](https://github.com/dazeGG/stroyhub/issues/63). The database source of
 truth now lives in [database.md](database.md).
 
+M16 update, 2026-05-26: matching is now part of the broader catalog-quality
+operations pipeline. The operator workflow should use task states such as
+ready to accept, needs review, data problem, and in catalog. The detailed state
+model and quality gates live in
+[catalog-quality-operations.md](catalog-quality-operations.md).
+
 ## Goal
 
 StroyHub currently stores source product cards independently. That is the right

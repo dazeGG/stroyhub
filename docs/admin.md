@@ -69,6 +69,28 @@ The admin dev server proxies `/api/*` requests to the local admin FastAPI app on
 `http://127.0.0.1:8001` by default. In Docker Compose, it uses the internal
 `http://admin_api:8001` service URL through `VITE_API_PROXY_TARGET`.
 
+## M16 Direction
+
+M16 turns the admin from an entity browser into a catalog-quality operations
+tool. The source of truth for the new workflow is
+[Catalog Quality Operations](catalog-quality-operations.md).
+
+Admin copy and navigation should use operator-facing terms such as new item,
+ready to accept, needs review, data problem, in catalog, and possible duplicate.
+Technical terms such as canonical product, match, candidate, and source product
+may appear in debug/detail context, but should not be the primary workflow
+language.
+
+The target M16 navigation is:
+
+- quality dashboard;
+- sources;
+- processing queues;
+- review workspace;
+- categorization;
+- normalized catalog;
+- data problems.
+
 ## Initial M12 Jobs
 
 The first admin version should help a human answer these questions without
