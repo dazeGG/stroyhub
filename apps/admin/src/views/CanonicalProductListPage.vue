@@ -50,10 +50,6 @@ const acceptedOffersCount = computed(() => {
   return products.value.reduce((sum, product) => sum + product.match_counts.accepted, 0)
 })
 
-const candidateCount = computed(() => {
-  return products.value.reduce((sum, product) => sum + product.match_counts.candidate, 0)
-})
-
 const currentPage = computed({
   get: () => Math.floor(offset.value / pageSize) + 1,
   set: (page: number) => {
@@ -322,27 +318,27 @@ onMounted(() => {
           <Icon :icon="icons.tags" class="size-4" aria-hidden="true" />
           Нормализованные товары
         </p>
-        <h2 class="mt-2 text-2xl font-semibold text-white">Canonical каталог</h2>
+        <h2 class="mt-2 text-2xl font-semibold text-white">Нормализованный каталог</h2>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
-          Смотрим созданные canonical products, связанные офферы и очередь кандидатов.
+          Список товаров, которые уже прошли нормализацию. Здесь показываем только связанные принятые офферы.
         </p>
       </div>
 
       <div class="grid gap-3 sm:grid-cols-3 2xl:min-w-[640px]" data-testid="canonical-products-metrics">
         <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
-          <p class="text-xs uppercase tracking-wide text-neutral-500">Товаров в списке</p>
-          <p class="mt-1 text-xs text-neutral-600">по текущей странице</p>
+          <p class="text-xs uppercase tracking-wide text-neutral-500">На странице</p>
+          <p class="mt-1 text-xs text-neutral-600">показано сейчас</p>
           <p class="mt-2 text-2xl font-semibold text-white">{{ products.length }}</p>
         </div>
         <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
           <p class="text-xs uppercase tracking-wide text-neutral-500">Принятых офферов</p>
-          <p class="mt-1 text-xs text-neutral-600">у этих товаров</p>
+          <p class="mt-1 text-xs text-neutral-600">по этой странице</p>
           <p class="mt-2 text-2xl font-semibold text-white">{{ acceptedOffersCount }}</p>
         </div>
-        <div class="rounded-lg border border-amber-400/20 bg-amber-400/10 p-4">
-          <p class="text-xs uppercase tracking-wide text-amber-200/80">Кандидатов на проверку</p>
-          <p class="mt-1 text-xs text-amber-200/60">у этих товаров</p>
-          <p class="mt-2 text-2xl font-semibold text-amber-100">{{ candidateCount }}</p>
+        <div class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4">
+          <p class="text-xs uppercase tracking-wide text-neutral-500">Всего найдено</p>
+          <p class="mt-1 text-xs text-neutral-600">по текущим фильтрам</p>
+          <p class="mt-2 text-2xl font-semibold text-white">{{ totalProducts }}</p>
         </div>
       </div>
     </div>
@@ -395,23 +391,23 @@ onMounted(() => {
 
     <div class="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-900/40">
       <div
-        class="grid min-w-[980px] grid-cols-[minmax(320px,2fr)_190px_140px_210px_150px] border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
+        class="grid min-w-[930px] grid-cols-[minmax(320px,2fr)_190px_140px_130px_150px] border-b border-neutral-800 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
       >
         <span>Товар</span>
         <span>Категория</span>
         <span>Статус</span>
-        <span>Матчи</span>
+        <span>Офферы</span>
         <span>Обновлен</span>
       </div>
 
-      <div v-if="isLoadingProducts && products.length === 0" class="min-w-[980px] px-4 py-14 text-center text-sm text-neutral-500">
+      <div v-if="isLoadingProducts && products.length === 0" class="min-w-[930px] px-4 py-14 text-center text-sm text-neutral-500">
         <Icon :icon="icons.tags" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         Загружаем нормализованные товары...
       </div>
 
       <div
         v-else-if="errorMessage"
-        class="min-w-[980px] px-4 py-14 text-center text-sm text-red-200"
+        class="min-w-[930px] px-4 py-14 text-center text-sm text-red-200"
       >
         <Icon :icon="icons.alertTriangle" class="mx-auto mb-3 size-6 text-red-300" aria-hidden="true" />
         Не удалось загрузить список: {{ errorMessage }}
@@ -419,7 +415,7 @@ onMounted(() => {
 
       <div
         v-else-if="products.length === 0"
-        class="min-w-[980px] px-4 py-14 text-center text-sm text-neutral-500"
+        class="min-w-[930px] px-4 py-14 text-center text-sm text-neutral-500"
       >
         <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-neutral-600" aria-hidden="true" />
         По этим фильтрам нормализованных товаров нет.
@@ -427,19 +423,19 @@ onMounted(() => {
 
       <div
         v-else
-        class="min-w-[980px] divide-y divide-neutral-800 transition-opacity"
+        class="min-w-[930px] divide-y divide-neutral-800 transition-opacity"
         :class="isLoadingProducts ? 'opacity-60' : 'opacity-100'"
       >
         <div
           v-for="product in products"
           :key="product.id"
-          class="grid grid-cols-[minmax(320px,2fr)_190px_140px_210px_150px] px-4 py-4 text-sm"
+          class="grid grid-cols-[minmax(320px,2fr)_190px_140px_130px_150px] px-4 py-4 text-sm"
           data-testid="canonical-product-row"
         >
           <div class="min-w-0 pr-5">
             <RouterLink
               :to="{ name: 'canonical-product-detail', params: { canonicalProductId: product.id } }"
-              class="truncate font-semibold text-white transition hover:text-amber-200"
+              class="block truncate font-semibold text-white transition hover:text-amber-200"
               :title="product.title"
             >
               {{ product.title }}
@@ -467,19 +463,9 @@ onMounted(() => {
             </span>
           </div>
 
-          <div class="grid grid-cols-3 gap-2 pr-5 text-center">
-            <div>
-              <p class="text-xs text-neutral-600">Офферы</p>
-              <p class="mt-1 font-semibold text-white">{{ product.match_counts.accepted }}</p>
-            </div>
-            <div>
-              <p class="text-xs text-neutral-600">Канд.</p>
-              <p class="mt-1 font-semibold text-amber-100">{{ product.match_counts.candidate }}</p>
-            </div>
-            <div>
-              <p class="text-xs text-neutral-600">Откл.</p>
-              <p class="mt-1 font-semibold text-neutral-300">{{ product.match_counts.rejected }}</p>
-            </div>
+          <div class="pr-5">
+            <p class="text-xs text-neutral-600">Принято</p>
+            <p class="mt-1 text-lg font-semibold leading-none text-white">{{ product.match_counts.accepted }}</p>
           </div>
 
           <div class="min-w-0 text-neutral-400">
