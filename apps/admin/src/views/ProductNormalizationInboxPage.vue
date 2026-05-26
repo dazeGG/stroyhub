@@ -21,7 +21,7 @@ import {
   type ShopListItem,
 } from '../lib/api'
 import { icons } from '../lib/icons'
-import { messageFromError, toastError } from '../lib/notifications'
+import { toastError, toastSuccess, toastWarning } from '../lib/notifications'
 
 interface StatusOption {
   value: ProductNormalizationState
@@ -53,8 +53,6 @@ const shops = ref<ShopListItem[]>([])
 const categories = ref<CategoryTreeItem[]>([])
 const isLoading = ref(false)
 const busyAction = ref('')
-const errorMessage = ref('')
-const saveMessage = ref('')
 const toast = useToast()
 const reasonByProductId = reactive<Record<number, string>>({})
 const canonicalSearchByProductId = reactive<Record<number, string>>({})
@@ -167,17 +165,17 @@ function isBusy(item: ProductNormalizationQueueItem, action: string): boolean {
   return busyAction.value === actionKey(item, action)
 }
 
-function decisionMessage(decision: ProductMatchDecision): string {
+function decisionDescription(decision: ProductMatchDecision): string {
   const action = typeof decision.reason?.action === 'string' ? decision.reason.action : decision.status
   const actionLabels: Record<string, string> = {
-    accept: 'принято',
-    reject: 'отклонено',
-    supersede: 'заменено',
-    accepted: 'принято',
-    rejected: 'отклонено',
+    accept: 'Принято',
+    reject: 'Отклонено',
+    supersede: 'Заменено',
+    accepted: 'Принято',
+    rejected: 'Отклонено',
   }
   const note = typeof decision.reason?.note === 'string' ? ` · ${decision.reason.note}` : ''
-  return `Решение сохранено: ${actionLabels[action] ?? action}${note}`
+  return `${actionLabels[action] ?? action}${note}`
 }
 
 function flattenCategories(itemsToFlatten: CategoryTreeItem[], level = 0): CategoryOption[] {
@@ -192,7 +190,6 @@ async function loadQueue(): Promise<void> {
   const request = new AbortController()
   queueRequest = request
   isLoading.value = true
-  errorMessage.value = ''
 
   try {
     const [shopResponse, categoryResponse, queueResponse] = await Promise.all([
@@ -219,7 +216,6 @@ async function loadQueue(): Promise<void> {
       return
     }
 
-    errorMessage.value = messageFromError(error, 'Не удалось загрузить очередь нормализации')
     toastError(
       toast,
       'Не удалось загрузить очередь нормализации',
@@ -237,18 +233,15 @@ async function loadQueue(): Promise<void> {
 
 async function createCanonicalFromItem(item: ProductNormalizationQueueItem): Promise<void> {
   busyAction.value = actionKey(item, 'create')
-  errorMessage.value = ''
-  saveMessage.value = ''
 
   try {
     const decision = await createCanonicalFromSourceAndAccept(
       item.id,
       reasonByProductId[item.id],
     )
-    saveMessage.value = decisionMessage(decision)
+    toastSuccess(toast, 'Решение сохранено', decisionDescription(decision))
     await loadQueue()
   } catch (error) {
-    errorMessage.value = messageFromError(error, 'Не удалось создать нормализованный товар')
     toastError(
       toast,
       'Не удалось создать нормализованный товар',
@@ -262,8 +255,6 @@ async function createCanonicalFromItem(item: ProductNormalizationQueueItem): Pro
 
 async function searchCanonicalProductsForItem(item: ProductNormalizationQueueItem): Promise<void> {
   busyAction.value = actionKey(item, 'search')
-  errorMessage.value = ''
-  saveMessage.value = ''
 
   try {
     const response = await fetchCanonicalProducts({
@@ -276,7 +267,6 @@ async function searchCanonicalProductsForItem(item: ProductNormalizationQueueIte
       selectedCanonicalByProductId[item.id] = String(response.items[0].id)
     }
   } catch (error) {
-    errorMessage.value = messageFromError(error, 'Не удалось найти нормализованные товары')
     toastError(
       toast,
       'Не удалось найти нормализованные товары',
@@ -291,13 +281,11 @@ async function searchCanonicalProductsForItem(item: ProductNormalizationQueueIte
 async function linkCanonicalProduct(item: ProductNormalizationQueueItem): Promise<void> {
   const canonicalProductId = Number(selectedCanonicalByProductId[item.id])
   if (!canonicalProductId) {
-    errorMessage.value = 'Выберите нормализованный товар для связи'
+    toastWarning(toast, 'Выберите нормализованный товар', 'Сначала найдите и выберите товар для связи.')
     return
   }
 
   busyAction.value = actionKey(item, 'link')
-  errorMessage.value = ''
-  saveMessage.value = ''
 
   try {
     const decision = await acceptProductMatch(
@@ -305,10 +293,9 @@ async function linkCanonicalProduct(item: ProductNormalizationQueueItem): Promis
       item.id,
       reasonByProductId[item.id],
     )
-    saveMessage.value = decisionMessage(decision)
+    toastSuccess(toast, 'Решение сохранено', decisionDescription(decision))
     await loadQueue()
   } catch (error) {
-    errorMessage.value = messageFromError(error, 'Не удалось связать товар')
     toastError(toast, 'Не удалось связать товар', error, 'Не удалось связать товар')
   } finally {
     busyAction.value = ''
@@ -320,8 +307,6 @@ async function acceptCandidateMatch(
   match: ProductNormalizationCandidateMatch,
 ): Promise<void> {
   busyAction.value = actionKey(item, `accept:${match.id}`)
-  errorMessage.value = ''
-  saveMessage.value = ''
 
   try {
     const decision = await acceptProductMatch(
@@ -329,10 +314,9 @@ async function acceptCandidateMatch(
       item.id,
       reasonByProductId[item.id],
     )
-    saveMessage.value = decisionMessage(decision)
+    toastSuccess(toast, 'Решение сохранено', decisionDescription(decision))
     await loadQueue()
   } catch (error) {
-    errorMessage.value = messageFromError(error, 'Не удалось принять кандидата')
     toastError(toast, 'Не удалось принять кандидата', error, 'Не удалось принять кандидата')
   } finally {
     busyAction.value = ''
@@ -344,18 +328,15 @@ async function rejectCandidateMatch(
   match: ProductNormalizationCandidateMatch,
 ): Promise<void> {
   busyAction.value = actionKey(item, `reject:${match.id}`)
-  errorMessage.value = ''
-  saveMessage.value = ''
 
   try {
     const decision = await rejectProductMatch(
       match.id,
       reasonByProductId[item.id] || 'Не тот товар',
     )
-    saveMessage.value = decisionMessage(decision)
+    toastSuccess(toast, 'Решение сохранено', decisionDescription(decision))
     await loadQueue()
   } catch (error) {
-    errorMessage.value = messageFromError(error, 'Не удалось отклонить кандидата')
     toastError(toast, 'Не удалось отклонить кандидата', error, 'Не удалось отклонить кандидата')
   } finally {
     busyAction.value = ''
@@ -500,14 +481,6 @@ onMounted(() => {
           Сбросить
         </button>
       </div>
-    </div>
-
-    <div v-if="errorMessage" class="rounded-lg border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-100">
-      {{ errorMessage }}
-    </div>
-
-    <div v-if="saveMessage" class="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100">
-      {{ saveMessage }}
     </div>
 
     <div v-if="isLoading" class="rounded-lg border border-neutral-800 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">

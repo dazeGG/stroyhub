@@ -17,10 +17,11 @@ const navItems = [
 
 const route = useRoute()
 const isFullPage = computed(() => route.meta.fullPage === true)
+const toasterOptions = { max: 3 }
 </script>
 
 <template>
-  <UApp>
+  <UApp :toaster="toasterOptions">
     <div class="min-h-screen bg-neutral-950 text-neutral-100">
       <RouterView v-if="isFullPage" />
 
