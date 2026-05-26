@@ -15,12 +15,15 @@ from stroyhub.models.tables import (
     ScrapeRun,
     Shop,
     ShopIdentity,
+    SourceCategoryMapping,
     SourceProduct,
 )
+from stroyhub.parsers.common import normalize_title
 
 JsonObject = dict[str, Any]
 PRODUCT_MATCH_STATUSES = frozenset({"accepted", "candidate", "rejected", "superseded"})
 CATEGORY_OVERRIDE_STATUSES = frozenset({"active", "replaced", "reverted"})
+SOURCE_CATEGORY_MAPPING_STATUSES = frozenset({"active", "non_product", "disabled"})
 SHOP_IDENTITY_STATUSES = frozenset({"active", "hold", "disabled", "out_of_scope"})
 SHOP_SOURCE_TYPES = frozenset({"2gis", "official_api", "official_html"})
 _DEFAULT_SOURCE_TYPES = {
@@ -87,6 +90,17 @@ class CategoryOverrideCreate:
 @dataclass(frozen=True, kw_only=True)
 class CategoryOverrideRevert:
     source_product_id: int
+    actor: str | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class SourceCategoryMappingUpsert:
+    source: str
+    raw_category: str
+    category_id: int | None = None
+    status: str = "active"
+    confidence: Decimal = Decimal("1.000")
+    reason: str | None = None
     actor: str | None = None
 
 
@@ -360,6 +374,82 @@ class CategoryRepository:
         return category
 
 
+class SourceCategoryMappingRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_by_source_raw(
+        self,
+        *,
+        source: str,
+        raw_category: str,
+    ) -> SourceCategoryMapping | None:
+        normalized_source = _normalized_required_text(source, field="source").lower()
+        normalized_raw_category = normalize_title(
+            _normalized_required_text(raw_category, field="raw_category")
+        )
+        statement = select(SourceCategoryMapping).where(
+            SourceCategoryMapping.source == normalized_source,
+            SourceCategoryMapping.normalized_raw_category == normalized_raw_category,
+        )
+        return self._session.scalar(statement)
+
+    def list_all(self, *, source: str | None = None) -> list[SourceCategoryMapping]:
+        statement = select(SourceCategoryMapping).order_by(
+            SourceCategoryMapping.source.asc(),
+            SourceCategoryMapping.normalized_raw_category.asc(),
+            SourceCategoryMapping.id.asc(),
+        )
+        if source is not None:
+            normalized_source = source.strip().lower()
+            if normalized_source:
+                statement = statement.where(SourceCategoryMapping.source == normalized_source)
+        return list(self._session.scalars(statement))
+
+    def upsert(self, data: SourceCategoryMappingUpsert) -> SourceCategoryMapping:
+        status = data.status.strip().lower()
+        if status not in SOURCE_CATEGORY_MAPPING_STATUSES:
+            raise ValueError("source category mapping status is invalid")
+
+        source = _normalized_required_text(data.source, field="source").lower()
+        raw_category = _normalized_required_text(data.raw_category, field="raw_category")
+        normalized_raw_category = normalize_title(raw_category)
+        if not normalized_raw_category:
+            raise ValueError("raw_category must not be empty")
+
+        category_id = data.category_id if status == "active" else None
+        if status == "active":
+            if category_id is None:
+                raise ValueError("active source category mapping requires category_id")
+            if self._session.get(Category, category_id) is None:
+                raise ValueError("category not found")
+
+        if not (Decimal("0.000") <= data.confidence <= Decimal("1.000")):
+            raise ValueError("source category mapping confidence is invalid")
+
+        mapping = self.get_by_source_raw(source=source, raw_category=raw_category)
+        actor = _normalized_optional_text(data.actor)
+        if mapping is None:
+            mapping = SourceCategoryMapping(
+                source=source,
+                raw_category=raw_category,
+                normalized_raw_category=normalized_raw_category,
+                created_by=actor,
+            )
+            self._session.add(mapping)
+
+        mapping.raw_category = raw_category
+        mapping.normalized_raw_category = normalized_raw_category
+        mapping.category_id = category_id
+        mapping.status = status
+        mapping.confidence = data.confidence.quantize(Decimal("0.001"))
+        mapping.reason = _normalized_optional_text(data.reason)
+        mapping.updated_by = actor
+
+        self._session.flush()
+        return mapping
+
+
 class CategoryOverrideRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -517,6 +607,13 @@ def _normalized_optional_text(value: str | None) -> str | None:
         return None
     normalized = value.strip()
     return normalized or None
+
+
+def _normalized_required_text(value: str, *, field: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"{field} must not be empty")
+    return normalized
 
 
 class PriceSnapshotRepository:

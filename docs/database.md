@@ -297,6 +297,48 @@ Audit metadata should be kept even when the actor is a local script rather than
 a future admin user. Use stable actor strings such as `local_script`,
 `admin:<username>`, or `system:<job-name>`.
 
+Source category mappings:
+
+- Store reusable corrections from a source's raw category text to a StroyHub
+  category in `source_category_mappings`.
+- These mappings are coarser than `category_overrides`: they apply to every
+  product with the same `source` and normalized `category_raw`.
+- Manual mappings override built-in source category aliases during scraping and
+  category backfills.
+- Mappings may also mark a raw source category as `non_product` or `disabled`.
+
+`source_category_mappings` table:
+
+- `id`: `bigint` primary key
+- `source`: `text`, required
+- `raw_category`: `text`, required
+- `normalized_raw_category`: `text`, required
+- `category_id`: `bigint`, nullable reference to `categories.id`
+- `status`: `text`, required, default `active`
+- `confidence`: `numeric(4,3)`, required, default `1.000`
+- `reason`: `text`, nullable
+- `created_by`: `text`, nullable
+- `updated_by`: `text`, nullable
+- `created_at`: `timestamp with time zone`, required
+- `updated_at`: `timestamp with time zone`, required
+
+Status values:
+
+- `active`: map the raw source category to `category_id`.
+- `non_product`: treat this raw source category as outside product catalog work.
+- `disabled`: intentionally suppress a default or previous mapping.
+
+Constraints and indexes:
+
+- Unique: `source`, `normalized_raw_category`.
+- Check: known `status`.
+- Check: active mappings require `category_id`; non-active mappings require it
+  to be null.
+- Check: `confidence` is between `0` and `1`.
+- Index: `source`.
+- Index: `category_id`.
+- Index: `status`.
+
 Matching rules:
 
 1. If `source_product_id` exists, match by `source`, `shop_id`, `source_product_id`.

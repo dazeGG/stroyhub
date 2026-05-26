@@ -10,6 +10,7 @@ from stroyhub.models.tables import (
     Shop,
     ShopIdentity,
     ShopSourceCandidate,
+    SourceCategoryMapping,
     SourceProduct,
 )
 
@@ -23,5 +24,6 @@ __all__ = [
     "Shop",
     "ShopIdentity",
     "ShopSourceCandidate",
+    "SourceCategoryMapping",
     "SourceProduct",
 ]
