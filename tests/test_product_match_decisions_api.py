@@ -579,12 +579,14 @@ def test_auto_accept_candidates_accepts_safe_exact_match(
     assert match.method == "exact_normalized_title"
     assert match.confidence == Decimal("1.000")
     assert match.reviewed_by == "admin"
-    assert match.reason == {
-        "action": "auto_accept",
-        "min_confidence": "1.000",
-        "methods": ["exact_normalized_title"],
-        "note": "safe exact batch",
-    }
+    assert match.reason is not None
+    assert match.reason["action"] == "auto_accept"
+    assert match.reason["min_confidence"] == "1.000"
+    assert match.reason["methods"] == ["exact_normalized_title"]
+    assert match.reason["note"] == "safe exact batch"
+    assert match.reason["decision"]["action"] == "attach_to_existing"
+    assert match.reason["decision"]["positive_evidence"]
+    assert match.reason["decision"]["negative_evidence"]
 
 
 def test_auto_accept_candidates_skips_ambiguous_source_products(

@@ -111,6 +111,7 @@ class ProductMatchAutoAcceptResponse(BaseModel):
     skipped_category_mismatch: int
     skipped_low_confidence: int
     skipped_method: int
+    skipped_decision_review: int
     skipped_previously_rejected: int
     followup_candidates_created: int
     items: tuple[ProductMatchAutoAcceptItemResponse, ...]

@@ -264,6 +264,7 @@ export interface ProductMatchAutoAcceptResponse {
   skipped_category_mismatch: number
   skipped_low_confidence: number
   skipped_method: number
+  skipped_decision_review: number
   skipped_previously_rejected: number
   followup_candidates_created: number
   items: ProductMatchAutoAcceptItem[]
@@ -297,6 +298,7 @@ export interface ProductBulkNormalizationResponse {
   skipped_became_candidate: number
   skipped_already_accepted: number
   skipped_ineligible: number
+  skipped_needs_review: number
   followup_candidates_created: number
   items: ProductBulkNormalizationItem[]
 }

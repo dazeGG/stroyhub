@@ -199,6 +199,7 @@ function skippedAutoAcceptCount(result: ProductMatchAutoAcceptResponse): number 
     + result.skipped_category_mismatch
     + result.skipped_low_confidence
     + result.skipped_method
+    + result.skipped_decision_review
     + result.skipped_previously_rejected
 }
 
@@ -206,6 +207,7 @@ function skippedBulkNormalizeCount(result: ProductBulkNormalizationResponse): nu
   return result.skipped_became_candidate
     + result.skipped_already_accepted
     + result.skipped_ineligible
+    + result.skipped_needs_review
 }
 
 function flattenCategories(itemsToFlatten: CategoryTreeItem[], level = 0): CategoryOption[] {

@@ -7,6 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from stroyhub.catalog.eligibility import is_matchable_source_product
+from stroyhub.catalog.normalization_decisions import (
+    NormalizationDecision,
+    decide_normalization,
+)
 from stroyhub.catalog.product_match_generation import ProductMatchCandidateGenerator
 from stroyhub.catalog.query_helpers import escape_like_pattern
 from stroyhub.models.tables import CanonicalProduct, ProductMatch, SourceProduct
@@ -52,6 +56,7 @@ class ProductMatchAutoAcceptResult:
     skipped_category_mismatch: int
     skipped_low_confidence: int
     skipped_method: int
+    skipped_decision_review: int
     skipped_previously_rejected: int
     followup_candidates_created: int
     items: tuple[ProductMatchAutoAcceptItem, ...]
@@ -75,8 +80,11 @@ class ProductMatchAutoAcceptService:
         skipped_category_mismatch = 0
         skipped_low_confidence = 0
         skipped_method = 0
+        skipped_decision_review = 0
         skipped_previously_rejected = 0
-        selected: list[tuple[ProductMatch, SourceProduct, CanonicalProduct]] = []
+        selected: list[
+            tuple[ProductMatch, SourceProduct, CanonicalProduct, NormalizationDecision]
+        ] = []
 
         for match, source_product, canonical in rows:
             if source_product.id in accepted_source_product_ids:
@@ -106,8 +114,16 @@ class ProductMatchAutoAcceptService:
             if (source_product.id, canonical.id) in rejected_pairs:
                 skipped_previously_rejected += 1
                 continue
+            decision = decide_normalization(source_product, candidates=(canonical,))
+            if (
+                not decision.is_auto_accept
+                or decision.action != "attach_to_existing"
+                or decision.canonical_product_id != canonical.id
+            ):
+                skipped_decision_review += 1
+                continue
 
-            selected.append((match, source_product, canonical))
+            selected.append((match, source_product, canonical, decision))
 
         limited = selected[: filters.limit]
         accepted = 0
@@ -127,11 +143,12 @@ class ProductMatchAutoAcceptService:
             skipped_category_mismatch=skipped_category_mismatch,
             skipped_low_confidence=skipped_low_confidence,
             skipped_method=skipped_method,
+            skipped_decision_review=skipped_decision_review,
             skipped_previously_rejected=skipped_previously_rejected,
             followup_candidates_created=followup_candidates_created,
             items=tuple(
                 _item(match, source_product, canonical)
-                for match, source_product, canonical in limited
+                for match, source_product, canonical, _decision in limited
             ),
         )
 
@@ -224,18 +241,18 @@ class ProductMatchAutoAcceptService:
 
     def _accept(
         self,
-        rows: list[tuple[ProductMatch, SourceProduct, CanonicalProduct]],
+        rows: list[tuple[ProductMatch, SourceProduct, CanonicalProduct, NormalizationDecision]],
         filters: ProductMatchAutoAcceptFilters,
     ) -> int:
         now = datetime.now(UTC)
         accepted = 0
-        for match, _source_product, _canonical in rows:
+        for match, _source_product, _canonical, decision in rows:
             if self._has_accepted_match(match.source_product_id):
                 continue
             match.status = "accepted"
             match.reviewed_at = now
             match.reviewed_by = filters.actor
-            match.reason = _reason(filters)
+            match.reason = _reason(filters, decision=decision)
             accepted += 1
 
         self._session.flush()
@@ -254,9 +271,11 @@ class ProductMatchAutoAcceptService:
 
     def _generate_followups(
         self,
-        rows: list[tuple[ProductMatch, SourceProduct, CanonicalProduct]],
+        rows: list[tuple[ProductMatch, SourceProduct, CanonicalProduct, NormalizationDecision]],
     ) -> int:
-        canonical_product_ids = {canonical.id for _match, _source_product, canonical in rows}
+        canonical_product_ids = {
+            canonical.id for _match, _source_product, canonical, _decision in rows
+        }
         generator = ProductMatchCandidateGenerator(self._session)
         created = 0
         for canonical_product_id in sorted(canonical_product_ids):
@@ -280,11 +299,16 @@ def _item(
     )
 
 
-def _reason(filters: ProductMatchAutoAcceptFilters) -> JsonObject:
+def _reason(
+    filters: ProductMatchAutoAcceptFilters,
+    *,
+    decision: NormalizationDecision,
+) -> JsonObject:
     reason: JsonObject = {
         "action": "auto_accept",
         "min_confidence": str(filters.min_confidence),
         "methods": list(filters.methods),
+        "decision": decision.as_reason(),
     }
     if filters.reason is not None:
         reason["note"] = filters.reason

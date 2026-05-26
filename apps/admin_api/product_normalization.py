@@ -136,6 +136,7 @@ class BulkNormalizationResponse(BaseModel):
     skipped_became_candidate: int
     skipped_already_accepted: int
     skipped_ineligible: int
+    skipped_needs_review: int
     followup_candidates_created: int
     items: tuple[BulkNormalizationItemResponse, ...]
 
