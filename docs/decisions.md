@@ -405,3 +405,25 @@ The first production path stays rule-based and explainable. A trained model may
 surface suggestions as review evidence, but it must not auto-accept or silently
 change categories unless protected-attribute checks and explainable safety gates
 pass and a later release decision explicitly allows it.
+
+## 2026-05-26: Separate Category Predictor From Category Verifier
+
+Context:
+The category verifier checks one product/category pair, but future category ML
+also needs a proposer that can rank likely categories for an uncategorized source
+product. Combining those responsibilities would make model output harder to
+evaluate and harder to explain in admin review.
+
+Decision:
+Treat the category predictor as a proposer only. It returns a small ranked list
+of existing normalized leaf categories with scores and reasons. The verifier
+then checks each proposed product/category pair before the system creates a
+review suggestion. Predictor/verifier output is evidence for admin review, not a
+direct category mutation path.
+
+Consequences:
+Predictor evaluation uses top-1/top-3 accuracy, coverage, MRR, and unsafe
+suggestion rate from operator decisions. Verifier evaluation remains pairwise.
+Manual category overrides keep precedence over suggestions, and products marked
+as not products are excluded. The detailed contract is documented in
+[category-predictor-pipeline.md](category-predictor-pipeline.md).

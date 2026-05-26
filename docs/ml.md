@@ -197,7 +197,8 @@ builder instead of recreating feature strings separately.
 ## Category Predictor
 
 The future category predictor proposes likely categories for a product. It can
-reuse the same labels collected by the verifier CLI:
+reuse the same labels collected by the verifier CLI and, after M16, the
+production operator decisions recorded in `operator_decisions`:
 
 - selected categories are positive predictor targets;
 - nothing fits means no positive target for that product/item.
@@ -205,6 +206,11 @@ reuse the same labels collected by the verifier CLI:
 The predictor should return top candidate leaf categories, for example top
 three. The verifier then checks each proposed product/category pair. Predictor
 work is tracked separately from the verifier MVP.
+
+The detailed predictor/proposer contract, verifier handoff, review routing,
+operator decision mapping, evaluation metrics, and implementation task sequence
+are documented in
+[category-predictor-pipeline.md](category-predictor-pipeline.md).
 
 ## Suggestion Review Flow
 
