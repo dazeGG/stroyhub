@@ -461,6 +461,10 @@ class PriceSnapshot(Base):
             "price IS NULL OR price >= 0",
             name="price_nonnegative",
         ),
+        CheckConstraint(
+            "price_kind IN ('exact', 'from', 'range', 'unknown')",
+            name="price_kind_known",
+        ),
         Index("ix_price_snapshots_source_product_id_parsed_at", "source_product_id", "parsed_at"),
         Index("ix_price_snapshots_parsed_at", "parsed_at"),
     )
@@ -468,6 +472,7 @@ class PriceSnapshot(Base):
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     source_product_id: Mapped[int] = mapped_column(ForeignKey("source_products.id"), nullable=False)
     price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    price_kind: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'exact'"))
     currency: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'RUB'"))
     unit_raw: Mapped[str | None] = mapped_column(Text)
     source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

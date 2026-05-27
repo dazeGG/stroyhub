@@ -657,6 +657,27 @@ def test_price_snapshot_repository_is_append_only(db_session: Session) -> None:
     assert count == 2
 
 
+def test_price_snapshot_repository_marks_missing_price_unknown(db_session: Session) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-test-missing-price", name="Shop")
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="product-missing-price",
+            title="Brick",
+            normalized_title="brick",
+        )
+    )
+
+    snapshot = PriceSnapshotRepository(db_session).add(
+        PriceSnapshotCreate(source_product_id=product.id, price=None)
+    )
+
+    assert snapshot.price_kind == "unknown"
+
+
 def test_price_snapshot_table_rejects_negative_price(db_session: Session) -> None:
     shop = ShopRepository(db_session).upsert(
         ShopUpsert(source="2gis", source_id="branch-test-negative-price", name="Shop")

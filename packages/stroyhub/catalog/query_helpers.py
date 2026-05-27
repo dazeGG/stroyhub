@@ -41,6 +41,7 @@ def latest_price_subquery() -> Any:
         select(
             PriceSnapshot.source_product_id.label("source_product_id"),
             PriceSnapshot.price.label("latest_price"),
+            PriceSnapshot.price_kind.label("latest_price_kind"),
             PriceSnapshot.currency.label("latest_currency"),
             PriceSnapshot.unit_raw.label("latest_unit_raw"),
             PriceSnapshot.source_updated_at.label("latest_source_updated_at"),

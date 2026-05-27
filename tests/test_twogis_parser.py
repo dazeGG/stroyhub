@@ -40,6 +40,7 @@ def test_parse_product_item_maps_2gis_fields_to_parsed_product() -> None:
     assert parsed.description == "Фасадная панель"
     assert parsed.category_raw == "Сайдинг, фасадные панели"
     assert parsed.price == Decimal("515")
+    assert parsed.price_kind == "exact"
     assert parsed.currency == "RUB"
     assert parsed.unit_raw is None
     assert parsed.image_url == "https://example.test/image.jpg?h={height}&w={width}"
@@ -65,6 +66,7 @@ def test_parse_product_item_handles_missing_optional_fields_and_empty_price() ->
     assert parsed.description is None
     assert parsed.category_raw == "СИП ПАНЕЛИ"
     assert parsed.price is None
+    assert parsed.price_kind == "unknown"
     assert parsed.currency == "RUB"
     assert parsed.fingerprint is not None
 
@@ -80,7 +82,54 @@ def test_parse_product_item_uses_fixed_price_value_when_offer_price_is_missing()
 
     assert parsed is not None
     assert parsed.price == Decimal("1550.50")
+    assert parsed.price_kind == "exact"
     assert parsed.currency == "RUB"
+
+
+def test_parse_product_item_preserves_from_price_value() -> None:
+    parsed = parse_product_item(
+        {
+            "product": {"id": "product-1", "name": "Брус"},
+            "offer": {"price_value": {"from": {"value": "29 000", "currency": "RUB"}}},
+        },
+        branch_id="branch-1",
+    )
+
+    assert parsed is not None
+    assert parsed.price == Decimal("29000")
+    assert parsed.price_kind == "from"
+    assert parsed.currency == "RUB"
+
+
+def test_parse_product_item_marks_range_title_price_as_from() -> None:
+    parsed = parse_product_item(
+        {
+            "product": {"id": "product-1", "name": "Брус от 100х100 мм до 180х180 мм"},
+            "offer": {"price": 29000, "currency": "RUB"},
+        },
+        branch_id="branch-1",
+    )
+
+    assert parsed is not None
+    assert parsed.price == Decimal("29000")
+    assert parsed.price_kind == "from"
+
+
+def test_parse_product_item_keeps_specific_product_title_range_exact() -> None:
+    parsed = parse_product_item(
+        {
+            "product": {
+                "id": "product-6",
+                "name": "Набор инструмента 120 предметов головки от 4 до 50 TSTOP",
+            },
+            "offer": {"price_value": {"fixed": {"value": "17300", "currency": "RUB"}}},
+        },
+        branch_id="branch-1",
+    )
+
+    assert parsed is not None
+    assert parsed.price == Decimal("17300")
+    assert parsed.price_kind == "exact"
 
 
 def test_parse_product_items_skips_items_without_product_title() -> None:

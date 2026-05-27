@@ -365,6 +365,7 @@ Core fields:
 - `id`: `bigint` primary key
 - `source_product_id`: `bigint`, required reference to `source_products.id`
 - `price`: `numeric(12, 2)`, nullable
+- `price_kind`: `text`, required, one of `exact`, `from`, `range`, `unknown`
 - `currency`: `text`, required, default `RUB`
 - `unit_raw`: `text`, nullable
 - `source_updated_at`: `timestamp with time zone`, nullable
@@ -384,6 +385,10 @@ Constraints and indexes:
 - Index: `parsed_at`
 - Check: `price IS NULL OR price >= 0`
 - `price` should be a decimal type, not a floating-point type.
+- `price_kind` distinguishes exact source prices from lower-bound/category
+  prices. A `from` price still stores the numeric lower bound in `price` for
+  sorting/filtering, but UI/API must display it as `от ...`, not as an exact SKU
+  price.
 
 ### `scrape_runs`
 

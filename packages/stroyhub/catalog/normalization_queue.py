@@ -6,7 +6,7 @@ from typing import Any, Literal
 from sqlalchemy import and_, exists, false, func, not_, or_, select
 from sqlalchemy.orm import Session
 
-from stroyhub.catalog.products import ProductLatestPrice, ProductShop
+from stroyhub.catalog.products import ProductLatestPrice, ProductShop, format_price_text
 from stroyhub.catalog.query_helpers import (
     category_descendant_ids,
     escape_like_pattern,
@@ -125,6 +125,7 @@ class ProductNormalizationQueue:
                 shop,
                 category,
                 latest_price,
+                latest_price_kind,
                 latest_currency,
                 latest_unit_raw,
                 latest_source_updated_at,
@@ -136,6 +137,7 @@ class ProductNormalizationQueue:
                 shop,
                 category,
                 latest_price,
+                latest_price_kind,
                 latest_currency,
                 latest_unit_raw,
                 latest_source_updated_at,
@@ -170,6 +172,7 @@ class ProductNormalizationQueue:
                 Shop,
                 Category,
                 latest_prices.c.latest_price,
+                latest_prices.c.latest_price_kind,
                 latest_prices.c.latest_currency,
                 latest_prices.c.latest_unit_raw,
                 latest_prices.c.latest_source_updated_at,
@@ -322,6 +325,7 @@ class ProductNormalizationQueue:
         shop: Shop,
         category: Category | None,
         latest_price: Decimal | None,
+        latest_price_kind: str | None,
         latest_currency: str | None,
         latest_unit_raw: str | None,
         latest_source_updated_at: datetime | None,
@@ -332,6 +336,12 @@ class ProductNormalizationQueue:
         if latest_parsed_at is not None:
             latest = ProductLatestPrice(
                 price=latest_price,
+                price_kind=latest_price_kind or "exact",
+                price_text=format_price_text(
+                    price=latest_price,
+                    currency=latest_currency or "RUB",
+                    price_kind=latest_price_kind or "exact",
+                ),
                 currency=latest_currency or "RUB",
                 unit_raw=latest_unit_raw,
                 source_updated_at=latest_source_updated_at,

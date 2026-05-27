@@ -56,6 +56,8 @@ class ProductShop:
 @dataclass(frozen=True, kw_only=True)
 class ProductLatestPrice:
     price: Decimal | None
+    price_kind: str
+    price_text: str | None
     currency: str
     unit_raw: str | None
     source_updated_at: datetime | None
@@ -100,6 +102,8 @@ class ProductSearchItem:
 class ProductPriceSnapshot:
     id: int
     price: Decimal | None
+    price_kind: str
+    price_text: str | None
     currency: str
     unit_raw: str | None
     source_updated_at: datetime | None
@@ -168,6 +172,12 @@ class ProductCatalog:
             ProductPriceSnapshot(
                 id=snapshot.id,
                 price=snapshot.price,
+                price_kind=snapshot.price_kind,
+                price_text=format_price_text(
+                    price=snapshot.price,
+                    currency=snapshot.currency,
+                    price_kind=snapshot.price_kind,
+                ),
                 currency=snapshot.currency,
                 unit_raw=snapshot.unit_raw,
                 source_updated_at=snapshot.source_updated_at,
@@ -184,6 +194,7 @@ class ProductCatalog:
                 SourceProduct,
                 Shop,
                 latest_prices.c.latest_price,
+                latest_prices.c.latest_price_kind,
                 latest_prices.c.latest_currency,
                 latest_prices.c.latest_unit_raw,
                 latest_prices.c.latest_source_updated_at,
@@ -243,6 +254,7 @@ class ProductCatalog:
         product: SourceProduct,
         shop: Shop,
         latest_price: Decimal | None,
+        latest_price_kind: str | None,
         latest_currency: str | None,
         latest_unit_raw: str | None,
         latest_source_updated_at: datetime | None,
@@ -253,6 +265,12 @@ class ProductCatalog:
         if latest_parsed_at is not None:
             price = ProductLatestPrice(
                 price=latest_price,
+                price_kind=latest_price_kind or "exact",
+                price_text=format_price_text(
+                    price=latest_price,
+                    currency=latest_currency or "RUB",
+                    price_kind=latest_price_kind or "exact",
+                ),
                 currency=latest_currency or "RUB",
                 unit_raw=latest_unit_raw,
                 source_updated_at=latest_source_updated_at,
@@ -353,6 +371,7 @@ class ProductCatalog:
                 preferred_shop.scrape_status.in_(_PUBLIC_HEALTHY_SCRAPE_STATUSES),
             )
         )
+
         return and_(
             Shop.scrape_status != "disabled",
             or_(
@@ -367,3 +386,18 @@ class ProductCatalog:
                 ),
             ),
         )
+
+
+def format_price_text(
+    *,
+    price: Decimal | None,
+    currency: str,
+    price_kind: str,
+) -> str | None:
+    if price is None:
+        return None
+
+    amount = f"{price:.2f}"
+    if price_kind in {"from", "range"}:
+        return f"от {amount} {currency}"
+    return f"{amount} {currency}"

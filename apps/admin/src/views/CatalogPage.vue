@@ -107,8 +107,9 @@ function formatPrice(product: ProductSearchItem): string {
       }).format(amount)
     : product.latest_price.price
   const unit = product.latest_price.unit_raw ? ` / ${product.latest_price.unit_raw}` : ''
+  const prefix = product.latest_price.price_kind === 'from' || product.latest_price.price_kind === 'range' ? 'от ' : ''
 
-  return `${value} ${product.latest_price.currency}${unit}`
+  return `${prefix}${value} ${product.latest_price.currency}${unit}`
 }
 
 function categoryLabel(product: ProductSearchItem): string {

@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from stroyhub.catalog.attributes import extract_title_attributes
 from stroyhub.catalog.tokenization import tokenize_title
-from stroyhub.parsers.common import JsonObject, normalize_title
+from stroyhub.parsers.common import JsonObject, normalize_title, title_implies_from_price
 
 CatalogEligibilityStatus = Literal["eligible", "needs_review", "ineligible"]
 
@@ -113,7 +113,7 @@ def evaluate_product_eligibility(data: ProductEligibilityInput) -> ProductEligib
     reasons: list[str] = []
     if data.price is None:
         reasons.append("missing_price")
-    if _has_from_or_range_price(data.raw):
+    if _has_from_or_range_price(data.raw) or title_implies_from_price(data.title):
         reasons.append("non_exact_price")
 
     tokens = tokenize_title(data.title).tokens

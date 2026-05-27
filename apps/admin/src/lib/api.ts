@@ -25,6 +25,8 @@ export interface ProductShop {
 
 export interface ProductLatestPrice {
   price: string | null
+  price_kind: string
+  price_text: string | null
   currency: string
   unit_raw: string | null
   source_updated_at: string | null
@@ -260,6 +262,8 @@ export interface CanonicalProductListResponse {
 
 export interface CanonicalSourceLatestPrice {
   price: string | null
+  price_kind: string
+  price_text: string | null
   currency: string
   unit_raw: string | null
   source_updated_at: string | null
@@ -406,6 +410,8 @@ export interface ProductDataProblemRequest {
 export interface ProductPriceSnapshot {
   id: number
   price: string | null
+  price_kind: string
+  price_text: string | null
   currency: string
   unit_raw: string | null
   source_updated_at: string | null

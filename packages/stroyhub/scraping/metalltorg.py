@@ -342,6 +342,7 @@ def persist_metalltorg_scrape_result(
             PriceSnapshotCreate(
                 source_product_id=source_product.id,
                 price=product.price,
+                price_kind=product.price_kind,
                 currency=product.currency,
                 unit_raw=product.unit_raw,
                 source_updated_at=product.source_updated_at,

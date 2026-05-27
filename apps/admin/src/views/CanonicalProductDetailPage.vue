@@ -75,7 +75,12 @@ function flattenCategories(itemsToFlatten: CategoryTreeItem[], level = 0): Categ
   ])
 }
 
-function formatMoney(price: string | null, currency: string, unitRaw: string | null): string {
+function formatMoney(
+  price: string | null,
+  currency: string,
+  unitRaw: string | null,
+  priceKind = 'exact',
+): string {
   if (price === null) {
     return 'Цена отсутствует'
   }
@@ -87,7 +92,8 @@ function formatMoney(price: string | null, currency: string, unitRaw: string | n
         minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
       }).format(amount)
     : price
-  return `${value} ${currency}${unitRaw ? ` / ${unitRaw}` : ''}`
+  const prefix = priceKind === 'from' || priceKind === 'range' ? 'от ' : ''
+  return `${prefix}${value} ${currency}${unitRaw ? ` / ${unitRaw}` : ''}`
 }
 
 function formatLatestPrice(item: CanonicalLinkedSourceProduct): string {
@@ -95,7 +101,12 @@ function formatLatestPrice(item: CanonicalLinkedSourceProduct): string {
     return 'Нет наблюдений цены'
   }
 
-  return formatMoney(item.latest_price.price, item.latest_price.currency, item.latest_price.unit_raw)
+  return formatMoney(
+    item.latest_price.price,
+    item.latest_price.currency,
+    item.latest_price.unit_raw,
+    item.latest_price.price_kind,
+  )
 }
 
 function formatDateTime(value: string): string {

@@ -27,6 +27,33 @@ def test_twogis_product_eligibility_rejects_from_price_group_listing() -> None:
     )
 
 
+def test_twogis_product_eligibility_rejects_title_implied_from_price_listing() -> None:
+    result = evaluate_product_eligibility(
+        ProductEligibilityInput(
+            source="2gis",
+            title="Брус от 100 *100 мм до 180*180 мм, длина 6 м",
+            price=Decimal("3250"),
+            raw={"offer": {"price_value": {"fixed": {"value": 3250, "currency": "RUB"}}}},
+        )
+    )
+
+    assert result.status == "ineligible"
+    assert result.reasons == ("non_exact_price",)
+
+
+def test_twogis_product_eligibility_allows_specific_product_range_title() -> None:
+    result = evaluate_product_eligibility(
+        ProductEligibilityInput(
+            source="2gis",
+            title="Набор инструмента 120 предметов головки от 4 до 50 TSTOP",
+            price=Decimal("17300"),
+            raw={"offer": {"price_value": {"fixed": {"value": 17300, "currency": "RUB"}}}},
+        )
+    )
+
+    assert result.status == "eligible"
+
+
 def test_twogis_product_eligibility_rejects_generic_exact_price_card() -> None:
     result = evaluate_product_eligibility(
         ProductEligibilityInput(

@@ -10,6 +10,7 @@ from stroyhub.parsers.common import (
     JsonObject,
     ParsedProduct,
     build_fingerprint,
+    infer_price_kind,
     normalize_title,
     parse_decimal,
 )
@@ -194,6 +195,7 @@ def _parse_card(
     image_url = _image_url(image_node, page_url=page_url)
     normalized_title = normalize_title(title)
     unit_raw = _unit_raw(unit_node.text if unit_node else None)
+    price = parse_decimal(_attr(price_node, "data-value"))
 
     return ParsedProduct(
         source=METALLTORG_SOURCE,
@@ -204,7 +206,8 @@ def _parse_card(
         description=None,
         category_raw=category_raw,
         unit_raw=unit_raw,
-        price=parse_decimal(_attr(price_node, "data-value")),
+        price=price,
+        price_kind=infer_price_kind(title=title, price=price),
         currency=_attr(price_node, "data-currency") or METALLTORG_DEFAULT_CURRENCY,
         image_url=image_url,
         source_updated_at=None,

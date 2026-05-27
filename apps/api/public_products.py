@@ -24,6 +24,8 @@ class PublicProductLatestPriceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     price: Decimal | None
+    price_kind: str
+    price_text: str | None
     currency: str
     unit_raw: str | None
     source_updated_at: datetime | None
@@ -61,6 +63,8 @@ class PublicProductPriceSnapshotResponse(BaseModel):
 
     id: int
     price: Decimal | None
+    price_kind: str
+    price_text: str | None
     currency: str
     unit_raw: str | None
     source_updated_at: datetime | None

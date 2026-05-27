@@ -4,6 +4,7 @@ from stroyhub.parsers.common import (
     JsonObject,
     ParsedProduct,
     build_fingerprint,
+    infer_price_kind,
     normalize_title,
     parse_decimal,
 )
@@ -46,6 +47,7 @@ def parse_product(
     normalized_title = normalize_title(title)
     category_raw = _string_or_none(product.get("category"))
     unit_raw = _string_or_none(product.get("price_unit"))
+    price = parse_decimal(product.get("price"))
 
     return ParsedProduct(
         source=UNICOM_SOURCE,
@@ -56,7 +58,8 @@ def parse_product(
         description=None,
         category_raw=category_raw,
         unit_raw=unit_raw,
-        price=parse_decimal(product.get("price")),
+        price=price,
+        price_kind=infer_price_kind(title=title, price=price),
         currency=UNICOM_DEFAULT_CURRENCY,
         image_url=None,
         source_updated_at=parse_created_date(product.get("created_date")),
