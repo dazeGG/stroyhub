@@ -2,10 +2,10 @@ from datetime import UTC, datetime
 
 from stroyhub.ml.labels import CategoryLabelRecord, CategoryLabelStore
 
-from apps.ml.category_verifier_train_cli import main
+from apps.ml.category_verifier.train_cli import main
 
 
-def test_category_verifier_train_cli_rejects_below_threshold_without_force(
+def test_category_verifier_train_command_rejects_below_threshold_without_force(
     tmp_path,
     capsys,
 ) -> None:

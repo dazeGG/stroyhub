@@ -22,7 +22,8 @@ Until the first MVP release is complete:
 ## Boundaries
 
 - `apps/ml` owns CLI commands for labeling, dataset snapshots, training,
-  evaluation, reports, and model artifact management.
+  evaluation, reports, and model artifact management. Commands are grouped by
+  model under `apps/ml/<model>/`.
 - `packages/stroyhub/ml` owns reusable ML code: feature builders, model
   metadata readers, public verifier/predictor APIs, and runtime loaders.
 - `apps/api` and `apps/worker` may load ready model artifacts through
@@ -107,8 +108,8 @@ every individual label.
 The category verifier dataset CLI exposes the current workflow:
 
 ```bash
-uv run python -m apps.ml.category_verifier_dataset_cli status
-uv run python -m apps.ml.category_verifier_dataset_cli snapshot
+uv run python -m apps.ml.category_verifier.dataset_cli status
+uv run python -m apps.ml.category_verifier.dataset_cli snapshot
 ```
 
 `status` compares the live label log with the latest snapshot and reports total
@@ -144,7 +145,7 @@ The first training implementation is intentionally a small token baseline, not
 a neural network. It is trained by:
 
 ```bash
-uv run python -m apps.ml.category_verifier_train_cli
+uv run python -m apps.ml.category_verifier.train_cli
 ```
 
 The command checks whether at least 50 newly labeled products exist since the

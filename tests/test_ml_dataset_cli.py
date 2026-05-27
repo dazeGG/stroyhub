@@ -2,10 +2,10 @@ from datetime import UTC, datetime
 
 from stroyhub.ml.labels import CategoryLabelRecord, CategoryLabelStore
 
-from apps.ml.category_verifier_dataset_cli import main
+from apps.ml.category_verifier.dataset_cli import main
 
 
-def test_category_verifier_dataset_cli_prints_status(tmp_path, capsys) -> None:
+def test_category_verifier_dataset_command_prints_status(tmp_path, capsys) -> None:
     labels_path = tmp_path / "labels.jsonl"
     datasets_dir = tmp_path / "datasets"
     store = CategoryLabelStore(labels_path)
@@ -29,7 +29,7 @@ def test_category_verifier_dataset_cli_prints_status(tmp_path, capsys) -> None:
     assert "ready_for_training=false" in output
 
 
-def test_category_verifier_dataset_cli_creates_snapshot(tmp_path, capsys) -> None:
+def test_category_verifier_dataset_command_creates_snapshot(tmp_path, capsys) -> None:
     labels_path = tmp_path / "labels.jsonl"
     datasets_dir = tmp_path / "datasets"
     store = CategoryLabelStore(labels_path)
