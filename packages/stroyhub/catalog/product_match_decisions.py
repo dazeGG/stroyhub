@@ -57,8 +57,14 @@ class ProductMatchDecisionInput:
 
 
 class ProductMatchDecisionService:
-    def __init__(self, session: Session) -> None:
+    def __init__(
+        self,
+        session: Session,
+        *,
+        refresh_quality_on_accept: bool = True,
+    ) -> None:
         self._session = session
+        self._refresh_quality_on_accept = refresh_quality_on_accept
 
     def accept_existing(
         self,
@@ -177,7 +183,8 @@ class ProductMatchDecisionService:
         previous_state: JsonObject = {"accepted_match": match_state(accepted)}
         if accepted is not None:
             if accepted.canonical_product_id == canonical_product_id:
-                self._refresh_quality_for_shop(source_product.shop_id)
+                if self._refresh_quality_on_accept:
+                    self._refresh_quality_for_shop(source_product.shop_id)
                 return _decision(accepted)
             if not supersede_existing:
                 raise ProductMatchDecisionConflict(
@@ -235,7 +242,8 @@ class ProductMatchDecisionService:
                 decided_at=reviewed_at,
             )
             self._generate_followup_candidates(canonical_product_id)
-            self._refresh_quality_for_source_product(source_product_id)
+            if self._refresh_quality_on_accept:
+                self._refresh_quality_for_source_product(source_product_id)
             return _decision(updated)
 
         match = ProductMatchRepository(self._session).create(
@@ -259,7 +267,8 @@ class ProductMatchDecisionService:
             decided_at=reviewed_at,
         )
         self._generate_followup_candidates(canonical_product_id)
-        self._refresh_quality_for_source_product(source_product_id)
+        if self._refresh_quality_on_accept:
+            self._refresh_quality_for_source_product(source_product_id)
         return _decision(match)
 
     def _record_accept_decision(
