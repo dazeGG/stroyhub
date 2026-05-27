@@ -129,8 +129,43 @@ def test_catalog_workflow_dashboard_and_queues(
 def test_catalog_workflow_auto_accept_batch_returns_per_item_results(
     client: TestClient,
     db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    import stroyhub.catalog.product_match_decisions as product_match_decisions_module
+    import stroyhub.catalog.workflow_queues as workflow_queues_module
+
     data = _seed_workflow_products(db_session)
+    final_refresh_calls: list[tuple[int, bool]] = []
+
+    class FailOnPerItemQualityRefresh:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError("batch accept must not refresh quality per accepted item")
+
+    class RecordFinalQualityRefresh:
+        def __init__(self, _session: Session) -> None:
+            pass
+
+        def run_for_shop(
+            self,
+            shop_id: int,
+            *,
+            processed_at: object | None = None,
+            generate_candidates: bool = True,
+        ) -> object:
+            assert processed_at is None
+            final_refresh_calls.append((shop_id, generate_candidates))
+            return object()
+
+    monkeypatch.setattr(
+        product_match_decisions_module,
+        "CatalogQualityPipeline",
+        FailOnPerItemQualityRefresh,
+    )
+    monkeypatch.setattr(
+        workflow_queues_module,
+        "CatalogQualityPipeline",
+        RecordFinalQualityRefresh,
+    )
 
     dry_run = client.post(
         "/catalog-workflows/batches/auto-accept",
@@ -185,6 +220,7 @@ def test_catalog_workflow_auto_accept_batch_returns_per_item_results(
     assert created_canonical is not None
     assert created_canonical.title == "Workflow Auto Product 50кг"
     assert data["duplicate_match"].status == "accepted"
+    assert final_refresh_calls == [(data["shop_id"], False)]
 
 
 def _seed_workflow_products(db_session: Session) -> dict[str, Any]:

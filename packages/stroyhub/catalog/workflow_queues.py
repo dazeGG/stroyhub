@@ -12,6 +12,7 @@ from stroyhub.catalog.product_match_decisions import (
     ProductMatchDecisionNotFound,
     ProductMatchDecisionService,
 )
+from stroyhub.catalog.quality_pipeline import CatalogQualityPipeline
 from stroyhub.catalog.query_helpers import (
     category_descendant_ids,
     escape_like_pattern,
@@ -473,8 +474,12 @@ class CatalogWorkflowAutoAcceptService:
             filters,
         )
         products = self._source_products_by_id([item.id for item in page.items])
-        decision_service = ProductMatchDecisionService(self._session)
+        decision_service = ProductMatchDecisionService(
+            self._session,
+            refresh_quality_on_accept=False,
+        )
         results: list[CatalogWorkflowAutoAcceptItem] = []
+        affected_shop_ids: set[int] = set()
 
         for item in page.items:
             product = products.get(item.id)
@@ -550,6 +555,14 @@ class CatalogWorkflowAutoAcceptService:
                     match_id=decision.id,
                 )
             )
+            affected_shop_ids.add(product.shop_id)
+
+        if not dry_run:
+            for shop_id in sorted(affected_shop_ids):
+                CatalogQualityPipeline(self._session).run_for_shop(
+                    shop_id,
+                    generate_candidates=False,
+                )
 
         return CatalogWorkflowAutoAcceptResult(
             dry_run=dry_run,
