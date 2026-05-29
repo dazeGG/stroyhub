@@ -134,6 +134,59 @@ export interface ProductNormalizationQueueResponse {
   total: number
 }
 
+export type PatronReviewAction = 'product' | 'not_product' | 'skip'
+export type PatronReviewMode = 'needs_review' | 'patron_rejected'
+
+export interface PatronReviewParams {
+  mode?: PatronReviewMode
+  minProbability?: number
+}
+
+export interface PatronReviewCategory {
+  id: number
+  slug: string
+  name: string
+}
+
+export interface PatronReviewItem {
+  id: number
+  source: string
+  source_product_id: string | null
+  title: string
+  normalized_title: string
+  description: string | null
+  category_id: number | null
+  category: PatronReviewCategory | null
+  category_raw: string | null
+  unit_raw: string | null
+  image_url: string | null
+  source_updated_at: string | null
+  last_seen_at: string
+  is_not_product: boolean
+  shop: ProductShop
+  latest_price: ProductLatestPrice | null
+  catalog_eligibility: Record<string, unknown> | null
+  raw: Record<string, unknown> | null
+}
+
+export interface PatronReviewStats {
+  total: number
+  remaining: number
+  reviewed: number
+  skipped: number
+}
+
+export interface PatronReviewPageResponse {
+  item: PatronReviewItem | null
+  stats: PatronReviewStats
+}
+
+export interface PatronReviewDecisionResponse {
+  action: PatronReviewAction | 'undo'
+  product_id: number | null
+  stats: PatronReviewStats
+}
+
 export type CatalogWorkflowQueueName =
   | 'auto_acceptable'
   | 'review_needed'
@@ -926,6 +979,60 @@ export function fetchProductNormalizationQueue(
 
   return fetchJson<ProductNormalizationQueueResponse>(
     `/product-normalization/queue?${params.toString()}`,
+    signal,
+  )
+}
+
+function patronReviewQuery(params?: PatronReviewParams): string {
+  const query = new URLSearchParams()
+  appendOptionalParam(query, 'mode', params?.mode)
+  appendOptionalParam(query, 'min_probability', params?.minProbability)
+  const value = query.toString()
+  return value ? `?${value}` : ''
+}
+
+export function fetchPatronReviewItem(
+  params?: PatronReviewParams,
+  signal?: AbortSignal,
+): Promise<PatronReviewPageResponse> {
+  return fetchJson<PatronReviewPageResponse>(`/patron-review${patronReviewQuery(params)}`, signal)
+}
+
+export function decidePatronReviewItem(
+  productId: number,
+  action: PatronReviewAction,
+  reason?: string,
+  params?: PatronReviewParams,
+  signal?: AbortSignal,
+): Promise<PatronReviewDecisionResponse> {
+  return writeJson<PatronReviewDecisionResponse>(
+    `/patron-review/${productId}/decision${patronReviewQuery(params)}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        action,
+        actor: 'admin',
+        reason: reason?.trim() || null,
+      }),
+    },
+    signal,
+  )
+}
+
+export function undoPatronReviewDecision(
+  reason?: string,
+  params?: PatronReviewParams,
+  signal?: AbortSignal,
+): Promise<PatronReviewDecisionResponse> {
+  return writeJson<PatronReviewDecisionResponse>(
+    `/patron-review/undo${patronReviewQuery(params)}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        actor: 'admin',
+        reason: reason?.trim() || null,
+      }),
+    },
     signal,
   )
 }

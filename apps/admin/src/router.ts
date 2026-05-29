@@ -9,6 +9,7 @@ import CategoryReviewPage from './views/CategoryReviewPage.vue'
 import DashboardPage from './views/DashboardPage.vue'
 import HelpPage from './views/HelpPage.vue'
 import MatchReviewPage from './views/MatchReviewPage.vue'
+import PatronReviewPage from './views/PatronReviewPage.vue'
 import ProductDetailPage from './views/ProductDetailPage.vue'
 import ProductNormalizationInboxPage from './views/ProductNormalizationInboxPage.vue'
 import ScrapeStatusPage from './views/ScrapeStatusPage.vue'
@@ -36,6 +37,7 @@ export const router = createRouter({
       component: CatalogWorkflowQueuePage,
     },
     { path: '/products', name: 'source-products', component: CatalogPage },
+    { path: '/patron-review', name: 'patron-review', component: PatronReviewPage },
     {
       path: '/canonical-products',
       name: 'canonical-products',
