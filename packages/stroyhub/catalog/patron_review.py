@@ -145,6 +145,8 @@ class PatronReviewQueue:
         product = self._session.get(SourceProduct, product_id)
         if product is None:
             raise ValueError("source product not found")
+        if not self._is_remaining_product(product_id):
+            raise ValueError("source product is not in Patron review queue")
 
         previous_state = _product_state(product)
         review_mode = _mode_for_product(product) or self._mode
@@ -193,7 +195,7 @@ class PatronReviewQueue:
         actor: str | None = "admin",
         reason: str | None = None,
     ) -> PatronReviewDecisionResult:
-        decision = self._last_review_decision()
+        decision = self._last_review_decision(actor=actor)
         if decision is None or decision.source_product_id is None:
             raise ValueError("patron review history is empty")
         previous_state = decision.previous_state
@@ -246,6 +248,14 @@ class PatronReviewQueue:
             )
             or 0
         )
+
+    def _is_remaining_product(self, product_id: int) -> bool:
+        statement = select(SourceProduct.id).where(
+            SourceProduct.id == product_id,
+            SourceProduct.is_active.is_(True),
+            self._remaining_predicate(),
+        )
+        return self._session.scalar(statement) is not None
 
     def _next_item(self) -> PatronReviewItem | None:
         latest_prices = latest_price_subquery()
@@ -300,7 +310,7 @@ class PatronReviewQueue:
             latest_parsed_at=latest_parsed_at,
         )
 
-    def _last_review_decision(self) -> OperatorDecision | None:
+    def _last_review_decision(self, *, actor: str | None) -> OperatorDecision | None:
         undone_decision_ids = self._undone_review_decision_ids()
         statement = (
             select(OperatorDecision)
@@ -310,6 +320,8 @@ class PatronReviewQueue:
             )
             .order_by(OperatorDecision.decided_at.desc(), OperatorDecision.id.desc())
         )
+        if actor is not None:
+            statement = statement.where(OperatorDecision.actor == actor)
         for decision in self._session.scalars(statement):
             if not self._decision_matches_mode(decision):
                 continue

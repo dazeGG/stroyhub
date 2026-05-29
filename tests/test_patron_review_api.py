@@ -160,6 +160,28 @@ def test_patron_review_records_patron_rejected_queue_decision(
     assert product.raw["catalog_eligibility"]["method"] == "operator_review"
 
 
+def test_patron_review_rejects_decision_outside_selected_queue(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    product = _patron_rejected_product(
+        db_session,
+        source_id="patron-rejected-below-selected-threshold",
+        probability="0.910",
+    )
+
+    response = client.post(
+        f"/patron-review/{product.id}/decision",
+        params={"mode": "patron_rejected", "min_probability": "0.990"},
+        json={"action": "product", "actor": "reviewer"},
+    )
+
+    assert response.status_code == 404
+    db_session.refresh(product)
+    assert product.is_not_product is True
+    assert "operator_review" not in product.raw
+
+
 def test_patron_review_undo_restores_previous_product_state(
     client: TestClient,
     db_session: Session,
@@ -216,6 +238,32 @@ def test_patron_review_undo_walks_back_multiple_review_decisions(
     assert second_undo.status_code == 200
     assert second_undo.json()["product_id"] == first_product.id
     assert second_undo.json()["stats"] == _stats_delta(baseline, total=2, remaining=2)
+
+
+def test_patron_review_undo_is_scoped_to_actor(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    first_product = _patron_review_product(db_session, source_id="patron-review-actor-first")
+    second_product = _patron_review_product(db_session, source_id="patron-review-actor-second")
+
+    assert client.post(
+        f"/patron-review/{first_product.id}/decision",
+        json={"action": "product", "actor": "first-reviewer"},
+    ).status_code == 200
+    assert client.post(
+        f"/patron-review/{second_product.id}/decision",
+        json={"action": "not_product", "actor": "second-reviewer"},
+    ).status_code == 200
+
+    undo_response = client.post("/patron-review/undo", json={"actor": "first-reviewer"})
+
+    assert undo_response.status_code == 200
+    assert undo_response.json()["product_id"] == first_product.id
+    db_session.refresh(first_product)
+    db_session.refresh(second_product)
+    assert first_product.raw["catalog_eligibility"]["status"] == "needs_review"
+    assert second_product.raw["operator_review"]["patron_review"]["status"] == "not_product"
 
 
 def _patron_review_product(session: Session, *, source_id: str) -> SourceProduct:
