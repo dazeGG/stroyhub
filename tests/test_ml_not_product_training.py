@@ -3,7 +3,9 @@ from datetime import date
 
 import joblib
 from stroyhub.ml.not_product_classifier import (
-    NotProductClassifierModel,
+    LinearNotProductClassifierModel,
+    NotProductClassifierModelUnavailableError,
+    PatronClassifier,
     build_not_product_text,
     load_not_product_examples,
     train_not_product_classifier_baseline,
@@ -96,20 +98,66 @@ def test_train_not_product_classifier_artifacts_save_model_metadata_current_and_
 
     metadata = json.loads(result.metadata_path.read_text("utf-8"))
     loaded_model = joblib.load(result.model_path)
-    assert isinstance(loaded_model, NotProductClassifierModel)
+    assert isinstance(loaded_model, LinearNotProductClassifierModel)
     assert loaded_model.model_version == "v0"
     assert metadata["model_name"] == "Patron"
     assert metadata["model_version"] == "v0"
-    assert metadata["model_type"] == "rule_guarded_token_naive_bayes_baseline"
-    assert metadata["feature_schema_version"] == "patron_features/v2"
+    assert metadata["model_type"] == "tfidf_sgd_logistic_regression"
+    assert metadata["training_model_type"] == "linear"
+    assert metadata["feature_schema_version"] == "patron_features/v3"
     assert metadata["thresholds"] == {"not_product": 0.7}
-    assert metadata["score_normalization"] == "average_token_log_likelihood"
+    assert metadata["score_normalization"] == "l2_normalized_tfidf_logistic_score"
     assert metadata["training_split"]["eval_label_counts"] == {
         "not_product": 1,
         "product": 2,
     }
     assert result.error_report_path.exists()
     assert (tmp_path / "models" / "current").resolve() == result.model_dir
+
+
+def test_patron_classifier_loads_artifact_and_predicts_record(tmp_path) -> None:
+    model_dir = tmp_path / "models" / "v0"
+    dataset_path = model_dir / "dataset.jsonl"
+    model_dir.mkdir(parents=True)
+    _write_dataset(dataset_path)
+    train_not_product_classifier_artifacts(
+        dataset_path=dataset_path,
+        model_dir=model_dir,
+        model_version="v0",
+        run_date=date(2026, 5, 27),
+    )
+
+    classifier = PatronClassifier.load(model_dir)
+    prediction = classifier.predict_record(
+        {
+            "source": "2gis",
+            "product": {
+                "title": "Товар",
+                "normalized_title": "товар",
+                "category_raw": "Розетки",
+                "category_name": "Розетки",
+            },
+            "latest_price": {
+                "price": None,
+                "price_kind": "unknown",
+            },
+        }
+    )
+
+    assert prediction.label == "not_product"
+    assert prediction.model_name == "Patron"
+    assert prediction.model_version == "v0"
+    assert prediction.feature_schema_version == "patron_features/v3"
+    assert prediction.threshold == 0.7
+
+
+def test_patron_classifier_reports_missing_artifact(tmp_path) -> None:
+    try:
+        PatronClassifier.load(tmp_path / "missing")
+    except NotProductClassifierModelUnavailableError as error:
+        assert "Patron model is unavailable" in str(error)
+    else:
+        raise AssertionError("expected missing Patron model error")
 
 
 def test_patron_train_cli_trains_from_dataset(tmp_path, capsys) -> None:

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from stroyhub.ml.not_product_training import train_not_product_classifier_artifacts
 
-DEFAULT_MODEL_DIR = Path(".var/ml/patron/models/v2")
+DEFAULT_MODEL_DIR = Path(".var/ml/patron/models/v3")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -17,6 +17,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--model-version", type=str)
     parser.add_argument("--run-date", type=date.fromisoformat)
     parser.add_argument("--train-ratio", type=float, default=0.80)
+    parser.add_argument("--extra-dataset-path", action="append", default=[])
+    parser.add_argument(
+        "--model-type",
+        choices=("linear", "naive_bayes"),
+        default="linear",
+    )
     args = parser.parse_args(argv)
 
     model_dir = Path(args.model_dir)
@@ -32,6 +38,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         model_version=model_version,
         run_date=run_date,
         train_ratio=args.train_ratio,
+        model_type=args.model_type,
+        extra_dataset_paths=[Path(path) for path in args.extra_dataset_path],
     )
     metrics = result.evaluation.metrics
 

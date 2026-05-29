@@ -2,21 +2,47 @@ from __future__ import annotations
 
 import json
 import math
+import random
+import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
+
+import joblib
 
 from stroyhub.catalog.tokenization import tokenize_normalized_text
 from stroyhub.ml.not_product_labels import NotProductLabel
 from stroyhub.parsers.common import normalize_title
 
 PATRON_MODEL_NAME = "Patron"
-NOT_PRODUCT_FEATURE_SCHEMA_VERSION = "patron_features/v2"
+NOT_PRODUCT_FEATURE_SCHEMA_VERSION = "patron_features/v3"
 NOT_PRODUCT_LABEL: NotProductLabel = "not_product"
 PRODUCT_LABEL: NotProductLabel = "product"
 DEFAULT_NOT_PRODUCT_THRESHOLD = 0.70
 LAPLACE_ALPHA = 1.0
+LINEAR_DEFAULT_EPOCHS = 18
+LINEAR_DEFAULT_LEARNING_RATE = 0.22
+LINEAR_DEFAULT_L2 = 0.0005
+LINEAR_DEFAULT_MAX_FEATURES = 45000
+
+_DIMENSION_PATTERN = re.compile(
+    r"\d+(?:[,.]\d+)?\s*(?:x|х|\*)\s*\d+|\d+(?:[,.]\d+)?\s*(?:кг|мм|см|м|л|шт|м2|м3)",
+    re.IGNORECASE,
+)
+_GENERIC_TITLES = frozenset(
+    {
+        "товар",
+        "разное",
+        "прочее",
+        "каталог",
+        "услуги",
+        "работы",
+        "материалы",
+        "комплектующие",
+        "запчасти",
+    }
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -26,6 +52,9 @@ class NotProductExample:
     text: str
     title: str
     source: str
+    label_source: str | None = None
+    synthetic: bool = False
+    sample_weight: float = 1.0
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -33,6 +62,34 @@ class NotProductPrediction:
     label: NotProductLabel
     not_product_probability: float
     confidence: float
+
+
+class NotProductClassifierModelUnavailableError(FileNotFoundError):
+    pass
+
+
+@dataclass(frozen=True, kw_only=True)
+class NotProductClassifierResult:
+    label: NotProductLabel
+    not_product_probability: float
+    confidence: float
+    model_name: str
+    model_version: str
+    feature_schema_version: str
+    threshold: float
+
+
+class NotProductClassifierModelLike(Protocol):
+    @property
+    def model_version(self) -> str:
+        pass
+
+    @property
+    def threshold(self) -> float:
+        pass
+
+    def predict(self, text: str) -> NotProductPrediction:
+        pass
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -104,6 +161,109 @@ class NotProductClassifierModel:
         return score
 
 
+@dataclass(frozen=True, kw_only=True)
+class LinearNotProductClassifierModel:
+    model_version: str
+    threshold: float
+    feature_schema_version: str
+    weights: dict[str, float]
+    bias: float
+    idf: dict[str, float]
+    vocabulary: tuple[str, ...]
+
+    def predict(self, text: str) -> NotProductPrediction:
+        not_product_probability = self.not_product_probability(text)
+        if not_product_probability >= self.threshold:
+            label = NOT_PRODUCT_LABEL
+            confidence = not_product_probability
+        else:
+            label = PRODUCT_LABEL
+            confidence = 1.0 - not_product_probability
+        return NotProductPrediction(
+            label=label,
+            not_product_probability=not_product_probability,
+            confidence=confidence,
+        )
+
+    def not_product_probability(self, text: str) -> float:
+        score = self.bias
+        for token, value in _tfidf_vector(_tokens(text), self.idf).items():
+            score += self.weights.get(token, 0.0) * value
+        return _sigmoid(score)
+
+
+class PatronClassifier:
+    def __init__(
+        self,
+        *,
+        model: NotProductClassifierModelLike,
+        metadata: dict[str, Any],
+    ) -> None:
+        self._model = model
+        self._metadata = metadata
+
+    @property
+    def model_name(self) -> str:
+        return str(self._metadata.get("model_name") or PATRON_MODEL_NAME)
+
+    @property
+    def model_version(self) -> str:
+        return str(self._metadata.get("model_version") or self._model.model_version)
+
+    @property
+    def feature_schema_version(self) -> str:
+        model_schema = getattr(self._model, "feature_schema_version", None)
+        return str(
+            self._metadata.get("feature_schema_version")
+            or model_schema
+            or NOT_PRODUCT_FEATURE_SCHEMA_VERSION
+        )
+
+    @property
+    def not_product_threshold(self) -> float:
+        thresholds = self._metadata.get("thresholds")
+        if isinstance(thresholds, dict) and "not_product" in thresholds:
+            return float(thresholds["not_product"])
+        return self._model.threshold
+
+    @classmethod
+    def default(cls, *, root: Path | None = None) -> PatronClassifier:
+        base_path = root or Path.cwd()
+        return cls.load(base_path / ".var" / "ml" / "patron" / "models" / "current")
+
+    @classmethod
+    def load(cls, model_dir: str | Path) -> PatronClassifier:
+        model_dir = Path(model_dir)
+        model_path = model_dir / "model.joblib"
+        metadata_path = model_dir / "metadata.json"
+        if not model_path.exists() or not metadata_path.exists():
+            raise NotProductClassifierModelUnavailableError(
+                f"Patron model is unavailable at {model_dir}"
+            )
+
+        model = joblib.load(model_path)
+        if not isinstance(model, (NotProductClassifierModel, LinearNotProductClassifierModel)):
+            raise TypeError(f"unsupported Patron model artifact: {type(model)!r}")
+
+        metadata = json.loads(metadata_path.read_text("utf-8"))
+        if not isinstance(metadata, dict):
+            raise ValueError("Patron metadata must be a JSON object")
+
+        return cls(model=model, metadata=metadata)
+
+    def predict_record(self, record: dict[str, Any]) -> NotProductClassifierResult:
+        prediction = self._model.predict(build_not_product_text(record))
+        return NotProductClassifierResult(
+            label=prediction.label,
+            not_product_probability=prediction.not_product_probability,
+            confidence=prediction.confidence,
+            model_name=self.model_name,
+            model_version=self.model_version,
+            feature_schema_version=self.feature_schema_version,
+            threshold=self.not_product_threshold,
+        )
+
+
 def load_not_product_examples(path: str | Path) -> list[NotProductExample]:
     examples: list[NotProductExample] = []
     with Path(path).open(encoding="utf-8") as file:
@@ -138,23 +298,58 @@ def not_product_example_from_record(payload: object) -> NotProductExample:
         text=build_not_product_text(payload),
         title=title,
         source=source,
+        label_source=_optional_str(payload.get("label_source")),
+        synthetic=bool(payload.get("synthetic", False)),
+        sample_weight=_sample_weight(payload),
     )
 
 
 def build_not_product_text(payload: dict[str, Any]) -> str:
     product = _dict_value(payload.get("product"))
     latest_price = _dict_value(payload.get("latest_price"))
+    shop = _dict_value(payload.get("shop"))
+    title = _text(product.get("title"))
+    normalized_title = _text(product.get("normalized_title"))
+    category_raw = _text(product.get("category_raw"))
+    category_name = _text(product.get("category_name"))
+    description = _text(product.get("description"))
+    unit_raw = _text(product.get("unit_raw") or latest_price.get("unit_raw"))
+    category_path = _text_list(product.get("category_path"))
 
     parts = [
         _text(payload.get("source")),
-        _text(product.get("title")),
-        _text(product.get("normalized_title")),
+        _feature_token("source", _text(payload.get("source"))),
+        _text(shop.get("name")),
+        _feature_token("shop", _text(shop.get("name"))),
+        title,
+        normalized_title,
+        category_raw,
+        category_name,
+        " ".join(category_path),
+        description,
+        unit_raw,
     ]
+    parts.extend(_title_feature_tokens(title or normalized_title))
+    if category_raw or category_name or category_path:
+        parts.append("featurecategorypresent")
+    else:
+        parts.append("featurecategorymissing")
+    if description:
+        parts.append("featuredescriptionpresent")
+    if unit_raw:
+        parts.append("featureunitpresent")
     if latest_price:
         price_kind = normalize_title(_text(latest_price.get("price_kind")))
         if price_kind:
             parts.append(f"price_kind_{price_kind}")
+            parts.append(_feature_token("pricekind", price_kind))
         parts.append("price_present" if latest_price.get("price") else "price_missing")
+        parts.append(
+            "featurepricepresent" if latest_price.get("price") else "featurepricemissing"
+        )
+        price_text = _text(latest_price.get("price_text"))
+        if price_text:
+            parts.append(price_text)
     return normalize_title(" ".join(part for part in parts if part))
 
 
@@ -219,8 +414,103 @@ def train_not_product_classifier_baseline(
     )
 
 
+def train_not_product_classifier_linear(
+    *,
+    model_version: str,
+    examples: list[NotProductExample],
+    threshold: float = DEFAULT_NOT_PRODUCT_THRESHOLD,
+    epochs: int = LINEAR_DEFAULT_EPOCHS,
+    learning_rate: float = LINEAR_DEFAULT_LEARNING_RATE,
+    l2: float = LINEAR_DEFAULT_L2,
+    max_features: int = LINEAR_DEFAULT_MAX_FEATURES,
+    seed: int = 20260527,
+) -> LinearNotProductClassifierModel:
+    if not examples:
+        raise ValueError("Patron needs at least one training example")
+    labels = {example.label for example in examples}
+    if labels != {PRODUCT_LABEL, NOT_PRODUCT_LABEL}:
+        raise ValueError("Patron needs both product and not_product examples")
+
+    tokenized = [_tokens(example.text) for example in examples]
+    document_frequency: Counter[str] = Counter()
+    for tokens in tokenized:
+        document_frequency.update(set(tokens))
+
+    vocabulary = tuple(
+        token
+        for token, _ in sorted(
+            document_frequency.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[:max_features]
+    )
+    vocabulary_set = set(vocabulary)
+    idf = {
+        token: math.log((1 + len(examples)) / (1 + document_frequency[token])) + 1.0
+        for token in vocabulary
+    }
+    vectors = [
+        _tfidf_vector(
+            tuple(token for token in tokens if token in vocabulary_set),
+            idf,
+        )
+        for tokens in tokenized
+    ]
+
+    class_counts = Counter(example.label for example in examples)
+    class_weights = {
+        label: len(examples) / (2 * count)
+        for label, count in class_counts.items()
+        if count > 0
+    }
+    weights = {token: 0.0 for token in vocabulary}
+    bias = 0.0
+    rng = random.Random(seed)
+    indices = list(range(len(examples)))
+
+    for epoch in range(epochs):
+        rng.shuffle(indices)
+        step_size = learning_rate / math.sqrt(epoch + 1)
+        for index in indices:
+            example = examples[index]
+            vector = vectors[index]
+            target = 1.0 if example.label == NOT_PRODUCT_LABEL else 0.0
+            score = bias + sum(weights[token] * value for token, value in vector.items())
+            prediction = _sigmoid(score)
+            effective_weight = example.sample_weight * class_weights[example.label]
+            error = (prediction - target) * effective_weight
+            bias -= step_size * error
+            for token, value in vector.items():
+                weights[token] -= step_size * (error * value + l2 * weights[token])
+
+    return LinearNotProductClassifierModel(
+        model_version=model_version,
+        threshold=threshold,
+        feature_schema_version=NOT_PRODUCT_FEATURE_SCHEMA_VERSION,
+        weights={token: weight for token, weight in weights.items() if weight},
+        bias=bias,
+        idf=idf,
+        vocabulary=vocabulary,
+    )
+
+
 def _tokens(text: str) -> tuple[str, ...]:
     return tokenize_normalized_text(normalize_title(text))
+
+
+def _tfidf_vector(tokens: tuple[str, ...], idf: dict[str, float]) -> dict[str, float]:
+    if not tokens:
+        return {}
+    counts = Counter(tokens)
+    total = sum(counts.values())
+    values = {
+        token: (count / total) * idf[token]
+        for token, count in counts.items()
+        if token in idf
+    }
+    norm = math.sqrt(sum(value * value for value in values.values()))
+    if not norm:
+        return values
+    return {token: value / norm for token, value in values.items()}
 
 
 def _dict_value(value: object) -> dict[str, Any]:
@@ -233,6 +523,70 @@ def _text(value: object) -> str:
     if value is None:
         return ""
     return str(value)
+
+
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _text_list(value: object) -> list[str]:
+    if isinstance(value, list):
+        return [_text(item) for item in value if _text(item)]
+    if isinstance(value, tuple):
+        return [_text(item) for item in value if _text(item)]
+    return []
+
+
+def _sample_weight(payload: dict[str, Any]) -> float:
+    explicit = payload.get("sample_weight")
+    if explicit is not None:
+        try:
+            weight = float(explicit)
+        except (TypeError, ValueError) as error:
+            raise ValueError("sample_weight must be a number") from error
+        return max(0.0, weight)
+    if payload.get("synthetic") is True:
+        return 0.35
+    return 1.0
+
+
+def _title_feature_tokens(title: str) -> list[str]:
+    normalized = normalize_title(title)
+    tokens = _tokens(normalized)
+    features: list[str] = []
+    if not tokens:
+        features.append("featuretitleempty")
+        return features
+    if len(tokens) == 1:
+        features.append("featuretitleoneword")
+    elif len(tokens) <= 3:
+        features.append("featuretitleshort")
+    elif len(tokens) >= 10:
+        features.append("featuretitlelong")
+    if normalized in _GENERIC_TITLES:
+        features.append("featuretitlegeneric")
+    if any(char.isdigit() for char in title):
+        features.append("featuretitlehasdigit")
+    if _DIMENSION_PATTERN.search(title):
+        features.append("featuretitlehasdimension")
+    if any(token in {"от", "до"} for token in tokens):
+        features.append("featuretitlehasrange")
+    return features
+
+
+def _feature_token(prefix: str, value: str) -> str:
+    normalized = "".join(_tokens(value))
+    return f"feature{prefix}{normalized}" if normalized else ""
+
+
+def _sigmoid(score: float) -> float:
+    if score >= 0:
+        z = math.exp(-score)
+        return 1.0 / (1.0 + z)
+    z = math.exp(score)
+    return z / (1.0 + z)
 
 
 def _required_str(value: object, field_name: str) -> str:

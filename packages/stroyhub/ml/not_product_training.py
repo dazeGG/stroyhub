@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import random
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -14,10 +15,13 @@ from stroyhub.ml.not_product_classifier import (
     NOT_PRODUCT_LABEL,
     PATRON_MODEL_NAME,
     PRODUCT_LABEL,
+    LinearNotProductClassifierModel,
     NotProductClassifierModel,
+    NotProductClassifierModelLike,
     NotProductExample,
     load_not_product_examples,
     train_not_product_classifier_baseline,
+    train_not_product_classifier_linear,
 )
 from stroyhub.ml.not_product_labels import NotProductLabel
 
@@ -101,10 +105,14 @@ def split_not_product_examples(
         PRODUCT_LABEL: [],
         NOT_PRODUCT_LABEL: [],
     }
+    synthetic_examples: list[NotProductExample] = []
     for example in examples:
+        if example.synthetic:
+            synthetic_examples.append(example)
+            continue
         by_label[example.label].append(example)
 
-    train_examples: list[NotProductExample] = []
+    train_examples: list[NotProductExample] = list(synthetic_examples)
     eval_examples: list[NotProductExample] = []
     for label_examples in by_label.values():
         shuffled = sorted(label_examples, key=lambda example: example.example_hash)
@@ -124,7 +132,11 @@ def split_not_product_examples(
         train_examples=train_examples,
         eval_examples=eval_examples,
         metadata=NotProductSplitMetadata(
-            strategy="stratified_label_random_80_20_by_example_hash",
+            strategy=(
+                "stratified_label_random_80_20_by_example_hash_synthetic_train_only"
+                if synthetic_examples
+                else "stratified_label_random_80_20_by_example_hash"
+            ),
             train_ratio=train_ratio,
             seed=seed,
             run_date=run_date.isoformat(),
@@ -138,7 +150,7 @@ def split_not_product_examples(
 
 def evaluate_not_product_classifier(
     *,
-    model: NotProductClassifierModel,
+    model: NotProductClassifierModelLike,
     examples: list[NotProductExample],
 ) -> NotProductEvaluation:
     true_positive = 0
@@ -207,17 +219,31 @@ def train_not_product_classifier_artifacts(
     model_version: str,
     run_date: date,
     train_ratio: float = 0.80,
+    model_type: str = "linear",
+    extra_dataset_paths: Sequence[Path] = (),
 ) -> NotProductTrainingResult:
     examples = load_not_product_examples(dataset_path)
+    for extra_dataset_path in extra_dataset_paths:
+        examples.extend(load_not_product_examples(extra_dataset_path))
     split = split_not_product_examples(
         examples,
         run_date=run_date,
         train_ratio=train_ratio,
     )
-    model = train_not_product_classifier_baseline(
-        model_version=model_version,
-        examples=split.train_examples,
-    )
+    model: NotProductClassifierModelLike
+    if model_type == "linear":
+        model = train_not_product_classifier_linear(
+            model_version=model_version,
+            examples=split.train_examples,
+            seed=split.metadata.seed,
+        )
+    elif model_type == "naive_bayes":
+        model = train_not_product_classifier_baseline(
+            model_version=model_version,
+            examples=split.train_examples,
+        )
+    else:
+        raise ValueError("model_type must be linear or naive_bayes")
     evaluation = evaluate_not_product_classifier(model=model, examples=split.eval_examples)
 
     model_dir.mkdir(parents=True, exist_ok=True)
@@ -234,6 +260,8 @@ def train_not_product_classifier_artifacts(
                 split=split,
                 evaluation=evaluation,
                 run_date=run_date,
+                model_type=model_type,
+                extra_dataset_paths=extra_dataset_paths,
             ),
             ensure_ascii=False,
             indent=2,
@@ -258,29 +286,51 @@ def train_not_product_classifier_artifacts(
 
 def _training_metadata(
     *,
-    model: NotProductClassifierModel,
+    model: NotProductClassifierModelLike,
     dataset_path: Path,
     split: NotProductSplit,
     evaluation: NotProductEvaluation,
     run_date: date,
+    model_type: str,
+    extra_dataset_paths: Sequence[Path],
 ) -> dict[str, object]:
+    if isinstance(model, LinearNotProductClassifierModel):
+        model_type_name = "tfidf_sgd_logistic_regression"
+        score_normalization = "l2_normalized_tfidf_logistic_score"
+        feature_schema_version = model.feature_schema_version
+        extra: dict[str, object] = {
+            "class_weight_policy": "balanced_by_label_count",
+            "synthetic_default_sample_weight": 0.35,
+        }
+    elif isinstance(model, NotProductClassifierModel):
+        model_type_name = "rule_guarded_token_naive_bayes_baseline"
+        score_normalization = "average_token_log_likelihood"
+        feature_schema_version = NOT_PRODUCT_FEATURE_SCHEMA_VERSION
+        extra = {
+            "class_prior_policy": "balanced_0.5_0.5",
+            "laplace_alpha": model.alpha,
+        }
+    else:
+        raise TypeError(f"unsupported Patron model artifact: {type(model)!r}")
+
     return {
         "model_name": PATRON_MODEL_NAME,
         "model_version": model.model_version,
-        "model_type": "rule_guarded_token_naive_bayes_baseline",
+        "model_type": model_type_name,
+        "training_model_type": model_type,
         "created_at": datetime.now(UTC).isoformat(),
         "run_date": run_date.isoformat(),
         "dataset_path": str(dataset_path),
-        "feature_schema_version": NOT_PRODUCT_FEATURE_SCHEMA_VERSION,
+        "extra_dataset_paths": [str(path) for path in extra_dataset_paths],
+        "feature_schema_version": feature_schema_version,
         "thresholds": {
             "not_product": model.threshold,
         },
-        "class_prior_policy": "balanced_0.5_0.5",
-        "score_normalization": "average_token_log_likelihood",
-        "laplace_alpha": model.alpha,
+        "score_normalization": score_normalization,
         "vocabulary_size": len(model.vocabulary),
         "training_split": asdict(split.metadata),
         "metrics": asdict(evaluation.metrics),
+        **extra,
     }
 
 
