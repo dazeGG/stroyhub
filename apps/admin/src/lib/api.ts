@@ -1002,6 +1002,7 @@ export function fetchPatronReviewItem(
 export function decidePatronReviewItem(
   productId: number,
   action: PatronReviewAction,
+  actor: string,
   reason?: string,
   params?: PatronReviewParams,
   signal?: AbortSignal,
@@ -1012,7 +1013,7 @@ export function decidePatronReviewItem(
       method: 'POST',
       body: JSON.stringify({
         action,
-        actor: 'admin',
+        actor: actor.trim() || 'admin',
         reason: reason?.trim() || null,
       }),
     },
@@ -1021,6 +1022,7 @@ export function decidePatronReviewItem(
 }
 
 export function undoPatronReviewDecision(
+  actor: string,
   reason?: string,
   params?: PatronReviewParams,
   signal?: AbortSignal,
@@ -1030,7 +1032,7 @@ export function undoPatronReviewDecision(
     {
       method: 'POST',
       body: JSON.stringify({
-        actor: 'admin',
+        actor: actor.trim() || 'admin',
         reason: reason?.trim() || null,
       }),
     },

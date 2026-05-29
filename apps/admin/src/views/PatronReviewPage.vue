@@ -53,6 +53,8 @@ const stats = ref<PatronReviewStats>(emptyStats)
 const isLoading = ref(false)
 const busyAction = ref('')
 const reason = ref('')
+const reviewerActorStorageKey = 'stroyhub.patronReview.actor'
+const reviewerActor = ref(window.localStorage.getItem(reviewerActorStorageKey) || 'admin')
 const toast = useToast()
 let loadRequestId = 0
 
@@ -75,6 +77,10 @@ const reviewParams = computed<PatronReviewParams>(() => {
     }
   }
   return { mode: activeMode.value }
+})
+
+const normalizedReviewerActor = computed(() => {
+  return reviewerActor.value.trim() || 'admin'
 })
 
 const modelLabel = computed(() => {
@@ -177,7 +183,13 @@ async function decide(action: PatronReviewAction): Promise<void> {
 
   busyAction.value = actionKey(action)
   try {
-    const response = await decidePatronReviewItem(item.value.id, action, reason.value, reviewParams.value)
+    const response = await decidePatronReviewItem(
+      item.value.id,
+      action,
+      normalizedReviewerActor.value,
+      reason.value,
+      reviewParams.value,
+    )
     stats.value = response.stats
     reason.value = ''
     toastSuccess(toast, 'Решение сохранено', actionLabel(action))
@@ -192,7 +204,11 @@ async function decide(action: PatronReviewAction): Promise<void> {
 async function undoPrevious(): Promise<void> {
   busyAction.value = 'undo'
   try {
-    const response = await undoPatronReviewDecision(reason.value, reviewParams.value)
+    const response = await undoPatronReviewDecision(
+      normalizedReviewerActor.value,
+      reason.value,
+      reviewParams.value,
+    )
     stats.value = response.stats
     reason.value = ''
     toastSuccess(toast, 'Предыдущее решение отменено')
@@ -220,6 +236,10 @@ onMounted(() => {
 watch([activeMode, minProbability], () => {
   reason.value = ''
   void loadReviewItem()
+})
+
+watch(reviewerActor, (value) => {
+  window.localStorage.setItem(reviewerActorStorageKey, value.trim() || 'admin')
 })
 </script>
 
@@ -407,6 +427,18 @@ watch([activeMode, minProbability], () => {
       </article>
 
       <aside class="space-y-4">
+        <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
+          <label class="block">
+            <span class="text-xs font-semibold uppercase tracking-wide text-admin-text-faint">Оператор</span>
+            <input
+              v-model="reviewerActor"
+              type="text"
+              class="mt-2 h-10 w-full rounded-md border border-admin-border bg-admin-bg px-3 text-sm text-admin-text outline-none transition placeholder:text-admin-text-faint focus:border-admin-link"
+              placeholder="admin"
+            >
+          </label>
+        </div>
+
         <div class="rounded-lg border border-admin-border bg-admin-surface p-4">
           <label class="block">
             <span class="text-xs font-semibold uppercase tracking-wide text-admin-text-faint">Комментарий</span>
