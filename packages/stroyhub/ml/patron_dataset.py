@@ -29,6 +29,7 @@ PATRON_DB_POLICY_LABEL_PRIORITY = 10
 PATRON_BULK_LABEL_PRIORITY = 70
 PATRON_HUMAN_LABEL_PRIORITY = 100
 PATRON_REVIEW_LABEL_PRIORITY = 100
+PATRON_OPERATOR_DATA_PROBLEM_LABEL_PRIORITY = 100
 
 _REVIEW_LABEL_ACTIONS: dict[str, NotProductLabel] = {
     "patron_review_product": "product",
@@ -60,7 +61,9 @@ class PatronLabelCandidate:
 class PatronDatasetBuildResult:
     dataset_path: Path
     manifest_path: Path
+    source_product_count: int
     record_count: int
+    skipped_counts: dict[str, int]
     label_counts: dict[str, int]
     label_source_counts: dict[str, int]
     label_priority_counts: dict[str, int]
@@ -102,19 +105,29 @@ def build_patron_dataset_snapshot(
     categories_by_id = _categories_by_id(session)
 
     rows: list[dict[str, Any]] = []
-    for product_row in _source_product_rows(
+    skipped_counts: Counter[str] = Counter()
+    product_rows = _source_product_rows(
         session,
         include_inactive=include_inactive,
         source_product_ids=source_product_id_set,
         limit=limit,
-    ):
+    )
+    for product_row in product_rows:
         product = product_row.product
         label = _best_label(
-            _db_policy_label(product, price_kind=product_row.latest_price_kind),
+            _db_policy_label(
+                product,
+                latest_price=product_row.latest_price,
+                price_kind=product_row.latest_price_kind,
+            ),
             bulk_labels.get(product.id),
             human_labels.get(product.id),
+            _operator_data_problem_label(product),
             review_labels.get(product.id),
         )
+        if label is None:
+            skipped_counts[_skip_reason(product)] += 1
+            continue
         rows.append(
             _dataset_record(
                 product_row,
@@ -132,6 +145,8 @@ def build_patron_dataset_snapshot(
         dataset_path=dataset_path,
         model_version=model_version,
         created_at=created_at,
+        source_product_count=len(product_rows),
+        skipped_counts=dict(skipped_counts),
         review_label_count=sum(
             1 for row in rows if row.get("label_source") == "operator_patron_review"
         ),
@@ -145,7 +160,9 @@ def build_patron_dataset_snapshot(
     return PatronDatasetBuildResult(
         dataset_path=dataset_path,
         manifest_path=manifest_path,
+        source_product_count=len(product_rows),
         record_count=len(rows),
+        skipped_counts=dict(skipped_counts),
         label_counts=dict(Counter(str(row["label"]) for row in rows)),
         label_source_counts=dict(Counter(str(row["label_source"]) for row in rows)),
         label_priority_counts=dict(
@@ -307,14 +324,44 @@ def _label_store_candidate(
 def _db_policy_label(
     product: SourceProduct,
     *,
+    latest_price: Decimal | None,
     price_kind: str | None,
-) -> PatronLabelCandidate:
-    label: NotProductLabel = "not_product" if product.is_not_product else "product"
+) -> PatronLabelCandidate | None:
+    eligibility = _catalog_eligibility(product.raw)
+    eligibility_status = _catalog_eligibility_status(product.raw)
+    eligibility_method = _catalog_eligibility_method(product.raw)
     reasons: list[str] = []
+
+    if product.source == "2gis" and (
+        latest_price is None or price_kind in {"from", "range"}
+    ):
+        label: NotProductLabel = "not_product"
+    elif eligibility_method == "patron":
+        return None
+    elif eligibility_status == "ineligible":
+        label = "not_product"
+    elif eligibility_status == "needs_review":
+        return None
+    elif eligibility_status == "eligible":
+        label = "product"
+    elif product.is_not_product:
+        label = "not_product"
+    else:
+        return None
+
     if product.is_not_product:
         reasons.append("db_is_not_product")
+    if eligibility_status is not None:
+        reasons.append(f"catalog_eligibility_{eligibility_status}")
+    if eligibility_method is not None:
+        reasons.append(f"catalog_eligibility_method_{eligibility_method}")
     if price_kind in {"from", "range", "unknown"}:
         reasons.append("non_exact_price")
+    if latest_price is None:
+        reasons.append("missing_price")
+    eligibility_reasons = eligibility.get("reasons") if eligibility is not None else None
+    if isinstance(eligibility_reasons, list):
+        reasons.extend(f"catalog_reason_{reason}" for reason in eligibility_reasons)
     return PatronLabelCandidate(
         source_product_id=product.id,
         label=label,
@@ -325,10 +372,33 @@ def _db_policy_label(
     )
 
 
-def _best_label(*candidates: PatronLabelCandidate | None) -> PatronLabelCandidate:
+def _operator_data_problem_label(product: SourceProduct) -> PatronLabelCandidate | None:
+    operator_review = _operator_review(product.raw)
+    if operator_review is None:
+        return None
+    data_problem = operator_review.get("data_problem")
+    if not isinstance(data_problem, dict):
+        return None
+    marked = data_problem.get("marked")
+    if not isinstance(marked, bool):
+        return None
+
+    return PatronLabelCandidate(
+        source_product_id=product.id,
+        label="not_product" if marked else "product",
+        label_source="operator_data_problem",
+        label_priority=PATRON_OPERATOR_DATA_PROBLEM_LABEL_PRIORITY,
+        label_recorded_at=_datetime_value(data_problem.get("reviewed_at"), product.last_seen_at),
+        label_reasons=("operator_data_problem",),
+        actor=_optional_str(data_problem.get("actor")),
+        reason=_optional_str(data_problem.get("reason")),
+    )
+
+
+def _best_label(*candidates: PatronLabelCandidate | None) -> PatronLabelCandidate | None:
     available = [candidate for candidate in candidates if candidate is not None]
     if not available:
-        raise ValueError("at least one Patron label candidate is required")
+        return None
     return max(
         available,
         key=lambda candidate: (
@@ -337,6 +407,41 @@ def _best_label(*candidates: PatronLabelCandidate | None) -> PatronLabelCandidat
             candidate.label_source,
         ),
     )
+
+
+def _skip_reason(product: SourceProduct) -> str:
+    eligibility_status = _catalog_eligibility_status(product.raw)
+    eligibility_method = _catalog_eligibility_method(product.raw)
+    if eligibility_status == "needs_review":
+        return "needs_review"
+    if eligibility_method == "patron":
+        return "patron_auto_label"
+    if eligibility_status is None:
+        return "missing_catalog_eligibility"
+    return "unlabeled"
+
+
+def _catalog_eligibility(raw: dict[str, Any] | None) -> dict[str, Any] | None:
+    if raw is None:
+        return None
+    eligibility = raw.get("catalog_eligibility")
+    return eligibility if isinstance(eligibility, dict) else None
+
+
+def _catalog_eligibility_status(raw: dict[str, Any] | None) -> str | None:
+    eligibility = _catalog_eligibility(raw)
+    if eligibility is None:
+        return None
+    status = eligibility.get("status")
+    return status if isinstance(status, str) else None
+
+
+def _catalog_eligibility_method(raw: dict[str, Any] | None) -> str | None:
+    eligibility = _catalog_eligibility(raw)
+    if eligibility is None:
+        return None
+    method = eligibility.get("method")
+    return method if isinstance(method, str) else None
 
 
 def _dataset_record(
@@ -367,7 +472,7 @@ def _dataset_record(
             "label_review": _review_payload(label),
         }
     )
-    record["example_hash"] = _record_hash(record)
+    record["example_hash"] = _example_hash(record)
     return record
 
 
@@ -425,7 +530,7 @@ def _latest_price_payload(row: _SourceProductRow) -> dict[str, Any]:
 
 
 def _review_payload(label: PatronLabelCandidate) -> dict[str, Any] | None:
-    if label.label_source != "operator_patron_review":
+    if label.label_source not in {"operator_patron_review", "operator_data_problem"}:
         return None
     return _compact(
         {
@@ -442,6 +547,8 @@ def _manifest(
     dataset_path: Path,
     model_version: str,
     created_at: datetime,
+    source_product_count: int,
+    skipped_counts: dict[str, int],
     review_label_count: int,
     include_inactive: bool,
 ) -> dict[str, Any]:
@@ -462,7 +569,10 @@ def _manifest(
         "label_policy_version": PATRON_LABEL_POLICY_VERSION,
         "dataset_path": str(dataset_path),
         "created_at": _isoformat(created_at),
+        "source_product_count": source_product_count,
         "record_count": len(rows),
+        "skipped_count": sum(skipped_counts.values()),
+        "skipped_counts": skipped_counts,
         "label_counts": dict(label_counts),
         "source_counts": dict(source_counts),
         "source_label_counts": dict(source_label_counts),
@@ -535,9 +645,15 @@ def _decision_hash(decision: OperatorDecision) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _record_hash(record: dict[str, Any]) -> str:
-    payload = dict(record)
-    payload.pop("example_hash", None)
+def _example_hash(record: dict[str, Any]) -> str:
+    payload = {
+        "schema_version": record.get("schema_version"),
+        "task": record.get("task"),
+        "source": record.get("source"),
+        "shop": record.get("shop"),
+        "product": record.get("product"),
+        "latest_price": record.get("latest_price"),
+    }
     encoded = json.dumps(
         payload,
         ensure_ascii=False,
@@ -549,6 +665,30 @@ def _record_hash(record: dict[str, Any]) -> str:
 
 def _compact(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if value is not None}
+
+
+def _operator_review(raw: dict[str, Any] | None) -> dict[str, Any] | None:
+    if raw is None:
+        return None
+    operator_review = raw.get("operator_review")
+    return operator_review if isinstance(operator_review, dict) else None
+
+
+def _datetime_value(value: object, fallback: datetime | None) -> datetime:
+    if isinstance(value, datetime):
+        return _aware_datetime(value)
+    if isinstance(value, str) and value:
+        try:
+            return _aware_datetime(datetime.fromisoformat(value.replace("Z", "+00:00")))
+        except ValueError:
+            return _aware_datetime(fallback)
+    return _aware_datetime(fallback)
+
+
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
 
 
 def _decimal_text(value: Decimal | None) -> str | None:
