@@ -240,7 +240,7 @@ def assign_product_category_override(
         },
         alternatives={"items": [{"category_id": payload.category_id, "selected": True}]},
     )
-    _refresh_product_quality(session, product_id)
+    _refresh_product_quality(session, product_id, generate_candidates=True)
     session.commit()
 
     item = ProductCatalog(session).get_product(product_id)
@@ -305,7 +305,7 @@ def revert_product_category_override(
             "selected_category_id": reverted.previous_category_id,
         },
     )
-    _refresh_product_quality(session, product_id)
+    _refresh_product_quality(session, product_id, generate_candidates=True)
     session.commit()
 
     item = ProductCatalog(session).get_product(product_id)
@@ -346,6 +346,9 @@ def mark_product_data_problem(
 
     previous_state = {
         "is_not_product": product.is_not_product,
+        "catalog_eligibility": (product.raw or {}).get("catalog_eligibility")
+        if isinstance(product.raw, dict)
+        else None,
         "operator_review": (product.raw or {}).get("operator_review")
         if isinstance(product.raw, dict)
         else None,
@@ -370,6 +373,9 @@ def mark_product_data_problem(
         previous_state=previous_state,
         new_state={
             "is_not_product": product.is_not_product,
+            "catalog_eligibility": product.raw.get("catalog_eligibility")
+            if isinstance(product.raw, dict)
+            else None,
             "operator_review": product.raw.get("operator_review")
             if isinstance(product.raw, dict)
             else None,
@@ -379,7 +385,11 @@ def mark_product_data_problem(
             "is_not_product": payload.is_not_product,
         },
     )
-    _refresh_product_quality(session, product_id)
+    _refresh_product_quality(
+        session,
+        product_id,
+        generate_candidates=not payload.is_not_product,
+    )
     session.commit()
 
     item = ProductCatalog(session).get_product(product_id)
@@ -392,11 +402,16 @@ def mark_product_data_problem(
     return ProductSearchItemResponse.model_validate(item)
 
 
-def _refresh_product_quality(session: Session, product_id: int) -> None:
-    product = session.get(SourceProduct, product_id)
-    if product is None:
-        return
-    CatalogQualityPipeline(session).run_for_shop(product.shop_id)
+def _refresh_product_quality(
+    session: Session,
+    product_id: int,
+    *,
+    generate_candidates: bool,
+) -> None:
+    CatalogQualityPipeline(session).run_for_product(
+        product_id,
+        generate_candidates=generate_candidates,
+    )
 
 
 def _with_operator_data_problem(
@@ -420,6 +435,13 @@ def _with_operator_data_problem(
         "reviewed_at": datetime.now(UTC).isoformat(),
     }
     updated["operator_review"] = operator_review
+    updated["catalog_eligibility"] = {
+        "status": "ineligible" if is_not_product else "eligible",
+        "confidence": "1.000",
+        "score": 0 if is_not_product else 100,
+        "reasons": ["operator_data_problem"],
+        "method": "operator_review",
+    }
     return updated
 
 

@@ -19,6 +19,7 @@ from stroyhub.parsers.common import JsonObject
 @dataclass(frozen=True, kw_only=True)
 class ProductMatchGenerationFilters:
     source: str | None = None
+    source_product_id: int | None = None
     shop_id: int | None = None
     category_id: int | None = None
     min_confidence: float = 0.75
@@ -172,6 +173,8 @@ class ProductMatchCandidateGenerator:
             source = filters.source.strip()
             if source:
                 statement = statement.where(SourceProduct.source == source)
+        if filters.source_product_id is not None:
+            statement = statement.where(SourceProduct.id == filters.source_product_id)
         if filters.shop_id is not None:
             statement = statement.where(SourceProduct.shop_id == filters.shop_id)
         if filters.category_id is not None:

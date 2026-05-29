@@ -63,6 +63,7 @@ class CatalogQualityPipeline:
             products=self._source_products(shop_id),
             processed_at=processed_at,
             generate_candidates=generate_candidates,
+            candidate_source_product_id=None,
         )
 
     def run_for_product(
@@ -70,6 +71,7 @@ class CatalogQualityPipeline:
         source_product_id: int,
         *,
         processed_at: datetime | None = None,
+        generate_candidates: bool = False,
     ) -> CatalogQualityPipelineResult:
         product = self._source_product(source_product_id)
         if product is None:
@@ -86,7 +88,8 @@ class CatalogQualityPipeline:
             shop_id=product.shop_id,
             products=[product],
             processed_at=processed_at,
-            generate_candidates=False,
+            generate_candidates=generate_candidates,
+            candidate_source_product_id=product.id,
         )
 
     def _run_for_products(
@@ -96,6 +99,7 @@ class CatalogQualityPipeline:
         products: list[SourceProduct],
         processed_at: datetime | None,
         generate_candidates: bool,
+        candidate_source_product_id: int | None,
     ) -> CatalogQualityPipelineResult:
         now = processed_at or datetime.now(UTC)
         categorizer = categorizer_for_session(self._session)
@@ -152,7 +156,11 @@ class CatalogQualityPipeline:
         candidates_skipped_existing = 0
         if generate_candidates:
             candidate_result = ProductMatchCandidateGenerator(self._session).generate(
-                ProductMatchGenerationFilters(shop_id=shop_id, limit=1000)
+                ProductMatchGenerationFilters(
+                    shop_id=shop_id,
+                    source_product_id=candidate_source_product_id,
+                    limit=1000,
+                )
             )
             candidates_seen = candidate_result.candidates_seen
             candidates_created = candidate_result.candidates_created

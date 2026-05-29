@@ -9,6 +9,8 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
 from stroyhub.db import (
+    CanonicalProductCreate,
+    CanonicalProductRepository,
     PriceSnapshotCreate,
     PriceSnapshotRepository,
     ShopIdentityCreate,
@@ -18,7 +20,7 @@ from stroyhub.db import (
     SourceProductRepository,
     SourceProductUpsert,
 )
-from stroyhub.models import Category, CategoryOverride
+from stroyhub.models import Category, CategoryOverride, ProductMatch
 
 from apps.admin_api.main import create_app
 from apps.admin_api.products import get_session as get_admin_session
@@ -755,6 +757,16 @@ def test_product_data_problem_endpoint_marks_product_and_refreshes_quality(
             raw={"source": "fixture"},
         )
     )
+    other_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="data-problem-api-2",
+            title="Another product",
+            normalized_title="another product",
+            raw={"catalog_quality": {"status": "stale"}},
+        )
+    )
     PriceSnapshotRepository(db_session).add(
         PriceSnapshotCreate(
             source_product_id=product.id,
@@ -780,7 +792,80 @@ def test_product_data_problem_endpoint_marks_product_and_refreshes_quality(
     assert product.raw["operator_review"]["data_problem"]["marked"] is True
     assert product.raw["operator_review"]["data_problem"]["reason"] == "service card"
     assert product.raw["operator_review"]["data_problem"]["actor"] == "reviewer"
+    assert product.raw["catalog_eligibility"]["status"] == "ineligible"
+    assert product.raw["catalog_eligibility"]["method"] == "operator_review"
     assert product.raw["catalog_quality"]["normalization"]["status"] == "data_problem"
+    db_session.expire(other_product)
+    assert other_product.raw == {"catalog_quality": {"status": "stale"}}
+
+
+def test_product_data_problem_endpoint_clear_refreshes_eligibility_and_candidates(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-api-clear-data-problem", name="Data Shop")
+    )
+    canonical = CanonicalProductRepository(db_session).create(
+        CanonicalProductCreate(
+            title="Clear Data Problem Cement M500 50kg",
+            normalized_title="clear data problem cement m500 50kg",
+        )
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="clear-data-problem-api-1",
+            title="Clear Data Problem Cement M500 50kg",
+            normalized_title="clear data problem cement m500 50kg",
+            raw={
+                "catalog_eligibility": {
+                    "status": "ineligible",
+                    "method": "operator_review",
+                },
+                "operator_review": {
+                    "data_problem": {
+                        "marked": True,
+                        "actor": "reviewer",
+                    }
+                },
+            },
+            is_not_product=True,
+        )
+    )
+    PriceSnapshotRepository(db_session).add(
+        PriceSnapshotCreate(
+            source_product_id=product.id,
+            price=Decimal("100.00"),
+            parsed_at=datetime(2026, 5, 20, 8, 0, tzinfo=UTC),
+        )
+    )
+
+    response = client.put(
+        f"/products/{product.id}/data-problem",
+        json={
+            "is_not_product": False,
+            "reason": "real product",
+            "actor": "reviewer",
+        },
+    )
+
+    match = db_session.scalar(
+        select(ProductMatch).where(
+            ProductMatch.source_product_id == product.id,
+            ProductMatch.canonical_product_id == canonical.id,
+        )
+    )
+    assert response.status_code == 200
+    db_session.expire(product)
+    assert product.is_not_product is False
+    assert product.raw is not None
+    assert product.raw["operator_review"]["data_problem"]["marked"] is False
+    assert product.raw["catalog_eligibility"]["status"] == "eligible"
+    assert product.raw["catalog_eligibility"]["method"] == "operator_review"
+    assert match is not None
+    assert match.status == "candidate"
 
 
 def test_product_price_history_endpoint_returns_ordered_snapshots(

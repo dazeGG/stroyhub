@@ -184,7 +184,7 @@ class ProductMatchDecisionService:
         if accepted is not None:
             if accepted.canonical_product_id == canonical_product_id:
                 if self._refresh_quality_on_accept:
-                    self._refresh_quality_for_shop(source_product.shop_id)
+                    self._refresh_quality_for_source_product(source_product.id)
                 return _decision(accepted)
             if not supersede_existing:
                 raise ProductMatchDecisionConflict(
@@ -339,16 +339,7 @@ class ProductMatchDecisionService:
         )
 
     def _refresh_quality_for_source_product(self, source_product_id: int) -> None:
-        product = self._session.get(SourceProduct, source_product_id)
-        if product is None:
-            return
-        self._refresh_quality_for_shop(product.shop_id)
-
-    def _refresh_quality_for_shop(self, shop_id: int) -> None:
-        CatalogQualityPipeline(self._session).run_for_shop(
-            shop_id,
-            generate_candidates=False,
-        )
+        CatalogQualityPipeline(self._session).run_for_product(source_product_id)
 
 
 def _decision(match: ProductMatch) -> ProductMatchDecision:
