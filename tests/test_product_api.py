@@ -828,6 +828,8 @@ def test_product_price_history_endpoint_returns_ordered_snapshots(
         {
             "id": earlier.id,
             "price": "400.00",
+            "price_kind": "exact",
+            "price_text": "400.00 RUB",
             "currency": "RUB",
             "unit_raw": "bag",
             "source_updated_at": "2026-05-17T09:50:00Z",
@@ -836,6 +838,8 @@ def test_product_price_history_endpoint_returns_ordered_snapshots(
         {
             "id": later.id,
             "price": "420.00",
+            "price_kind": "exact",
+            "price_text": "420.00 RUB",
             "currency": "RUB",
             "unit_raw": "bag",
             "source_updated_at": "2026-05-17T10:50:00Z",
