@@ -105,8 +105,26 @@ Controls:
 Frozen datasets for Patron are stored with model artifacts:
 
 ```text
-.var/ml/patron/models/v2/dataset.jsonl
+.var/ml/patron/models/v3/dataset.jsonl
 ```
+
+Build the next dataset snapshot from the current database plus label overlays:
+
+```bash
+uv run python -m apps.ml.patron.dataset_cli --model-dir .var/ml/patron/models/v3
+```
+
+The builder exports one current source product per row, omits database/source
+ids from the frozen dataset, and applies labels by priority:
+
+- admin Patron review in `operator_decisions` and CLI human labels from
+  `.var/ml/patron/human_labels.jsonl`;
+- bulk labels from `.var/ml/patron/labels.jsonl`;
+- current StroyHub policy/DB state.
+
+`skip` decisions are not training labels, and `undo` removes the undone review
+decision from the overlay. Re-running the command rewrites the snapshot, so
+review rows are idempotent rather than appended repeatedly.
 
 Legacy not-product classifier v0/v1 artifacts are archived under:
 
@@ -114,14 +132,16 @@ Legacy not-product classifier v0/v1 artifacts are archived under:
 .var/ml/patron/archive/not_product_classifier/
 ```
 
-Train Patron v2 with:
+Train Patron v3 with:
 
 ```bash
 uv run python -m apps.ml.patron.train_cli
 ```
 
-The command trains a small rule-guarded, length-normalized token Naive Bayes
-baseline without adding external ML dependencies, evaluates on a stratified
-held-out split, saves `model.joblib`, `metadata.json`, and `eval_errors.jsonl`
-under the selected model directory, and updates
-`.var/ml/patron/models/current`.
+The command trains a lightweight TF-IDF + SGD logistic-regression model without
+adding external ML dependencies, evaluates on a stratified held-out split, saves
+`model.joblib`, `metadata.json`, and `eval_errors.jsonl` under the selected
+model directory, and updates `.var/ml/patron/models/current`. Synthetic
+not-product support data can be passed with `--extra-dataset-path`; synthetic
+rows should carry `label_source=synthetic_not_product` and `synthetic=true` so
+they stay auditable and train-only.

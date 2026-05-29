@@ -19,6 +19,16 @@ Until the first MVP release is complete:
 - New ML work should be limited to clearly optional experiments or maintenance
   that does not block release work.
 
+Patron is the first exception allowed into the scraping path: scrape persistence
+may load `.var/ml/patron/models/current` to classify source cards as product or
+not product. If the artifact is missing, scraping must fall back to deterministic
+rules and continue.
+
+Patron is not the first gate for catalog eligibility. Deterministic hard
+constraints run before the model and can mark a card ineligible without a Patron
+prediction. For 2GIS this includes missing exact price data, `from`/range prices,
+and source descriptions that say the price is approximate or not a public offer.
+
 ## Boundaries
 
 - `apps/ml` owns CLI commands for labeling, dataset snapshots, training,
@@ -104,6 +114,19 @@ when selecting candidates.
 `labels.jsonl` is the live append-only label log. Dataset snapshots are frozen
 files created from the live log before training. A snapshot is not created for
 every individual label.
+
+Patron datasets are rebuilt as frozen snapshots instead of patched in place.
+The builder reads current source products from PostgreSQL, applies label
+overlays by priority, and writes a new `dataset.jsonl` under the target model
+directory. Admin Patron review decisions from `operator_decisions` and CLI
+human labels have top priority, bulk labels are below them, and current
+DB/policy state is the fallback. `skip` is not a training label; `undo` removes
+the undone review decision from the overlay. The frozen dataset keeps
+`label_source`, `label_priority`, and a one-way review `decision_hash`, but does
+not store database ids or source product ids. Synthetic Patron examples must be
+stored separately, marked with `label_source=synthetic_not_product` and
+`synthetic=true`, and used as train-only support data rather than evaluation
+truth.
 
 The category verifier dataset CLI exposes the current workflow:
 
