@@ -17,7 +17,8 @@ from stroyhub.ml.not_product_training import (
     train_not_product_classifier_artifacts,
 )
 
-from apps.ml.patron.train_cli import main
+from apps.ml.patron.train_cli import main as train_main
+from scripts.check_patron_readiness import main as readiness_main
 
 
 def test_not_product_model_predicts_generic_product_title_as_not_product(tmp_path) -> None:
@@ -176,6 +177,24 @@ def test_patron_classifier_loads_artifact_and_predicts_record(tmp_path) -> None:
     assert prediction.threshold == 0.7
 
 
+def test_patron_classifier_default_can_use_explicit_model_dir(tmp_path) -> None:
+    model_dir = tmp_path / "custom" / "patron-current"
+    dataset_path = model_dir / "dataset.jsonl"
+    model_dir.mkdir(parents=True)
+    _write_dataset(dataset_path)
+    train_not_product_classifier_artifacts(
+        dataset_path=dataset_path,
+        model_dir=model_dir,
+        model_version="v0",
+        run_date=date(2026, 5, 27),
+    )
+
+    classifier = PatronClassifier.default(model_dir=model_dir)
+
+    assert classifier.model_version == "v0"
+    assert PatronClassifier.default_model_dir(model_dir=model_dir) == model_dir
+
+
 def test_patron_classifier_reports_missing_artifact(tmp_path) -> None:
     try:
         PatronClassifier.load(tmp_path / "missing")
@@ -185,13 +204,39 @@ def test_patron_classifier_reports_missing_artifact(tmp_path) -> None:
         raise AssertionError("expected missing Patron model error")
 
 
+def test_patron_readiness_cli_checks_model_without_database(tmp_path, capsys) -> None:
+    model_dir = tmp_path / "models" / "v0"
+    dataset_path = model_dir / "dataset.jsonl"
+    model_dir.mkdir(parents=True)
+    _write_dataset(dataset_path)
+    train_not_product_classifier_artifacts(
+        dataset_path=dataset_path,
+        model_dir=model_dir,
+        model_version="v0",
+        run_date=date(2026, 5, 27),
+    )
+
+    exit_code = readiness_main(
+        [
+            "--model-dir",
+            str(model_dir),
+            "--skip-db",
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "model_loaded=true" in output
+    assert "patron_ready=true" in output
+
+
 def test_patron_train_cli_trains_from_dataset(tmp_path, capsys) -> None:
     model_dir = tmp_path / "models" / "v0"
     dataset_path = model_dir / "dataset.jsonl"
     model_dir.mkdir(parents=True)
     _write_dataset(dataset_path)
 
-    exit_code = main(
+    exit_code = train_main(
         [
             "--model-dir",
             str(model_dir),

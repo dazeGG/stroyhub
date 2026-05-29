@@ -42,10 +42,11 @@ class ProductSuitabilityEvaluator:
         cls,
         *,
         root: Path | None = None,
+        model_dir: str | Path | None = None,
         require_patron: bool = False,
     ) -> ProductSuitabilityEvaluator:
         try:
-            patron = PatronClassifier.default(root=root)
+            patron = PatronClassifier.default(root=root, model_dir=model_dir)
         except NotProductClassifierModelUnavailableError:
             if require_patron:
                 raise

@@ -10,9 +10,14 @@ from typing import cast
 
 from sqlalchemy import and_, select
 from stroyhub.catalog.eligibility import with_catalog_eligibility
+from stroyhub.catalog.eligibility_readiness import count_missing_catalog_eligibility
 from stroyhub.catalog.product_suitability import ProductSuitabilityEvaluator
 from stroyhub.catalog.query_helpers import latest_price_subquery
 from stroyhub.db import SessionLocal
+from stroyhub.ml.not_product_classifier import (
+    NotProductClassifierModelUnavailableError,
+    PatronClassifier,
+)
 from stroyhub.models import Category, Shop, SourceProduct
 from stroyhub.parsers.common import ParsedProduct, PriceKind
 
@@ -33,18 +38,31 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Allow a rules-only run when Patron model artifacts are unavailable.",
     )
     parser.add_argument("--limit", type=int, help="Only process the first N products.")
+    parser.add_argument(
+        "--require-complete",
+        action="store_true",
+        help=(
+            "Return a non-zero code when active source products still miss "
+            "raw.catalog_eligibility after the run."
+        ),
+    )
     args = parser.parse_args(argv)
 
-    evaluator = ProductSuitabilityEvaluator.default()
-    model_loaded = evaluator.patron is not None
-    if not model_loaded and not args.allow_rules_fallback:
+    try:
+        evaluator = ProductSuitabilityEvaluator.default(
+            require_patron=not args.allow_rules_fallback
+        )
+    except NotProductClassifierModelUnavailableError:
         print("action=blocked")
         print("model_loaded=false")
+        print(f"patron_model_dir={PatronClassifier.default_model_dir()}")
         print("error=Patron model is unavailable")
         return 1
+    model_loaded = evaluator.patron is not None
 
     counters: Counter[str] = Counter()
     started_at = datetime.now(UTC)
+    remaining_missing = 0
 
     with SessionLocal() as session:
         latest_prices = latest_price_subquery()
@@ -134,11 +152,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             session.rollback()
             action = "dry_run"
 
+        remaining_missing = count_missing_catalog_eligibility(
+            session,
+            include_inactive=args.include_inactive,
+        )
+
     print(f"action={action}")
     print(f"model_loaded={str(model_loaded).lower()}")
+    print(f"patron_model_dir={PatronClassifier.default_model_dir()}")
     print(f"started_at={started_at.isoformat()}")
+    print(f"missing_catalog_eligibility={remaining_missing}")
     for key in sorted(counters):
         print(f"{key}={counters[key]}")
+    if args.require_complete and remaining_missing:
+        print("error=missing_catalog_eligibility_remaining")
+        return 2
     return 0
 
 

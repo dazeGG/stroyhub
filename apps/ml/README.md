@@ -145,3 +145,21 @@ model directory, and updates `.var/ml/patron/models/current`. Synthetic
 not-product support data can be passed with `--extra-dataset-path`; synthetic
 rows should carry `label_source=synthetic_not_product` and `synthetic=true` so
 they stay auditable and train-only.
+
+Runtime uses `.var/ml/patron/models/current` by default. Override it with
+`STROYHUB_PATRON_MODEL_DIR` when the model artifacts live outside the repo-local
+`.var/` tree.
+
+Before enabling scheduled scrapes after a deploy or on an existing database,
+check both the model artifact and catalog eligibility coverage:
+
+```bash
+uv run python scripts/check_patron_readiness.py
+```
+
+If existing source products still miss `raw.catalog_eligibility`, run:
+
+```bash
+uv run python scripts/backfill_product_suitability.py
+uv run python scripts/backfill_product_suitability.py --apply --require-complete
+```

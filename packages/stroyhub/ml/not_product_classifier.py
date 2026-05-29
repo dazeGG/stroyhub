@@ -12,6 +12,7 @@ from typing import Any, Protocol
 import joblib
 
 from stroyhub.catalog.tokenization import tokenize_normalized_text
+from stroyhub.core.config import settings
 from stroyhub.ml.not_product_labels import NotProductLabel
 from stroyhub.parsers.common import normalize_title
 
@@ -228,9 +229,25 @@ class PatronClassifier:
         return self._model.threshold
 
     @classmethod
-    def default(cls, *, root: Path | None = None) -> PatronClassifier:
-        base_path = root or Path.cwd()
-        return cls.load(base_path / ".var" / "ml" / "patron" / "models" / "current")
+    def default(
+        cls,
+        *,
+        root: Path | None = None,
+        model_dir: str | Path | None = None,
+    ) -> PatronClassifier:
+        return cls.load(cls.default_model_dir(root=root, model_dir=model_dir))
+
+    @staticmethod
+    def default_model_dir(
+        *,
+        root: Path | None = None,
+        model_dir: str | Path | None = None,
+    ) -> Path:
+        if model_dir is not None:
+            return Path(model_dir)
+        if root is not None:
+            return root / ".var" / "ml" / "patron" / "models" / "current"
+        return Path(settings.patron_model_dir)
 
     @classmethod
     def load(cls, model_dir: str | Path) -> PatronClassifier:

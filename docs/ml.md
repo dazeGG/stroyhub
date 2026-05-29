@@ -19,10 +19,12 @@ Until the first MVP release is complete:
 - New ML work should be limited to clearly optional experiments or maintenance
   that does not block release work.
 
-Patron is the first exception allowed into the scraping path: scrape persistence
-may load `.var/ml/patron/models/current` to classify source cards as product or
-not product. If the artifact is missing, scraping must fall back to deterministic
-rules and continue.
+Patron is the first exception allowed into the scraping path: scheduled scrape
+persistence loads a ready Patron artifact to classify source cards as product or
+not product. The default artifact path is `.var/ml/patron/models/current` and can
+be overridden with `STROYHUB_PATRON_MODEL_DIR`. Scheduled scraping must fail
+closed when the artifact is missing; one-off scripts may opt into deterministic
+rules fallback explicitly.
 
 Patron is not the first gate for catalog eligibility. Deterministic hard
 constraints run before the model and can mark a card ineligible without a Patron
@@ -47,6 +49,27 @@ and source descriptions that say the price is approximate or not a public offer.
 
 ML runtime data is stored under `.var/ml` in the repository root. `.var/` is
 ignored by git.
+
+Before enabling scheduled scrapes against an existing database, verify that the
+runtime model is present and every active source product has
+`raw.catalog_eligibility`:
+
+```bash
+uv run python scripts/check_patron_readiness.py
+```
+
+If readiness reports missing catalog eligibility, first run a dry backfill and
+inspect the counters:
+
+```bash
+uv run python scripts/backfill_product_suitability.py
+```
+
+Apply the backfill only after the dry-run looks correct:
+
+```bash
+uv run python scripts/backfill_product_suitability.py --apply --require-complete
+```
 
 ```text
 .var/ml/
