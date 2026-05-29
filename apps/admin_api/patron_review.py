@@ -14,7 +14,6 @@ from stroyhub.catalog.patron_review import (
 )
 from stroyhub.catalog.quality_pipeline import CatalogQualityPipeline
 from stroyhub.db import get_session
-from stroyhub.models import SourceProduct
 
 from apps.admin_api.errors import ApiError, api_error_responses
 from apps.admin_api.validation import ActorName, ReasonText
@@ -197,7 +196,4 @@ def undo_patron_review_decision(
 
 
 def _refresh_product_quality(session: Session, product_id: int) -> None:
-    product = session.get(SourceProduct, product_id)
-    if product is None:
-        return
-    CatalogQualityPipeline(session).run_for_shop(product.shop_id)
+    CatalogQualityPipeline(session).run_for_product(product_id)
