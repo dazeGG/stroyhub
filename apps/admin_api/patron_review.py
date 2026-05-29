@@ -12,7 +12,9 @@ from stroyhub.catalog.patron_review import (
     PatronReviewMode,
     PatronReviewQueue,
 )
+from stroyhub.catalog.quality_pipeline import CatalogQualityPipeline
 from stroyhub.db import get_session
+from stroyhub.models import SourceProduct
 
 from apps.admin_api.errors import ApiError, api_error_responses
 from apps.admin_api.validation import ActorName, ReasonText
@@ -154,6 +156,8 @@ def decide_patron_review_item(
             code="patron_review_item_not_found",
             message=str(error),
         ) from error
+    if result.product_id is not None and payload.action in {"product", "not_product"}:
+        _refresh_product_quality(session, result.product_id)
     session.commit()
     return PatronReviewDecisionResponse.model_validate(result)
 
@@ -186,5 +190,14 @@ def undo_patron_review_decision(
             code="patron_review_history_empty",
             message=str(error),
         ) from error
+    if result.product_id is not None:
+        _refresh_product_quality(session, result.product_id)
     session.commit()
     return PatronReviewDecisionResponse.model_validate(result)
+
+
+def _refresh_product_quality(session: Session, product_id: int) -> None:
+    product = session.get(SourceProduct, product_id)
+    if product is None:
+        return
+    CatalogQualityPipeline(session).run_for_shop(product.shop_id)

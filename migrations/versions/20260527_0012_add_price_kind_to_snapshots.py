@@ -48,6 +48,14 @@ def upgrade() -> None:
     )
     op.execute(
         """
+        UPDATE price_snapshots
+        SET price_kind = 'from'
+        WHERE price IS NOT NULL
+          AND LOWER(raw->'offer'->>'price') ~ '(^|[[:space:]])от[[:space:]]*[0-9]'
+        """
+    )
+    op.execute(
+        """
         UPDATE price_snapshots AS snapshots
         SET price_kind = 'from'
         FROM source_products AS products

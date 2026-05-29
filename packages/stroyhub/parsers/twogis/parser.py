@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -27,6 +28,7 @@ MONTHS_RU = {
     "ноября": 11,
     "декабря": 12,
 }
+_PRICE_TEXT_FROM_PATTERN = re.compile(r"(^|\s)от\s*\d", re.IGNORECASE)
 
 
 def parse_product_items(
@@ -160,6 +162,10 @@ def _price(offer: JsonObject) -> Decimal | None:
 
 
 def _raw_price_kind(offer: JsonObject) -> PriceKind | None:
+    text_price_kind = _price_text_kind(offer.get("price"))
+    if text_price_kind is not None:
+        return text_price_kind
+
     price_value = offer.get("price_value")
     if not isinstance(price_value, dict):
         return None
@@ -169,6 +175,14 @@ def _raw_price_kind(offer: JsonObject) -> PriceKind | None:
         return "exact"
     if isinstance(price_value.get("empty"), dict):
         return "unknown"
+    return None
+
+
+def _price_text_kind(value: object) -> PriceKind | None:
+    if not isinstance(value, str):
+        return None
+    if _PRICE_TEXT_FROM_PATTERN.search(normalize_title(value)):
+        return "from"
     return None
 
 

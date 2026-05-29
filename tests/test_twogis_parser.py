@@ -101,6 +101,21 @@ def test_parse_product_item_preserves_from_price_value() -> None:
     assert parsed.currency == "RUB"
 
 
+def test_parse_product_item_marks_text_price_from_as_from() -> None:
+    parsed = parse_product_item(
+        {
+            "product": {"id": "product-1", "name": "Доска обрезная"},
+            "offer": {"price": "от 29 000 ₽", "currency": "RUB"},
+        },
+        branch_id="branch-1",
+    )
+
+    assert parsed is not None
+    assert parsed.price == Decimal("29000")
+    assert parsed.price_kind == "from"
+    assert parsed.currency == "RUB"
+
+
 def test_parse_product_item_marks_range_title_price_as_from() -> None:
     parsed = parse_product_item(
         {

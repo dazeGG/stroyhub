@@ -91,6 +91,7 @@ def test_patron_review_returns_next_item_and_records_not_product_decision(
     assert product.is_not_product is True
     assert product.raw["operator_review"]["patron_review"]["status"] == "not_product"
     assert product.raw["catalog_eligibility"]["method"] == "operator_review"
+    assert product.raw["catalog_quality"]["normalization"]["status"] == "data_problem"
 
 
 def test_patron_review_can_review_patron_rejected_products_by_probability(
@@ -158,6 +159,8 @@ def test_patron_review_records_patron_rejected_queue_decision(
     )
     assert product.raw["catalog_eligibility"]["status"] == "eligible"
     assert product.raw["catalog_eligibility"]["method"] == "operator_review"
+    assert product.raw["catalog_quality"]["status"] == "processed"
+    assert product.raw["catalog_quality"]["normalization"]["status"] != "data_problem"
 
 
 def test_patron_review_rejects_decision_outside_selected_queue(
@@ -205,6 +208,7 @@ def test_patron_review_undo_restores_previous_product_state(
     assert product.is_not_product is False
     assert "operator_review" not in product.raw
     assert product.raw["catalog_eligibility"]["status"] == "needs_review"
+    assert product.raw["catalog_quality"]["normalization"]["status"] == "needs_review"
 
 
 def test_patron_review_undo_walks_back_multiple_review_decisions(
