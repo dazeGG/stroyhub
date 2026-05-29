@@ -893,6 +893,7 @@ def test_public_products_prefer_healthy_identity_preferred_source(
             source_product_id="public-priority-fallback-product",
             title="Priority Cement M500",
             normalized_title="priority cement m500",
+            raw={"catalog_eligibility": {"status": "eligible"}},
         )
     )
     preferred_product = SourceProductRepository(db_session).upsert(
@@ -902,6 +903,7 @@ def test_public_products_prefer_healthy_identity_preferred_source(
             source_product_id="public-priority-preferred-product",
             title="Priority Cement M500",
             normalized_title="priority cement m500",
+            raw={"catalog_eligibility": {"status": "eligible"}},
         )
     )
 
@@ -1006,6 +1008,7 @@ def test_public_products_fall_back_when_preferred_source_is_unhealthy(
             source_product_id="public-fallback-visible-product",
             title="Fallback Cement M400",
             normalized_title="fallback cement m400",
+            raw={"catalog_eligibility": {"status": "eligible"}},
         )
     )
     SourceProductRepository(db_session).upsert(
@@ -1015,10 +1018,70 @@ def test_public_products_fall_back_when_preferred_source_is_unhealthy(
             source_product_id="public-fallback-hidden-product",
             title="Fallback Cement M400",
             normalized_title="fallback cement m400",
+            raw={"catalog_eligibility": {"status": "eligible"}},
         )
     )
 
     response = public_client.get("/products", params={"q": "Fallback Cement M400"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert [item["id"] for item in payload["items"]] == [visible_product.id]
+    assert payload["items"][0]["shop"]["source"] == "2gis"
+
+
+def test_public_products_fall_back_when_preferred_source_has_no_visible_products(
+    public_client: TestClient,
+    db_session: Session,
+) -> None:
+    identity = ShopIdentityRepository(db_session).create(
+        ShopIdentityCreate(
+            display_name="Fallback Hidden Product Identity",
+            preferred_source="unicom",
+        )
+    )
+    fallback_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="public-fallback-visible-product-source",
+            name="Fallback Visible Product Shop",
+            shop_identity_id=identity.id,
+            scrape_status="success",
+        )
+    )
+    preferred_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="public-fallback-hidden-product-source",
+            name="Preferred Hidden Product Shop",
+            shop_identity_id=identity.id,
+            scrape_status="success",
+        )
+    )
+    visible_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=fallback_shop.id,
+            source="2gis",
+            source_product_id="public-fallback-visible-product-source-product",
+            title="Fallback Visible Patron Product",
+            normalized_title="fallback visible patron product",
+            raw={"catalog_eligibility": {"status": "eligible"}},
+        )
+    )
+    SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=preferred_shop.id,
+            source="unicom",
+            source_product_id="public-fallback-hidden-product-source-product",
+            title="Fallback Visible Patron Product",
+            normalized_title="fallback visible patron product",
+            raw={"catalog_eligibility": {"status": "ineligible", "method": "patron"}},
+            is_not_product=True,
+        )
+    )
+
+    response = public_client.get("/products", params={"q": "Fallback Visible Patron Product"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -1060,3 +1123,40 @@ def test_public_products_hide_non_active_shop_identity_statuses(
     assert response.status_code == 200
     assert response.json()["total"] == 0
     assert public_client.get(f"/products/{product.id}").status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("raw", "is_not_product"),
+    [
+        ({}, False),
+        ({"catalog_eligibility": {"status": "ineligible", "method": "patron"}}, True),
+        ({"catalog_eligibility": {"status": "needs_review", "method": "patron"}}, False),
+    ],
+)
+def test_public_products_hide_unsafe_source_products(
+    public_client: TestClient,
+    db_session: Session,
+    raw: dict[str, object],
+    is_not_product: bool,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="public-hidden-patron", name="Hidden Patron Shop")
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="public-hidden-patron-product",
+            title="Hidden Patron Product",
+            normalized_title="hidden patron product",
+            raw=raw,
+            is_not_product=is_not_product,
+        )
+    )
+
+    response = public_client.get("/products", params={"q": "Hidden Patron Product"})
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+    assert public_client.get(f"/products/{product.id}").status_code == 404
+    assert public_client.get(f"/products/{product.id}/prices").status_code == 404

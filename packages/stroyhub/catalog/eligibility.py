@@ -203,7 +203,7 @@ def is_matchable_source_product(raw: JsonObject | None, *, is_not_product: bool)
 
     eligibility = _raw_eligibility(raw)
     if eligibility is None:
-        return True
+        return False
 
     return eligibility.get("status") == "eligible"
 

@@ -629,6 +629,7 @@ def _queue_predicate(queue: CatalogWorkflowQueueName) -> Any:
         return and_(
             not_accepted,
             SourceProduct.is_not_product.is_(False),
+            eligibility_status == "eligible",
             pipeline_status == "processed",
             categorization_status == "assigned",
             normalization_status == "ready_to_accept",
@@ -642,6 +643,8 @@ def _queue_predicate(queue: CatalogWorkflowQueueName) -> Any:
             not_accepted,
             SourceProduct.is_not_product.is_(False),
             or_(
+                eligibility_status.is_(None),
+                eligibility_status == "",
                 eligibility_status == "needs_review",
                 categorization_status == "needs_review",
                 normalization_status == "needs_review",
@@ -655,7 +658,12 @@ def _queue_predicate(queue: CatalogWorkflowQueueName) -> Any:
             normalization_status == "data_problem",
         )
     if queue == "possible_duplicates":
-        return and_(not_accepted, candidate_exists)
+        return and_(
+            not_accepted,
+            candidate_exists,
+            SourceProduct.is_not_product.is_(False),
+            eligibility_status == "eligible",
+        )
     return accepted_exists
 
 

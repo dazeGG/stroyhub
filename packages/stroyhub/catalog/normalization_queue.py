@@ -248,16 +248,20 @@ class ProductNormalizationQueue:
         )
         eligible_for_matching = and_(
             not_(ineligible),
-            or_(
-                eligibility_status.is_(None),
-                eligibility_status != "needs_review",
-            ),
+            eligibility_status == "eligible",
         )
 
         if state == "ineligible":
             return ineligible
         if state == "needs_review":
-            return and_(not_(ineligible), eligibility_status == "needs_review")
+            return and_(
+                not_(ineligible),
+                or_(
+                    eligibility_status.is_(None),
+                    eligibility_status == "",
+                    eligibility_status == "needs_review",
+                ),
+            )
         if state == "accepted":
             return and_(eligible_for_matching, accepted_exists)
         if state == "candidate_match":
@@ -398,7 +402,7 @@ def _queue_state(
     eligibility_status = eligibility.status if eligibility is not None else None
     if product.is_not_product or eligibility_status == "ineligible":
         return "ineligible"
-    if eligibility_status == "needs_review":
+    if eligibility_status in {None, "", "needs_review"}:
         return "needs_review"
     if match_info.accepted_match_id is not None:
         return "accepted"

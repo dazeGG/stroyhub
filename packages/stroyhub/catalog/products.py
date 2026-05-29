@@ -356,6 +356,10 @@ class ProductCatalog:
     def _public_visibility_predicate(self) -> Any:
         preferred_shop = aliased(Shop)
         preferred_product = aliased(SourceProduct)
+        eligibility_status = SourceProduct.raw["catalog_eligibility"]["status"].astext
+        preferred_eligibility_status = preferred_product.raw["catalog_eligibility"][
+            "status"
+        ].astext
         preferred_source_has_products = exists(
             select(preferred_shop.id)
             .join(
@@ -363,6 +367,8 @@ class ProductCatalog:
                 and_(
                     preferred_product.shop_id == preferred_shop.id,
                     preferred_product.is_active.is_(True),
+                    preferred_product.is_not_product.is_(False),
+                    preferred_eligibility_status == "eligible",
                 ),
             )
             .where(
@@ -373,6 +379,8 @@ class ProductCatalog:
         )
 
         return and_(
+            SourceProduct.is_not_product.is_(False),
+            eligibility_status == "eligible",
             Shop.scrape_status != "disabled",
             or_(
                 Shop.shop_identity_id.is_(None),

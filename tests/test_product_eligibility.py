@@ -95,3 +95,21 @@ def test_matchable_source_product_requires_eligible_raw_status() -> None:
     raw = with_catalog_eligibility({"offer": {"price": 300}}, result)
 
     assert is_matchable_source_product(raw, is_not_product=False) is False
+
+
+def test_matchable_source_product_rejects_missing_eligibility() -> None:
+    assert is_matchable_source_product({"offer": {"price": 300}}, is_not_product=False) is False
+
+
+def test_matchable_source_product_accepts_eligible_raw_status() -> None:
+    result = evaluate_product_eligibility(
+        ProductEligibilityInput(
+            source="2gis",
+            title="Гвозди строительные 3,0х70 мм 1кг",
+            price=Decimal("180"),
+            raw={"offer": {"price": 180}},
+        )
+    )
+    raw = with_catalog_eligibility({"offer": {"price": 180}}, result)
+
+    assert is_matchable_source_product(raw, is_not_product=False) is True
