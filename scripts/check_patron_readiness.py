@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
-from pathlib import Path
 
 from sqlalchemy.exc import SQLAlchemyError
 from stroyhub.catalog.eligibility_readiness import count_missing_catalog_eligibility
@@ -18,11 +17,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Check Patron runtime artifacts and catalog eligibility backfill readiness."
     )
     parser.add_argument(
-        "--model-dir",
-        type=Path,
-        help="Patron model directory. Defaults to STROYHUB_PATRON_MODEL_DIR.",
-    )
-    parser.add_argument(
         "--skip-db",
         action="store_true",
         help="Only verify that the Patron model artifact can be loaded.",
@@ -34,7 +28,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    model_dir = PatronClassifier.default_model_dir(model_dir=args.model_dir)
+    model_dir = PatronClassifier.default_model_dir()
     try:
         classifier = PatronClassifier.load(model_dir)
     except NotProductClassifierModelUnavailableError as error:

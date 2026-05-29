@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
+from stroyhub.catalog.eligibility_readiness import count_missing_catalog_eligibility
 from stroyhub.core.config import settings
 from stroyhub.db import (
     OperatorDecisionCreate,
@@ -357,6 +358,8 @@ def test_patron_dataset_example_hash_is_stable_across_observation_timestamps(
     )
     product.last_seen_at = datetime(2026, 5, 29, 9, 0, tzinfo=UTC)
     product.source_updated_at = datetime(2026, 5, 29, 8, 55, tzinfo=UTC)
+    product.shop.address = "Changed Dataset Street"
+    product.shop.url = "https://example.test/changed-shop"
     PriceSnapshotRepository(db_session).add(
         PriceSnapshotCreate(
             source_product_id=product.id,
@@ -378,6 +381,28 @@ def test_patron_dataset_example_hash_is_stable_across_observation_timestamps(
     first_row = _read_jsonl(first_result.dataset_path)[0]
     second_row = _read_jsonl(second_result.dataset_path)[0]
     assert first_row["example_hash"] == second_row["example_hash"]
+
+
+def test_catalog_eligibility_readiness_counts_invalid_status(
+    db_session: Session,
+) -> None:
+    _source_product(
+        db_session,
+        source_id="catalog-eligibility-valid",
+        raw={"catalog_eligibility": {"status": "eligible"}},
+    )
+    _source_product(
+        db_session,
+        source_id="catalog-eligibility-invalid",
+        raw={"catalog_eligibility": {"status": "unknown"}},
+    )
+    _source_product(
+        db_session,
+        source_id="catalog-eligibility-missing",
+        raw={"source_payload": {"title": "missing eligibility"}},
+    )
+
+    assert count_missing_catalog_eligibility(db_session) == 2
 
 
 def _source_product(

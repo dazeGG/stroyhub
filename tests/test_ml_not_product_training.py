@@ -2,6 +2,7 @@ import json
 from datetime import date
 
 import joblib
+from stroyhub.core.config import settings
 from stroyhub.ml.not_product_classifier import (
     LinearNotProductClassifierModel,
     NotProductClassifierModelUnavailableError,
@@ -204,7 +205,9 @@ def test_patron_classifier_reports_missing_artifact(tmp_path) -> None:
         raise AssertionError("expected missing Patron model error")
 
 
-def test_patron_readiness_cli_checks_model_without_database(tmp_path, capsys) -> None:
+def test_patron_readiness_cli_checks_model_without_database(
+    tmp_path, capsys, monkeypatch
+) -> None:
     model_dir = tmp_path / "models" / "v0"
     dataset_path = model_dir / "dataset.jsonl"
     model_dir.mkdir(parents=True)
@@ -216,13 +219,9 @@ def test_patron_readiness_cli_checks_model_without_database(tmp_path, capsys) ->
         run_date=date(2026, 5, 27),
     )
 
-    exit_code = readiness_main(
-        [
-            "--model-dir",
-            str(model_dir),
-            "--skip-db",
-        ]
-    )
+    monkeypatch.setattr(settings, "patron_model_dir", str(model_dir))
+
+    exit_code = readiness_main(["--skip-db"])
 
     output = capsys.readouterr().out
     assert exit_code == 0
