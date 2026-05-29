@@ -55,6 +55,7 @@ class NotProductExample:
     label_source: str | None = None
     synthetic: bool = False
     sample_weight: float = 1.0
+    group_key: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -301,6 +302,7 @@ def not_product_example_from_record(payload: object) -> NotProductExample:
         label_source=_optional_str(payload.get("label_source")),
         synthetic=bool(payload.get("synthetic", False)),
         sample_weight=_sample_weight(payload),
+        group_key=_group_key(payload),
     )
 
 
@@ -550,6 +552,18 @@ def _sample_weight(payload: dict[str, Any]) -> float:
     if payload.get("synthetic") is True:
         return 0.35
     return 1.0
+
+
+def _group_key(payload: dict[str, Any]) -> str:
+    product = _dict_value(payload.get("product"))
+    shop = _dict_value(payload.get("shop"))
+    parts = [
+        _text(payload.get("source")),
+        _text(shop.get("name")),
+        _text(product.get("normalized_title") or product.get("title")),
+        _text(product.get("category_raw") or product.get("category_name")),
+    ]
+    return normalize_title(" ".join(part for part in parts if part))
 
 
 def _title_feature_tokens(title: str) -> list[str]:

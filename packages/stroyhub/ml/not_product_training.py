@@ -115,15 +115,13 @@ def split_not_product_examples(
     train_examples: list[NotProductExample] = list(synthetic_examples)
     eval_examples: list[NotProductExample] = []
     for label_examples in by_label.values():
-        shuffled = sorted(label_examples, key=lambda example: example.example_hash)
-        rng.shuffle(shuffled)
-        if len(shuffled) <= 1:
-            train_examples.extend(shuffled)
-            continue
-
-        eval_count = max(1, round(len(shuffled) * (1 - train_ratio)))
-        eval_examples.extend(shuffled[:eval_count])
-        train_examples.extend(shuffled[eval_count:])
+        label_train, label_eval = _split_label_examples_by_group(
+            label_examples,
+            rng=rng,
+            train_ratio=train_ratio,
+        )
+        train_examples.extend(label_train)
+        eval_examples.extend(label_eval)
 
     train_examples = sorted(train_examples, key=lambda example: example.example_hash)
     eval_examples = sorted(eval_examples, key=lambda example: example.example_hash)
@@ -133,9 +131,9 @@ def split_not_product_examples(
         eval_examples=eval_examples,
         metadata=NotProductSplitMetadata(
             strategy=(
-                "stratified_label_random_80_20_by_example_hash_synthetic_train_only"
+                "stratified_label_group_random_80_20_synthetic_train_only"
                 if synthetic_examples
-                else "stratified_label_random_80_20_by_example_hash"
+                else "stratified_label_group_random_80_20"
             ),
             train_ratio=train_ratio,
             seed=seed,
@@ -146,6 +144,57 @@ def split_not_product_examples(
             eval_label_counts=_label_counts(eval_examples),
         ),
     )
+
+
+def _split_label_examples_by_group(
+    examples: list[NotProductExample],
+    *,
+    rng: random.Random,
+    train_ratio: float,
+) -> tuple[list[NotProductExample], list[NotProductExample]]:
+    if len(examples) <= 1:
+        return list(examples), []
+
+    groups: dict[str, list[NotProductExample]] = {}
+    for example in examples:
+        group_key = example.group_key or example.example_hash
+        groups.setdefault(group_key, []).append(example)
+
+    if len(groups) <= 1:
+        return _split_examples(examples, rng=rng, train_ratio=train_ratio)
+
+    target_eval_count = max(1, round(len(examples) * (1 - train_ratio)))
+    shuffled_groups = sorted(groups.values(), key=lambda group: group[0].example_hash)
+    rng.shuffle(shuffled_groups)
+
+    train_groups: list[list[NotProductExample]] = []
+    eval_groups: list[list[NotProductExample]] = []
+    eval_count = 0
+    for index, group in enumerate(shuffled_groups):
+        remaining_groups = len(shuffled_groups) - index
+        if eval_count < target_eval_count and remaining_groups > 1:
+            eval_groups.append(group)
+            eval_count += len(group)
+        else:
+            train_groups.append(group)
+
+    train = [example for group in train_groups for example in group]
+    eval_ = [example for group in eval_groups for example in group]
+    if not train or not eval_:
+        return _split_examples(examples, rng=rng, train_ratio=train_ratio)
+    return train, eval_
+
+
+def _split_examples(
+    examples: list[NotProductExample],
+    *,
+    rng: random.Random,
+    train_ratio: float,
+) -> tuple[list[NotProductExample], list[NotProductExample]]:
+    shuffled = sorted(examples, key=lambda example: example.example_hash)
+    rng.shuffle(shuffled)
+    eval_count = max(1, round(len(shuffled) * (1 - train_ratio)))
+    return shuffled[eval_count:], shuffled[:eval_count]
 
 
 def evaluate_not_product_classifier(

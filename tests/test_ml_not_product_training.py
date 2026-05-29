@@ -5,11 +5,13 @@ import joblib
 from stroyhub.ml.not_product_classifier import (
     LinearNotProductClassifierModel,
     NotProductClassifierModelUnavailableError,
+    NotProductExample,
     PatronClassifier,
     build_not_product_text,
     load_not_product_examples,
     train_not_product_classifier_baseline,
 )
+from stroyhub.ml.not_product_labels import NotProductLabel
 from stroyhub.ml.not_product_training import (
     split_not_product_examples,
     train_not_product_classifier_artifacts,
@@ -46,10 +48,33 @@ def test_split_not_product_examples_is_stratified(tmp_path) -> None:
         run_date=date(2026, 5, 27),
     )
 
-    assert split.metadata.strategy == "stratified_label_random_80_20_by_example_hash"
+    assert split.metadata.strategy == "stratified_label_group_random_80_20"
     assert split.metadata.seed == 20260527
     assert split.metadata.train_label_counts == {"not_product": 4, "product": 8}
     assert split.metadata.eval_label_counts == {"not_product": 1, "product": 2}
+
+
+def test_split_not_product_examples_keeps_groups_in_one_side() -> None:
+    examples = [
+        *_grouped_examples("product", "product-a"),
+        *_grouped_examples("product", "product-b"),
+        *_grouped_examples("product", "product-c"),
+        *_grouped_examples("product", "product-d"),
+        *_grouped_examples("not_product", "not-product-a"),
+        *_grouped_examples("not_product", "not-product-b"),
+        *_grouped_examples("not_product", "not-product-c"),
+        *_grouped_examples("not_product", "not-product-d"),
+    ]
+
+    split = split_not_product_examples(
+        examples,
+        run_date=date(2026, 5, 27),
+    )
+
+    train_groups = {example.group_key for example in split.train_examples}
+    eval_groups = {example.group_key for example in split.eval_examples}
+    assert split.eval_examples
+    assert train_groups.isdisjoint(eval_groups)
 
 
 def test_not_product_model_applies_non_exact_price_rule(tmp_path) -> None:
@@ -221,4 +246,18 @@ def _examples(label: str, count: int, title: str, category: str, prefix: str) ->
             "label_source": "test",
         }
         for index in range(count)
+    ]
+
+
+def _grouped_examples(label: NotProductLabel, group_key: str) -> list[NotProductExample]:
+    return [
+        NotProductExample(
+            example_hash=f"{group_key}-{index}",
+            label=label,
+            text=f"{group_key} {index}",
+            title=f"{group_key} {index}",
+            source="test",
+            group_key=group_key,
+        )
+        for index in range(2)
     ]
