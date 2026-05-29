@@ -14,6 +14,7 @@ from stroyhub.catalog.normalization_decisions import (
     decide_normalization,
     decide_normalization_batch,
 )
+from stroyhub.catalog.product_suitability import ProductSuitabilityEvaluator
 from stroyhub.catalog.quality_pipeline import (
     CatalogQualityPipeline,
     CatalogQualityPipelineResult,
@@ -34,6 +35,7 @@ __all__ = [
     "NormalizationDecisionEngine",
     "NormalizationEvidence",
     "ProductAttributeExtraction",
+    "ProductSuitabilityEvaluator",
     "CatalogQualityPipeline",
     "CatalogQualityPipelineResult",
     "SourceCategoryMappingCatalog",

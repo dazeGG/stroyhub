@@ -247,7 +247,9 @@ Product validity flag:
   plus confidence/score/reasons.
 - For 2GIS, `raw.catalog_eligibility` is intentionally strict: cards without
   exact prices, cards with `от ...` or range-like prices, and obvious generic
-  group cards such as `Гвозди` should not enter canonical matching.
+  group cards such as `Гвозди` should not enter canonical matching. Source cards
+  whose descriptions say the price is approximate or not a public offer are also
+  blocked before ML classification.
 - Rescraping should preserve `is_not_product` unless a caller explicitly
   provides a new value.
 - The flag should not delete source data or price history; it only changes

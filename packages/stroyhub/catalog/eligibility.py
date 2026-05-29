@@ -75,6 +75,7 @@ class ProductEligibilityInput:
     title: str
     price: Decimal | None
     raw: JsonObject | None = None
+    price_kind: str = "exact"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -83,6 +84,12 @@ class ProductEligibility:
     confidence: Decimal
     reasons: tuple[str, ...]
     score: int
+    method: str = "rules"
+    model_name: str | None = None
+    model_version: str | None = None
+    feature_schema_version: str | None = None
+    not_product_probability: Decimal | None = None
+    thresholds: JsonObject | None = None
 
     @property
     def is_matchable(self) -> bool:
@@ -93,12 +100,24 @@ class ProductEligibility:
         return self.status == "ineligible"
 
     def as_raw(self) -> JsonObject:
-        return {
+        raw: JsonObject = {
             "status": self.status,
             "confidence": str(self.confidence),
             "score": self.score,
             "reasons": list(self.reasons),
+            "method": self.method,
         }
+        if self.model_name is not None:
+            raw["model_name"] = self.model_name
+        if self.model_version is not None:
+            raw["model_version"] = self.model_version
+        if self.feature_schema_version is not None:
+            raw["feature_schema_version"] = self.feature_schema_version
+        if self.not_product_probability is not None:
+            raw["not_product_probability"] = str(self.not_product_probability)
+        if self.thresholds is not None:
+            raw["thresholds"] = self.thresholds
+        return raw
 
 
 def evaluate_product_eligibility(data: ProductEligibilityInput) -> ProductEligibility:
@@ -110,12 +129,7 @@ def evaluate_product_eligibility(data: ProductEligibilityInput) -> ProductEligib
             score=100,
         )
 
-    reasons: list[str] = []
-    if data.price is None:
-        reasons.append("missing_price")
-    if _has_from_or_range_price(data.raw) or title_implies_from_price(data.title):
-        reasons.append("non_exact_price")
-
+    reasons = _hard_constraint_reasons(data)
     tokens = tokenize_title(data.title).tokens
     attributes = extract_title_attributes(data.title)
     has_specific_attribute = any(
@@ -130,7 +144,11 @@ def evaluate_product_eligibility(data: ProductEligibilityInput) -> ProductEligib
     if not (has_specific_attribute or has_protected_token or has_grade):
         reasons.append("no_specific_product_attributes")
 
-    if "missing_price" in reasons or "non_exact_price" in reasons:
+    if (
+        "missing_price" in reasons
+        or "non_exact_price" in reasons
+        or "approximate_offer" in reasons
+    ):
         return _result("ineligible", reasons, score=0)
 
     if generic_title and not (has_specific_attribute or has_protected_token or has_grade):
@@ -150,6 +168,35 @@ def evaluate_product_eligibility(data: ProductEligibilityInput) -> ProductEligib
     return _result("eligible", reasons or ["exact_price_and_specific_title"], score=score)
 
 
+def evaluate_product_hard_constraints(
+    data: ProductEligibilityInput,
+) -> ProductEligibility | None:
+    if data.source != "2gis":
+        return None
+
+    reasons = _hard_constraint_reasons(data)
+    if not reasons:
+        return None
+
+    return _result("ineligible", reasons, score=0)
+
+
+def _hard_constraint_reasons(data: ProductEligibilityInput) -> list[str]:
+    reasons: list[str] = []
+    if data.price is None:
+        reasons.append("missing_price")
+    if (
+        data.price_kind in {"from", "range"}
+        or _has_from_or_range_price(data.raw)
+        or title_implies_from_price(data.title)
+    ):
+        reasons.append("non_exact_price")
+    if _has_approximate_offer_notice(data.raw):
+        reasons.append("approximate_offer")
+
+    return reasons
+
+
 def is_matchable_source_product(raw: JsonObject | None, *, is_not_product: bool) -> bool:
     if is_not_product:
         return False
@@ -161,10 +208,31 @@ def is_matchable_source_product(raw: JsonObject | None, *, is_not_product: bool)
     return eligibility.get("status") == "eligible"
 
 
-def with_catalog_eligibility(raw: JsonObject | None, eligibility: ProductEligibility) -> JsonObject:
+def with_catalog_eligibility(
+    raw: JsonObject | None,
+    eligibility: ProductEligibility,
+    *,
+    existing_raw: JsonObject | None = None,
+) -> JsonObject:
     updated: JsonObject = dict(raw or {})
+    operator_review = _operator_review(existing_raw)
+    if operator_review is not None:
+        updated["operator_review"] = operator_review
     updated["catalog_eligibility"] = eligibility.as_raw()
     return updated
+
+
+def operator_data_problem_mark(raw: JsonObject | None) -> bool | None:
+    operator_review = _operator_review(raw)
+    if operator_review is None:
+        return None
+
+    data_problem = operator_review.get("data_problem")
+    if not isinstance(data_problem, dict):
+        return None
+
+    marked = data_problem.get("marked")
+    return marked if isinstance(marked, bool) else None
 
 
 def _result(
@@ -209,6 +277,30 @@ def _has_from_or_range_price(raw: JsonObject | None) -> bool:
     return _contains_price_from_signal(offer)
 
 
+def _has_approximate_offer_notice(raw: JsonObject | None) -> bool:
+    if raw is None:
+        return False
+
+    product = raw.get("product")
+    if isinstance(product, dict) and _contains_approximate_offer_notice(
+        product.get("description")
+    ):
+        return True
+
+    return _contains_approximate_offer_notice(raw.get("description"))
+
+
+def _contains_approximate_offer_notice(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+
+    normalized = normalize_title(value)
+    return (
+        "цена указана ориентировочно" in normalized
+        or "не является публичной оферт" in normalized
+    )
+
+
 def _contains_price_from_signal(value: object, *, key: str | None = None) -> bool:
     if isinstance(value, dict):
         for nested_key, nested_value in value.items():
@@ -239,3 +331,10 @@ def _raw_eligibility(raw: JsonObject | None) -> dict[str, Any] | None:
 
     eligibility = raw.get("catalog_eligibility")
     return eligibility if isinstance(eligibility, dict) else None
+
+
+def _operator_review(raw: JsonObject | None) -> dict[str, Any] | None:
+    if raw is None:
+        return None
+    operator_review = raw.get("operator_review")
+    return dict(operator_review) if isinstance(operator_review, dict) else None
