@@ -7,6 +7,7 @@ from stroyhub.ml.not_product_classifier import (
     LinearNotProductClassifierModel,
     NotProductClassifierModelUnavailableError,
     NotProductExample,
+    NotProductPrediction,
     PatronClassifier,
     build_not_product_text,
     load_not_product_examples,
@@ -178,6 +179,20 @@ def test_patron_classifier_loads_artifact_and_predicts_record(tmp_path) -> None:
     assert prediction.threshold == 0.7
 
 
+def test_patron_classifier_applies_metadata_threshold_to_prediction_label() -> None:
+    classifier = PatronClassifier(
+        model=_FixedProbabilityModel(not_product_probability=0.6),
+        metadata={"thresholds": {"not_product": 0.7}},
+    )
+
+    prediction = classifier.predict_record({"product": {"title": "Товар"}})
+
+    assert prediction.label == "product"
+    assert prediction.not_product_probability == 0.6
+    assert prediction.confidence == 0.4
+    assert prediction.threshold == 0.7
+
+
 def test_patron_classifier_default_can_use_explicit_model_dir(tmp_path) -> None:
     model_dir = tmp_path / "custom" / "patron-current"
     dataset_path = model_dir / "dataset.jsonl"
@@ -305,3 +320,18 @@ def _grouped_examples(label: NotProductLabel, group_key: str) -> list[NotProduct
         )
         for index in range(2)
     ]
+
+
+class _FixedProbabilityModel:
+    model_version = "v-test"
+    threshold = 0.5
+
+    def __init__(self, *, not_product_probability: float) -> None:
+        self._not_product_probability = not_product_probability
+
+    def predict(self, _text: str) -> NotProductPrediction:
+        return NotProductPrediction(
+            label="not_product",
+            not_product_probability=self._not_product_probability,
+            confidence=self._not_product_probability,
+        )

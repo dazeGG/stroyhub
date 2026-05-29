@@ -271,14 +271,25 @@ class PatronClassifier:
 
     def predict_record(self, record: dict[str, Any]) -> NotProductClassifierResult:
         prediction = self._model.predict(build_not_product_text(record))
+        threshold = self.not_product_threshold
+        label: NotProductLabel = (
+            NOT_PRODUCT_LABEL
+            if prediction.not_product_probability >= threshold
+            else PRODUCT_LABEL
+        )
+        confidence = (
+            prediction.not_product_probability
+            if label == NOT_PRODUCT_LABEL
+            else 1.0 - prediction.not_product_probability
+        )
         return NotProductClassifierResult(
-            label=prediction.label,
+            label=label,
             not_product_probability=prediction.not_product_probability,
-            confidence=prediction.confidence,
+            confidence=confidence,
             model_name=self.model_name,
             model_version=self.model_version,
             feature_schema_version=self.feature_schema_version,
-            threshold=self.not_product_threshold,
+            threshold=threshold,
         )
 
 

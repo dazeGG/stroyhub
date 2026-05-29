@@ -134,10 +134,10 @@ def _patron_decision(prediction: NotProductClassifierResult) -> ProductEligibili
         model_name=prediction.model_name,
         model_version=prediction.model_version,
         feature_schema_version=prediction.feature_schema_version,
-        not_product_probability=not_product_probability,
+        not_product_probability=not_product_probability.quantize(_DECIMAL_QUANT),
         thresholds={
-            "not_product": str(not_product_threshold),
-            "product": str(product_threshold),
+            "not_product": str(not_product_threshold.quantize(_DECIMAL_QUANT)),
+            "product": str(product_threshold.quantize(_DECIMAL_QUANT)),
         },
     )
 
@@ -181,4 +181,4 @@ def _patron_record(
 
 
 def _decimal(value: float) -> Decimal:
-    return Decimal(str(value)).quantize(_DECIMAL_QUANT)
+    return Decimal(str(value))

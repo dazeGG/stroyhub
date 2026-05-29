@@ -39,6 +39,18 @@ def test_product_suitability_routes_uncertain_patron_predictions_to_review() -> 
     assert decision.not_product_probability == Decimal("0.550")
 
 
+def test_product_suitability_compares_patron_threshold_before_rounding() -> None:
+    evaluator = ProductSuitabilityEvaluator(
+        patron=FakePatron(not_product_probability=0.6996)
+    )
+
+    decision = evaluator.evaluate(_product(source="unicom", title="Цемент М500"))
+
+    assert decision.status == "needs_review"
+    assert decision.reasons == ("patron_uncertain",)
+    assert decision.not_product_probability == Decimal("0.700")
+
+
 def test_product_suitability_passes_full_patron_feature_record() -> None:
     patron = FakePatron(not_product_probability=0.10)
     evaluator = ProductSuitabilityEvaluator(patron=patron)
