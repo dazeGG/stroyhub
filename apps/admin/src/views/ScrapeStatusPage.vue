@@ -60,6 +60,18 @@ const dueShops = computed(() => {
 
 const mostRecentRun = computed(() => recentRuns.value[0] || null)
 
+function filteredShops(items: ShopListItem[]): ShopListItem[] {
+  return items.filter((shop) => {
+    if (selectedSource.value && shop.source !== selectedSource.value) {
+      return false
+    }
+    if (selectedStatus.value && shop.scrape_status !== selectedStatus.value) {
+      return false
+    }
+    return true
+  })
+}
+
 function formatDateTime(value: string | null): string {
   if (!value) {
     return '-'
@@ -156,15 +168,8 @@ async function loadDashboard(): Promise<void> {
   errorMessage.value = ''
 
   try {
-    const [allShopResponse, shopResponse, healthResponse] = await Promise.all([
+    const [shopResponse, healthResponse] = await Promise.all([
       fetchShops({}, request.signal),
-      fetchShops(
-        {
-          source: selectedSource.value,
-          status: selectedStatus.value,
-        },
-        request.signal,
-      ),
       fetchScrapeHealth(
         {
           source: selectedSource.value,
@@ -175,8 +180,8 @@ async function loadDashboard(): Promise<void> {
         request.signal,
       ),
     ])
-    allShops.value = allShopResponse.items
-    shops.value = shopResponse.items
+    allShops.value = shopResponse.items
+    shops.value = filteredShops(shopResponse.items)
     statusCounts.value = healthResponse.status_counts
     recentRuns.value = healthResponse.recent_runs
   } catch (error) {
