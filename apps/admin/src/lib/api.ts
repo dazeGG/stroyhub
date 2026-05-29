@@ -761,6 +761,7 @@ export interface ScrapeHealthParams {
   shopId?: number
   status?: string
   limit?: number
+  includeCatalogPipeline?: boolean
 }
 
 export interface ShopListParams {
@@ -933,7 +934,7 @@ async function writeJson<T>(
   return response.json() as Promise<T>
 }
 
-function appendOptionalParam(params: URLSearchParams, key: string, value: string | number | undefined): void {
+function appendOptionalParam(params: URLSearchParams, key: string, value: string | number | boolean | undefined): void {
   if (value !== undefined && value !== '') {
     params.set(key, String(value))
   }
@@ -1513,6 +1514,7 @@ export function fetchScrapeHealth(
   appendOptionalParam(params, 'shop', filters.shopId)
   appendOptionalParam(params, 'status', filters.status)
   appendOptionalParam(params, 'limit', filters.limit)
+  appendOptionalParam(params, 'include_catalog_pipeline', filters.includeCatalogPipeline)
   const query = params.toString()
 
   return fetchJson<ScrapeHealthResponse>(query ? `/scrapes/health?${query}` : '/scrapes/health', signal)

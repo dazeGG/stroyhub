@@ -54,12 +54,14 @@ def get_scrape_health(
     shop: Annotated[int | None, Query(gt=0)] = None,
     status: ScrapeRunStatus | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    include_catalog_pipeline: bool = True,
 ) -> ScrapeHealthResponse:
     filters = ScrapeHealthFilters(
         source=source,
         shop_id=shop,
         status=status,
         limit=limit,
+        include_catalog_pipeline=include_catalog_pipeline,
     )
     health = ScrapeHealthCatalog(session).get_health(filters)
     return ScrapeHealthResponse(
