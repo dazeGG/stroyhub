@@ -7,18 +7,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from stroyhub.catalog.categorization import RuleBasedCategorizer
+from stroyhub.catalog.product_suitability import ProductSuitabilityEvaluator
 from stroyhub.catalog.source_category_mappings import categorizer_for_session
 from stroyhub.db.repositories import (
     CategoryRepository,
     CategoryUpsert,
-    PriceSnapshotCreate,
     PriceSnapshotRepository,
     ScrapeRunCreate,
     ScrapeRunRepository,
     ShopRepository,
     ShopUpsert,
     SourceProductRepository,
-    SourceProductUpsert,
 )
 from stroyhub.models import Shop, SourceProduct
 from stroyhub.parsers.common import JsonObject, ParsedProduct, build_fingerprint
@@ -29,6 +28,7 @@ from stroyhub.parsers.metalltorg import (
     parse_listing_page,
     parse_product_detail_page,
 )
+from stroyhub.scraping.source_products import persist_source_product_observation
 
 METALLTORG_DEFAULT_SHOP_NAME = "Металл Торг"
 METALLTORG_DEFAULT_SHOP_URL = METALLTORG_BASE_URL
@@ -60,6 +60,13 @@ class MetalltorgPersistResult:
     source_products_saved: int
     price_snapshots_saved: int
     scrape_status: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class _CategoryContext:
+    id: int
+    name: str
+    path: tuple[str, ...]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -156,6 +163,7 @@ def scrape_metalltorg_shop(
     *,
     fetch: Callable[[str, float], str] | None = None,
     finished_at: datetime | None = None,
+    require_patron_model: bool = False,
 ) -> MetalltorgShopScrapeResult:
     completed_at = finished_at or datetime.now(UTC)
     config = metalltorg_shop_scrape_config(shop.raw)
@@ -164,6 +172,9 @@ def scrape_metalltorg_shop(
     source_products_saved = 0
     price_snapshots_saved = 0
     details_fetched = 0
+    suitability_evaluator = ProductSuitabilityEvaluator.default(
+        require_patron=require_patron_model
+    )
 
     for category_url in config.category_urls:
         result = scrape_metalltorg_category(
@@ -187,6 +198,7 @@ def scrape_metalltorg_shop(
             shop_name=shop.name,
             shop_url=shop.url or METALLTORG_DEFAULT_SHOP_URL,
             finished_at=completed_at,
+            suitability_evaluator=suitability_evaluator,
         )
         products_seen += result.products_seen
         source_products_saved += persisted.source_products_saved
@@ -272,6 +284,8 @@ def persist_metalltorg_scrape_result(
     shop_name: str = METALLTORG_DEFAULT_SHOP_NAME,
     shop_url: str = METALLTORG_DEFAULT_SHOP_URL,
     finished_at: datetime | None = None,
+    suitability_evaluator: ProductSuitabilityEvaluator | None = None,
+    require_patron_model: bool = False,
 ) -> MetalltorgPersistResult:
     completed_at = finished_at or datetime.now(UTC)
     scrape_run_status = "success" if result.completeness == "complete" else "partial"
@@ -311,44 +325,31 @@ def persist_metalltorg_scrape_result(
     price_repository = PriceSnapshotRepository(session)
     category_repository = CategoryRepository(session)
     categorizer = categorizer_for_session(session)
+    suitability_evaluator = suitability_evaluator or ProductSuitabilityEvaluator.default(
+        require_patron=require_patron_model
+    )
     source_products_saved = 0
     price_snapshots_saved = 0
 
     for product in result.products:
-        source_product = product_repository.upsert(
-            SourceProductUpsert(
-                shop_id=shop.id,
-                source=product.source,
-                source_product_id=product.source_product_id,
-                fingerprint=product.fingerprint,
-                title=product.title,
-                normalized_title=product.normalized_title,
-                description=product.description,
-                category_id=_category_id(
-                    category_repository=category_repository,
-                    categorizer=categorizer,
-                    product=product,
-                ),
-                category_raw=product.category_raw,
-                unit_raw=product.unit_raw,
-                image_url=product.image_url,
-                source_updated_at=product.source_updated_at,
-                raw=product.raw,
-                observed_at=product.parsed_at,
-            )
+        category = _category_context(
+            category_repository=category_repository,
+            categorizer=categorizer,
+            product=product,
+        )
+        persist_source_product_observation(
+            product_repository=product_repository,
+            price_repository=price_repository,
+            suitability_evaluator=suitability_evaluator,
+            shop_id=shop.id,
+            product=product,
+            category_id=category.id if category is not None else None,
+            shop_name=shop.name,
+            shop_url=shop.url,
+            category_name=category.name if category is not None else None,
+            category_path=category.path if category is not None else (),
         )
         source_products_saved += 1
-        price_repository.add(
-            PriceSnapshotCreate(
-                source_product_id=source_product.id,
-                price=product.price,
-                currency=product.currency,
-                unit_raw=product.unit_raw,
-                source_updated_at=product.source_updated_at,
-                parsed_at=product.parsed_at,
-                raw=product.raw,
-            )
-        )
         price_snapshots_saved += 1
 
     scrape_run_repository.finish(
@@ -443,12 +444,12 @@ def _has_detail_category(category_raw: str | None) -> bool:
     return bool(category_raw and "/" in category_raw)
 
 
-def _category_id(
+def _category_context(
     *,
     category_repository: CategoryRepository,
     categorizer: RuleBasedCategorizer,
     product: ParsedProduct,
-) -> int | None:
+) -> _CategoryContext | None:
     prediction = categorizer.categorize(
         title=product.title,
         source=product.source,
@@ -459,11 +460,13 @@ def _category_id(
         return None
 
     parent_id = None
+    path: list[str] = []
     if prediction.parent_slug is not None and prediction.parent_name is not None:
         parent = category_repository.upsert(
             CategoryUpsert(slug=prediction.parent_slug, name=prediction.parent_name)
         )
         parent_id = parent.id
+        path.append(parent.name)
 
     category = category_repository.upsert(
         CategoryUpsert(
@@ -472,7 +475,8 @@ def _category_id(
             parent_id=parent_id,
         )
     )
-    return category.id
+    path.append(category.name)
+    return _CategoryContext(id=category.id, name=category.name, path=tuple(path))
 
 
 def _first_parsed_at(products: list[ParsedProduct]) -> datetime | None:

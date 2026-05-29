@@ -21,6 +21,7 @@ const navSections = [
     items: [
       { label: 'Нормализованный каталог', to: '/canonical-products', icon: icons.tags },
       { label: 'Исходные товары', to: '/products', icon: icons.package },
+      { label: 'Patron ревью', to: '/patron-review', icon: icons.shieldLock },
       { label: 'Категоризация', to: '/categories/quality', icon: icons.category },
     ],
   },

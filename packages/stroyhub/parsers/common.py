@@ -3,9 +3,25 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
-from typing import Any
+from typing import Any, Literal
 
 JsonObject = dict[str, Any]
+PriceKind = Literal["exact", "from", "range", "unknown"]
+_CATALOG_RANGE_TITLE_PREFIXES = frozenset(
+    {
+        "арматура",
+        "брус",
+        "доска",
+        "лист",
+        "пиловочник",
+        "полоса",
+        "профиль",
+        "труба",
+        "уголок",
+        "фанера",
+        "швеллер",
+    }
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -25,6 +41,7 @@ class ParsedProduct:
     source_updated_at: datetime | None
     raw: JsonObject
     parsed_at: datetime
+    price_kind: PriceKind = "exact"
 
 
 def normalize_title(title: str) -> str:
@@ -74,3 +91,32 @@ def parse_decimal(value: object) -> Decimal | None:
         return Decimal(cleaned)
     except (InvalidOperation, ValueError):
         return None
+
+
+def infer_price_kind(
+    *,
+    title: str,
+    price: Decimal | None,
+    raw_kind: PriceKind | None = None,
+) -> PriceKind:
+    if raw_kind in {"from", "range"}:
+        return raw_kind
+    if price is None:
+        return "unknown"
+    if title_implies_from_price(title):
+        return "from"
+    return raw_kind or "exact"
+
+
+def title_implies_from_price(title: str) -> bool:
+    normalized = normalize_title(title)
+    words = re.findall(r"[0-9a-zа-яё]+", normalized, flags=re.IGNORECASE)
+    if not words or words[0] not in _CATALOG_RANGE_TITLE_PREFIXES:
+        return False
+
+    patterns = (
+        r"(?<!\w)от(?!\w).{0,120}(?<!\w)до(?!\w)",
+        r"(?<!\w)от\s*\d",
+        r"(?<!\w)и\s+более(?!\w)",
+    )
+    return any(re.search(pattern, normalized) for pattern in patterns)

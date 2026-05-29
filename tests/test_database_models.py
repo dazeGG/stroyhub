@@ -75,6 +75,13 @@ def test_models_match_expected_table_names() -> None:
     assert ProductMatch.__tablename__ == "product_matches"
 
 
+def test_price_snapshot_tracks_price_kind() -> None:
+    columns = PriceSnapshot.__table__.columns
+
+    assert "price_kind" in columns
+    assert columns["price_kind"].nullable is False
+
+
 def test_shop_has_scheduling_columns() -> None:
     columns = Shop.__table__.columns
 
@@ -168,6 +175,7 @@ def test_db_invariant_check_constraints_are_declared() -> None:
     assert _has_check(ProductMatch, "ck_product_matches_status_known")
     assert _has_check(ProductMatch, "ck_product_matches_method_known")
     assert _has_check(PriceSnapshot, "ck_price_snapshots_price_nonnegative")
+    assert _has_check(PriceSnapshot, "ck_price_snapshots_price_kind_known")
     assert _has_check(ScrapeRun, "ck_scrape_runs_status_known")
 
 

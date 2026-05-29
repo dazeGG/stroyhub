@@ -154,7 +154,10 @@ function formatPrice(item: ProductNormalizationQueueItem): string {
     currency: item.latest_price.currency,
     maximumFractionDigits: 2,
   }).format(Number(item.latest_price.price))
-  return item.latest_price.unit_raw ? `${value} · ${item.latest_price.unit_raw}` : value
+  const prefix = item.latest_price.price_kind === 'from' || item.latest_price.price_kind === 'range' ? 'от ' : ''
+  return item.latest_price.unit_raw
+    ? `${prefix}${value} · ${item.latest_price.unit_raw}`
+    : `${prefix}${value}`
 }
 
 function formatDateTime(value: string): string {

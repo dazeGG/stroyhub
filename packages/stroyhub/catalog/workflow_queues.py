@@ -12,6 +12,7 @@ from stroyhub.catalog.product_match_decisions import (
     ProductMatchDecisionNotFound,
     ProductMatchDecisionService,
 )
+from stroyhub.catalog.products import format_price_text
 from stroyhub.catalog.quality_pipeline import CatalogQualityPipeline
 from stroyhub.catalog.query_helpers import (
     category_descendant_ids,
@@ -76,6 +77,8 @@ class CatalogWorkflowCategory:
 @dataclass(frozen=True, kw_only=True)
 class CatalogWorkflowLatestPrice:
     price: Decimal | None
+    price_kind: str
+    price_text: str | None
     currency: str
     unit_raw: str | None
     source_updated_at: datetime | None
@@ -232,6 +235,7 @@ class CatalogWorkflowQueueCatalog:
                 shop=shop,
                 category=category,
                 latest_price=latest_price,
+                latest_price_kind=latest_price_kind,
                 latest_currency=latest_currency,
                 latest_unit_raw=latest_unit_raw,
                 latest_source_updated_at=latest_source_updated_at,
@@ -243,6 +247,7 @@ class CatalogWorkflowQueueCatalog:
                 shop,
                 category,
                 latest_price,
+                latest_price_kind,
                 latest_currency,
                 latest_unit_raw,
                 latest_source_updated_at,
@@ -315,6 +320,7 @@ class CatalogWorkflowQueueCatalog:
                 Shop,
                 Category,
                 latest_prices.c.latest_price,
+                latest_prices.c.latest_price_kind,
                 latest_prices.c.latest_currency,
                 latest_prices.c.latest_unit_raw,
                 latest_prices.c.latest_source_updated_at,
@@ -398,6 +404,7 @@ class CatalogWorkflowQueueCatalog:
         shop: Shop,
         category: Category | None,
         latest_price: Decimal | None,
+        latest_price_kind: str | None,
         latest_currency: str | None,
         latest_unit_raw: str | None,
         latest_source_updated_at: datetime | None,
@@ -408,6 +415,12 @@ class CatalogWorkflowQueueCatalog:
         if latest_parsed_at is not None:
             latest = CatalogWorkflowLatestPrice(
                 price=latest_price,
+                price_kind=latest_price_kind or "exact",
+                price_text=format_price_text(
+                    price=latest_price,
+                    currency=latest_currency or "RUB",
+                    price_kind=latest_price_kind or "exact",
+                ),
                 currency=latest_currency or "RUB",
                 unit_raw=latest_unit_raw,
                 source_updated_at=latest_source_updated_at,
@@ -616,6 +629,7 @@ def _queue_predicate(queue: CatalogWorkflowQueueName) -> Any:
         return and_(
             not_accepted,
             SourceProduct.is_not_product.is_(False),
+            eligibility_status == "eligible",
             pipeline_status == "processed",
             categorization_status == "assigned",
             normalization_status == "ready_to_accept",
@@ -629,6 +643,8 @@ def _queue_predicate(queue: CatalogWorkflowQueueName) -> Any:
             not_accepted,
             SourceProduct.is_not_product.is_(False),
             or_(
+                eligibility_status.is_(None),
+                eligibility_status == "",
                 eligibility_status == "needs_review",
                 categorization_status == "needs_review",
                 normalization_status == "needs_review",
@@ -642,7 +658,12 @@ def _queue_predicate(queue: CatalogWorkflowQueueName) -> Any:
             normalization_status == "data_problem",
         )
     if queue == "possible_duplicates":
-        return and_(not_accepted, candidate_exists)
+        return and_(
+            not_accepted,
+            candidate_exists,
+            SourceProduct.is_not_product.is_(False),
+            eligibility_status == "eligible",
+        )
     return accepted_exists
 
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { useToast } from '@nuxt/ui/composables'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import {
   fetchScrapeHealth,
@@ -24,6 +24,7 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 const saveMessage = ref('')
 const retryingShopId = ref<number | null>(null)
+const isRecentRunsModalOpen = ref(false)
 const toast = useToast()
 
 let dashboardRequest: AbortController | null = null
@@ -58,6 +59,18 @@ const dueShops = computed(() => {
 })
 
 const mostRecentRun = computed(() => recentRuns.value[0] || null)
+
+function filteredShops(items: ShopListItem[]): ShopListItem[] {
+  return items.filter((shop) => {
+    if (selectedSource.value && shop.source !== selectedSource.value) {
+      return false
+    }
+    if (selectedStatus.value && shop.scrape_status !== selectedStatus.value) {
+      return false
+    }
+    return true
+  })
+}
 
 function formatDateTime(value: string | null): string {
   if (!value) {
@@ -133,6 +146,20 @@ function enqueueFailureTitle(shop: ShopListItem): string {
   return `${shop.enqueue_failed.operation}: ${shop.enqueue_failed.reason}`
 }
 
+function openRecentRunsModal(): void {
+  isRecentRunsModalOpen.value = true
+}
+
+function closeRecentRunsModal(): void {
+  isRecentRunsModalOpen.value = false
+}
+
+function handleKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && isRecentRunsModalOpen.value) {
+    closeRecentRunsModal()
+  }
+}
+
 async function loadDashboard(): Promise<void> {
   dashboardRequest?.abort()
   const request = new AbortController()
@@ -141,26 +168,20 @@ async function loadDashboard(): Promise<void> {
   errorMessage.value = ''
 
   try {
-    const [allShopResponse, shopResponse, healthResponse] = await Promise.all([
+    const [shopResponse, healthResponse] = await Promise.all([
       fetchShops({}, request.signal),
-      fetchShops(
-        {
-          source: selectedSource.value,
-          status: selectedStatus.value,
-        },
-        request.signal,
-      ),
       fetchScrapeHealth(
         {
           source: selectedSource.value,
           status: selectedStatus.value,
           limit: 20,
+          includeCatalogPipeline: false,
         },
         request.signal,
       ),
     ])
-    allShops.value = allShopResponse.items
-    shops.value = shopResponse.items
+    allShops.value = shopResponse.items
+    shops.value = filteredShops(shopResponse.items)
     statusCounts.value = healthResponse.status_counts
     recentRuns.value = healthResponse.recent_runs
   } catch (error) {
@@ -203,7 +224,13 @@ watch([selectedSource, selectedStatus], () => {
 })
 
 onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
   void loadDashboard()
+})
+
+onBeforeUnmount(() => {
+  dashboardRequest?.abort()
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -221,31 +248,14 @@ onMounted(() => {
         </p>
       </div>
 
-      <div
-        class="grid gap-3 sm:grid-cols-2 2xl:min-w-[520px]"
-        data-testid="scrape-dashboard-filters"
+      <button
+        type="button"
+        class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-admin-border-strong bg-admin-surface-muted px-3 text-sm font-medium text-admin-text-muted transition hover:border-admin-primary hover:bg-admin-surface-hover hover:text-admin-text"
+        @click="openRecentRunsModal"
       >
-        <select
-          v-model="selectedSource"
-          aria-label="Фильтр скрейпов по источнику"
-          class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
-        >
-          <option value="">Все источники</option>
-          <option v-for="source in sourceOptions" :key="source" :value="source">
-            {{ source }}
-          </option>
-        </select>
-        <select
-          v-model="selectedStatus"
-          aria-label="Фильтр скрейпов по статусу"
-          class="h-10 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
-        >
-          <option value="">Все статусы</option>
-          <option v-for="status in statusOptions" :key="status" :value="status">
-            {{ statusLabel(status) }}
-          </option>
-        </select>
-      </div>
+        <Icon :icon="icons.timeline" class="size-4" aria-hidden="true" />
+        Последние скрейпы
+      </button>
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">
@@ -285,7 +295,40 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
+    <div class="space-y-3">
+      <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-admin-text-faint">
+          <Icon :icon="icons.buildingStore" class="size-4" aria-hidden="true" />
+          Магазины
+        </div>
+
+        <div
+          class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end"
+          data-testid="scrape-dashboard-filters"
+        >
+          <select
+            v-model="selectedSource"
+            aria-label="Фильтр скрейпов по источнику"
+            class="h-10 min-w-56 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
+          >
+            <option value="">Все источники</option>
+            <option v-for="source in sourceOptions" :key="source" :value="source">
+              {{ source }}
+            </option>
+          </select>
+          <select
+            v-model="selectedStatus"
+            aria-label="Фильтр скрейпов по статусу"
+            class="h-10 min-w-56 rounded-md border border-admin-border bg-admin-surface-muted px-3 text-sm text-admin-text outline-none transition focus:border-admin-focus"
+          >
+            <option value="">Все статусы</option>
+            <option v-for="status in statusOptions" :key="status" :value="status">
+              {{ statusLabel(status) }}
+            </option>
+          </select>
+        </div>
+      </div>
+
       <div class="overflow-x-auto rounded-lg border border-admin-border bg-admin-surface">
         <div
           class="grid min-w-[1020px] grid-cols-[minmax(220px,1.5fr)_110px_130px_170px_170px_minmax(150px,1fr)_150px] border-b border-admin-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-admin-text-faint"
@@ -357,53 +400,80 @@ onMounted(() => {
           </div>
         </div>
       </div>
+    </div>
 
-      <div class="rounded-lg border border-admin-border bg-admin-surface">
-        <div class="flex items-center gap-2 border-b border-admin-border px-4 py-3 text-xs font-semibold uppercase tracking-wide text-admin-text-faint">
-          <Icon :icon="icons.timeline" class="size-4" aria-hidden="true" />
-          Recent runs
-        </div>
+    <Teleport to="body">
+      <div
+        v-if="isRecentRunsModalOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        @click.self="closeRecentRunsModal"
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="recent-runs-title"
+          class="flex max-h-[calc(100vh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-admin-border bg-admin-surface shadow-xl"
+        >
+          <header class="flex items-start justify-between gap-4 border-b border-admin-border px-5 py-4">
+            <div>
+              <p id="recent-runs-title" class="text-base font-semibold text-admin-text">Последние скрейпы</p>
+              <p class="mt-1 text-sm text-admin-text-faint">
+                Последние {{ recentRuns.length }} запусков по выбранным фильтрам
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label="Закрыть"
+              class="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-admin-border bg-admin-surface-muted text-admin-text-muted transition hover:border-admin-primary hover:bg-admin-surface-hover hover:text-admin-text"
+              @click="closeRecentRunsModal"
+            >
+              <Icon :icon="icons.x" class="size-4" aria-hidden="true" />
+            </button>
+          </header>
 
-        <div v-if="isLoading" class="px-4 py-14 text-center text-sm text-admin-text-faint">
-          <Icon :icon="icons.timeline" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
-          Загружаем запуски...
-        </div>
+          <div class="overflow-y-auto">
+            <div v-if="isLoading" class="px-5 py-14 text-center text-sm text-admin-text-faint">
+              <Icon :icon="icons.timeline" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
+              Загружаем запуски...
+            </div>
 
-        <div v-else-if="recentRuns.length === 0" class="px-4 py-14 text-center text-sm text-admin-text-faint">
-          <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
-          Запусков по этим фильтрам нет.
-        </div>
+            <div v-else-if="recentRuns.length === 0" class="px-5 py-14 text-center text-sm text-admin-text-faint">
+              <Icon :icon="icons.search" class="mx-auto mb-3 size-6 text-admin-text-faint" aria-hidden="true" />
+              Запусков по этим фильтрам нет.
+            </div>
 
-        <div v-else class="divide-y divide-admin-border">
-          <div
-            v-for="run in recentRuns"
-            :key="run.id"
-            class="p-4 text-sm"
-            data-testid="scrape-run-row"
-          >
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p class="font-medium text-admin-text">#{{ run.id }} · {{ run.source }}</p>
-                <p class="mt-1 text-xs text-admin-text-faint">
-                  shop {{ run.shop_id || '-' }} · {{ formatDuration(run) }}
+            <div v-else class="divide-y divide-admin-border">
+              <div
+                v-for="run in recentRuns"
+                :key="run.id"
+                class="p-5 text-sm"
+                data-testid="scrape-run-row"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p class="font-medium text-admin-text">#{{ run.id }} · {{ run.source }}</p>
+                    <p class="mt-1 text-xs text-admin-text-faint">
+                      shop {{ run.shop_id || '-' }} · {{ formatDuration(run) }}
+                    </p>
+                  </div>
+                  <span class="rounded-full border px-2 py-1 text-xs" :class="statusClass(run.status)">
+                    {{ statusLabel(run.status) }}
+                  </span>
+                </div>
+                <div class="mt-3 grid gap-2 text-xs text-admin-text-faint sm:grid-cols-2">
+                  <p>started: {{ formatDateTime(run.started_at) }}</p>
+                  <p>finished: {{ formatDateTime(run.finished_at) }}</p>
+                  <p>seen: {{ run.items_seen }}</p>
+                  <p>saved: {{ run.items_saved }}</p>
+                </div>
+                <p v-if="run.error" class="mt-3 rounded-md bg-admin-danger-soft px-3 py-2 text-xs text-admin-danger">
+                  {{ run.error }}
                 </p>
               </div>
-              <span class="rounded-full border px-2 py-1 text-xs" :class="statusClass(run.status)">
-                {{ statusLabel(run.status) }}
-              </span>
             </div>
-            <div class="mt-3 grid gap-2 text-xs text-admin-text-faint sm:grid-cols-2">
-              <p>started: {{ formatDateTime(run.started_at) }}</p>
-              <p>finished: {{ formatDateTime(run.finished_at) }}</p>
-              <p>seen: {{ run.items_seen }}</p>
-              <p>saved: {{ run.items_saved }}</p>
-            </div>
-            <p v-if="run.error" class="mt-3 rounded-md bg-admin-danger-soft px-3 py-2 text-xs text-admin-danger">
-              {{ run.error }}
-            </p>
           </div>
-        </div>
+        </section>
       </div>
-    </div>
+    </Teleport>
   </section>
 </template>

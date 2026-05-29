@@ -3,26 +3,21 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from stroyhub.catalog.eligibility import (
-    ProductEligibilityInput,
-    evaluate_product_eligibility,
-    with_catalog_eligibility,
-)
+from stroyhub.catalog.product_suitability import ProductSuitabilityEvaluator
 from stroyhub.catalog.source_category_mappings import categorizer_for_session
 from stroyhub.db.repositories import (
     CategoryRepository,
     CategoryUpsert,
-    PriceSnapshotCreate,
     PriceSnapshotRepository,
     ScrapeRunCreate,
     ScrapeRunRepository,
     ShopRepository,
     ShopUpsert,
     SourceProductRepository,
-    SourceProductUpsert,
 )
 from stroyhub.parsers.common import JsonObject, ParsedProduct
 from stroyhub.parsers.twogis import TwogisBranchItems, TwogisClient, parse_product_items
+from stroyhub.scraping.source_products import persist_source_product_observation
 
 TWOGIS_SOURCE = "2gis"
 TWOGIS_LARGE_CATALOG_THRESHOLD = 2_000
@@ -210,6 +205,8 @@ def persist_twogis_scrape_result(
     shop_name: str | None = None,
     finished_at: datetime | None = None,
     partial_shop_status: str = "failed",
+    suitability_evaluator: ProductSuitabilityEvaluator | None = None,
+    require_patron_model: bool = False,
 ) -> TwogisPersistResult:
     completed_at = finished_at or datetime.now(UTC)
     scrape_run_status = "success" if result.completeness in {"complete", "empty"} else "partial"
@@ -246,19 +243,16 @@ def persist_twogis_scrape_result(
     price_repository = PriceSnapshotRepository(session)
     category_repository = CategoryRepository(session)
     categorizer = categorizer_for_session(session)
+    suitability_evaluator = suitability_evaluator or ProductSuitabilityEvaluator.default(
+        require_patron=require_patron_model
+    )
     source_products_saved = 0
     price_snapshots_saved = 0
 
     for product in result.products:
-        eligibility = evaluate_product_eligibility(
-            ProductEligibilityInput(
-                source=product.source,
-                title=product.title,
-                price=product.price,
-                raw=product.raw,
-            )
-        )
         category_id = None
+        category_name = None
+        category_path: tuple[str, ...] = ()
         prediction = categorizer.categorize(
             title=product.title,
             source=product.source,
@@ -267,6 +261,7 @@ def persist_twogis_scrape_result(
         )
         if prediction is not None:
             parent_id = None
+            path: list[str] = []
             if prediction.parent_slug is not None and prediction.parent_name is not None:
                 parent = category_repository.upsert(
                     CategoryUpsert(
@@ -275,6 +270,7 @@ def persist_twogis_scrape_result(
                     )
                 )
                 parent_id = parent.id
+                path.append(parent.name)
 
             category = category_repository.upsert(
                 CategoryUpsert(
@@ -284,39 +280,23 @@ def persist_twogis_scrape_result(
                 )
             )
             category_id = category.id
+            category_name = category.name
+            path.append(category.name)
+            category_path = tuple(path)
 
-        source_product = product_repository.upsert(
-            SourceProductUpsert(
-                shop_id=shop.id,
-                source=product.source,
-                source_product_id=product.source_product_id,
-                fingerprint=product.fingerprint,
-                title=product.title,
-                normalized_title=product.normalized_title,
-                description=product.description,
-                category_id=category_id,
-                category_raw=product.category_raw,
-                unit_raw=product.unit_raw,
-                image_url=product.image_url,
-                source_updated_at=product.source_updated_at,
-                raw=with_catalog_eligibility(product.raw, eligibility),
-                observed_at=product.parsed_at,
-                is_not_product=eligibility.is_not_product,
-            )
+        persist_source_product_observation(
+            product_repository=product_repository,
+            price_repository=price_repository,
+            suitability_evaluator=suitability_evaluator,
+            shop_id=shop.id,
+            product=product,
+            category_id=category_id,
+            shop_name=shop.name,
+            shop_url=shop.url,
+            category_name=category_name,
+            category_path=category_path,
         )
         source_products_saved += 1
-
-        price_repository.add(
-            PriceSnapshotCreate(
-                source_product_id=source_product.id,
-                price=product.price,
-                currency=product.currency,
-                unit_raw=product.unit_raw,
-                source_updated_at=product.source_updated_at,
-                parsed_at=product.parsed_at,
-                raw=product.raw,
-            )
-        )
         price_snapshots_saved += 1
 
     scrape_run_repository.finish(

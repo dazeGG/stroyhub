@@ -119,7 +119,9 @@ const categoryLabel = computed(() => {
 const hasActiveOverride = computed(() => product.value?.category_override != null)
 
 function priceStateKey(snapshot: ProductPriceSnapshot): string {
-  return snapshot.price === null ? 'null' : `${snapshot.price}:${snapshot.currency}:${snapshot.unit_raw || ''}`
+  return snapshot.price === null
+    ? 'null'
+    : `${snapshot.price}:${snapshot.price_kind}:${snapshot.currency}:${snapshot.unit_raw || ''}`
 }
 
 function formatDateTime(value: string | null): string {
@@ -141,7 +143,7 @@ function formatSnapshotPrice(snapshot: ProductPriceSnapshot): string {
     return 'Цена отсутствует'
   }
 
-  return formatMoney(snapshot.price, snapshot.currency, snapshot.unit_raw)
+  return formatMoney(snapshot.price, snapshot.currency, snapshot.unit_raw, snapshot.price_kind)
 }
 
 function formatLatestPrice(item: ProductSearchItem | null): string {
@@ -149,10 +151,15 @@ function formatLatestPrice(item: ProductSearchItem | null): string {
     return '-'
   }
 
-  return formatMoney(item.latest_price.price, item.latest_price.currency, item.latest_price.unit_raw)
+  return formatMoney(
+    item.latest_price.price,
+    item.latest_price.currency,
+    item.latest_price.unit_raw,
+    item.latest_price.price_kind,
+  )
 }
 
-function formatMoney(price: string, currency: string, unitRaw: string | null): string {
+function formatMoney(price: string, currency: string, unitRaw: string | null, priceKind = 'exact'): string {
   const amount = Number(price)
   const value = Number.isFinite(amount)
     ? new Intl.NumberFormat('ru-RU', {
@@ -161,8 +168,9 @@ function formatMoney(price: string, currency: string, unitRaw: string | null): s
       }).format(amount)
     : price
   const unit = unitRaw ? ` / ${unitRaw}` : ''
+  const prefix = priceKind === 'from' || priceKind === 'range' ? 'от ' : ''
 
-  return `${value} ${currency}${unit}`
+  return `${prefix}${value} ${currency}${unit}`
 }
 
 function snapshotStatus(snapshot: ProductPriceSnapshot, index: number): string {

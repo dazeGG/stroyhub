@@ -127,6 +127,159 @@ def test_catalog_quality_pipeline_generates_candidates_idempotently(
     assert product.raw["catalog_quality"]["normalization"]["action"] == "attach_to_existing"
 
 
+def test_catalog_quality_pipeline_run_for_product_is_bounded(
+    db_session: Session,
+) -> None:
+    parent_category = CategoryRepository(db_session).upsert(
+        CategoryUpsert(slug="mixes_aggregates", name="Смеси и сыпучие материалы")
+    )
+    category = CategoryRepository(db_session).upsert(
+        CategoryUpsert(slug="cement", name="Цемент", parent_id=parent_category.id)
+    )
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="unicom", source_id="quality-pipeline-bounded-shop", name="Shop")
+    )
+    selected_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="unicom",
+            source_product_id="quality-pipeline-bounded-selected",
+            title="Цемент М500 50кг",
+            normalized_title="цемент м500 50кг",
+            category_id=category.id,
+            category_raw="Цемент",
+        )
+    )
+    untouched_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="unicom",
+            source_product_id="quality-pipeline-bounded-untouched",
+            title="Цемент М400 25кг",
+            normalized_title="цемент м400 25кг",
+            category_id=category.id,
+            category_raw="Цемент",
+            raw={"catalog_quality": {"status": "stale"}},
+        )
+    )
+    canonical = CanonicalProductRepository(db_session).create(
+        CanonicalProductCreate(
+            title="Цемент М500 50кг",
+            normalized_title="цемент м500 50кг",
+            category_id=category.id,
+        )
+    )
+
+    result = CatalogQualityPipeline(db_session).run_for_product(selected_product.id)
+
+    match_count = db_session.scalar(
+        select(func.count())
+        .select_from(ProductMatch)
+        .where(
+            ProductMatch.source_product_id == selected_product.id,
+            ProductMatch.canonical_product_id == canonical.id,
+        )
+    )
+    db_session.expire(selected_product)
+    db_session.expire(untouched_product)
+    assert result.shop_id == shop.id
+    assert result.products_seen == 1
+    assert result.products_processed == 1
+    assert result.products_failed == 0
+    assert result.candidates_seen == 0
+    assert result.candidates_created == 0
+    assert match_count == 0
+    assert selected_product.raw is not None
+    assert selected_product.raw["catalog_quality"]["status"] == "processed"
+    assert untouched_product.raw == {"catalog_quality": {"status": "stale"}}
+
+
+def test_catalog_quality_pipeline_run_for_product_generates_only_selected_candidates(
+    db_session: Session,
+) -> None:
+    parent_category = CategoryRepository(db_session).upsert(
+        CategoryUpsert(slug="mixes_aggregates", name="Смеси и сыпучие материалы")
+    )
+    category = CategoryRepository(db_session).upsert(
+        CategoryUpsert(slug="cement", name="Цемент", parent_id=parent_category.id)
+    )
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="unicom", source_id="quality-pipeline-selected-candidates", name="Shop")
+    )
+    selected_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="unicom",
+            source_product_id="quality-pipeline-selected-candidate",
+            title="Цемент М500 50кг",
+            normalized_title="цемент м500 50кг",
+            category_id=category.id,
+            category_raw="Цемент",
+            raw={"catalog_eligibility": {"status": "eligible", "method": "rules"}},
+        )
+    )
+    other_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="unicom",
+            source_product_id="quality-pipeline-other-candidate",
+            title="Цемент М400 25кг",
+            normalized_title="цемент м400 25кг",
+            category_id=category.id,
+            category_raw="Цемент",
+            raw={"catalog_eligibility": {"status": "eligible", "method": "rules"}},
+        )
+    )
+    selected_canonical = CanonicalProductRepository(db_session).create(
+        CanonicalProductCreate(
+            title="Цемент М500 50кг",
+            normalized_title="цемент м500 50кг",
+            category_id=category.id,
+        )
+    )
+    other_canonical = CanonicalProductRepository(db_session).create(
+        CanonicalProductCreate(
+            title="Цемент М400 25кг",
+            normalized_title="цемент м400 25кг",
+            category_id=category.id,
+        )
+    )
+
+    result = CatalogQualityPipeline(db_session).run_for_product(
+        selected_product.id,
+        generate_candidates=True,
+    )
+
+    selected_match_count = db_session.scalar(
+        select(func.count())
+        .select_from(ProductMatch)
+        .where(
+            ProductMatch.source_product_id == selected_product.id,
+            ProductMatch.canonical_product_id == selected_canonical.id,
+            ProductMatch.status == "candidate",
+        )
+    )
+    other_match_count = db_session.scalar(
+        select(func.count())
+        .select_from(ProductMatch)
+        .where(
+            ProductMatch.source_product_id == other_product.id,
+            ProductMatch.canonical_product_id == other_canonical.id,
+        )
+    )
+    db_session.expire(selected_product)
+    db_session.expire(other_product)
+    assert result.products_seen == 1
+    assert result.products_processed == 1
+    assert result.candidates_created == 1
+    assert selected_match_count == 1
+    assert other_match_count == 0
+    assert selected_product.raw is not None
+    normalization = selected_product.raw["catalog_quality"]["normalization"]
+    assert normalization["action"] == "attach_to_existing"
+    assert "catalog_quality" not in (other_product.raw or {})
+
+
 def test_catalog_quality_pipeline_records_stage_failures(
     db_session: Session,
     monkeypatch: pytest.MonkeyPatch,

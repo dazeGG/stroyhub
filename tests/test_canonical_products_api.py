@@ -290,6 +290,8 @@ def test_canonical_product_detail_and_update_show_linked_source_products(
             "last_seen_at": accepted_source.last_seen_at.isoformat().replace("+00:00", "Z"),
             "latest_price": {
                 "price": "777.00",
+                "price_kind": "exact",
+                "price_text": "777.00 RUB",
                 "currency": "RUB",
                 "unit_raw": None,
                 "source_updated_at": None,

@@ -9,6 +9,8 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from stroyhub.core.config import settings
 from stroyhub.db import (
+    CanonicalProductCreate,
+    CanonicalProductRepository,
     PriceSnapshotCreate,
     PriceSnapshotRepository,
     ShopIdentityCreate,
@@ -18,7 +20,7 @@ from stroyhub.db import (
     SourceProductRepository,
     SourceProductUpsert,
 )
-from stroyhub.models import Category, CategoryOverride
+from stroyhub.models import Category, CategoryOverride, ProductMatch
 
 from apps.admin_api.main import create_app
 from apps.admin_api.products import get_session as get_admin_session
@@ -755,6 +757,16 @@ def test_product_data_problem_endpoint_marks_product_and_refreshes_quality(
             raw={"source": "fixture"},
         )
     )
+    other_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="data-problem-api-2",
+            title="Another product",
+            normalized_title="another product",
+            raw={"catalog_quality": {"status": "stale"}},
+        )
+    )
     PriceSnapshotRepository(db_session).add(
         PriceSnapshotCreate(
             source_product_id=product.id,
@@ -780,7 +792,80 @@ def test_product_data_problem_endpoint_marks_product_and_refreshes_quality(
     assert product.raw["operator_review"]["data_problem"]["marked"] is True
     assert product.raw["operator_review"]["data_problem"]["reason"] == "service card"
     assert product.raw["operator_review"]["data_problem"]["actor"] == "reviewer"
+    assert product.raw["catalog_eligibility"]["status"] == "ineligible"
+    assert product.raw["catalog_eligibility"]["method"] == "operator_review"
     assert product.raw["catalog_quality"]["normalization"]["status"] == "data_problem"
+    db_session.expire(other_product)
+    assert other_product.raw == {"catalog_quality": {"status": "stale"}}
+
+
+def test_product_data_problem_endpoint_clear_refreshes_eligibility_and_candidates(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="branch-api-clear-data-problem", name="Data Shop")
+    )
+    canonical = CanonicalProductRepository(db_session).create(
+        CanonicalProductCreate(
+            title="Clear Data Problem Cement M500 50kg",
+            normalized_title="clear data problem cement m500 50kg",
+        )
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="clear-data-problem-api-1",
+            title="Clear Data Problem Cement M500 50kg",
+            normalized_title="clear data problem cement m500 50kg",
+            raw={
+                "catalog_eligibility": {
+                    "status": "ineligible",
+                    "method": "operator_review",
+                },
+                "operator_review": {
+                    "data_problem": {
+                        "marked": True,
+                        "actor": "reviewer",
+                    }
+                },
+            },
+            is_not_product=True,
+        )
+    )
+    PriceSnapshotRepository(db_session).add(
+        PriceSnapshotCreate(
+            source_product_id=product.id,
+            price=Decimal("100.00"),
+            parsed_at=datetime(2026, 5, 20, 8, 0, tzinfo=UTC),
+        )
+    )
+
+    response = client.put(
+        f"/products/{product.id}/data-problem",
+        json={
+            "is_not_product": False,
+            "reason": "real product",
+            "actor": "reviewer",
+        },
+    )
+
+    match = db_session.scalar(
+        select(ProductMatch).where(
+            ProductMatch.source_product_id == product.id,
+            ProductMatch.canonical_product_id == canonical.id,
+        )
+    )
+    assert response.status_code == 200
+    db_session.expire(product)
+    assert product.is_not_product is False
+    assert product.raw is not None
+    assert product.raw["operator_review"]["data_problem"]["marked"] is False
+    assert product.raw["catalog_eligibility"]["status"] == "eligible"
+    assert product.raw["catalog_eligibility"]["method"] == "operator_review"
+    assert match is not None
+    assert match.status == "candidate"
 
 
 def test_product_price_history_endpoint_returns_ordered_snapshots(
@@ -828,6 +913,8 @@ def test_product_price_history_endpoint_returns_ordered_snapshots(
         {
             "id": earlier.id,
             "price": "400.00",
+            "price_kind": "exact",
+            "price_text": "400.00 RUB",
             "currency": "RUB",
             "unit_raw": "bag",
             "source_updated_at": "2026-05-17T09:50:00Z",
@@ -836,6 +923,8 @@ def test_product_price_history_endpoint_returns_ordered_snapshots(
         {
             "id": later.id,
             "price": "420.00",
+            "price_kind": "exact",
+            "price_text": "420.00 RUB",
             "currency": "RUB",
             "unit_raw": "bag",
             "source_updated_at": "2026-05-17T10:50:00Z",
@@ -889,6 +978,7 @@ def test_public_products_prefer_healthy_identity_preferred_source(
             source_product_id="public-priority-fallback-product",
             title="Priority Cement M500",
             normalized_title="priority cement m500",
+            raw={"catalog_eligibility": {"status": "eligible"}},
         )
     )
     preferred_product = SourceProductRepository(db_session).upsert(
@@ -898,6 +988,7 @@ def test_public_products_prefer_healthy_identity_preferred_source(
             source_product_id="public-priority-preferred-product",
             title="Priority Cement M500",
             normalized_title="priority cement m500",
+            raw={"catalog_eligibility": {"status": "eligible"}},
         )
     )
 
@@ -1002,6 +1093,7 @@ def test_public_products_fall_back_when_preferred_source_is_unhealthy(
             source_product_id="public-fallback-visible-product",
             title="Fallback Cement M400",
             normalized_title="fallback cement m400",
+            raw={"catalog_eligibility": {"status": "eligible"}},
         )
     )
     SourceProductRepository(db_session).upsert(
@@ -1011,10 +1103,70 @@ def test_public_products_fall_back_when_preferred_source_is_unhealthy(
             source_product_id="public-fallback-hidden-product",
             title="Fallback Cement M400",
             normalized_title="fallback cement m400",
+            raw={"catalog_eligibility": {"status": "eligible"}},
         )
     )
 
     response = public_client.get("/products", params={"q": "Fallback Cement M400"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert [item["id"] for item in payload["items"]] == [visible_product.id]
+    assert payload["items"][0]["shop"]["source"] == "2gis"
+
+
+def test_public_products_fall_back_when_preferred_source_has_no_visible_products(
+    public_client: TestClient,
+    db_session: Session,
+) -> None:
+    identity = ShopIdentityRepository(db_session).create(
+        ShopIdentityCreate(
+            display_name="Fallback Hidden Product Identity",
+            preferred_source="unicom",
+        )
+    )
+    fallback_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="2gis",
+            source_id="public-fallback-visible-product-source",
+            name="Fallback Visible Product Shop",
+            shop_identity_id=identity.id,
+            scrape_status="success",
+        )
+    )
+    preferred_shop = ShopRepository(db_session).upsert(
+        ShopUpsert(
+            source="unicom",
+            source_id="public-fallback-hidden-product-source",
+            name="Preferred Hidden Product Shop",
+            shop_identity_id=identity.id,
+            scrape_status="success",
+        )
+    )
+    visible_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=fallback_shop.id,
+            source="2gis",
+            source_product_id="public-fallback-visible-product-source-product",
+            title="Fallback Visible Patron Product",
+            normalized_title="fallback visible patron product",
+            raw={"catalog_eligibility": {"status": "eligible"}},
+        )
+    )
+    SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=preferred_shop.id,
+            source="unicom",
+            source_product_id="public-fallback-hidden-product-source-product",
+            title="Fallback Visible Patron Product",
+            normalized_title="fallback visible patron product",
+            raw={"catalog_eligibility": {"status": "ineligible", "method": "patron"}},
+            is_not_product=True,
+        )
+    )
+
+    response = public_client.get("/products", params={"q": "Fallback Visible Patron Product"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -1056,3 +1208,40 @@ def test_public_products_hide_non_active_shop_identity_statuses(
     assert response.status_code == 200
     assert response.json()["total"] == 0
     assert public_client.get(f"/products/{product.id}").status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("raw", "is_not_product"),
+    [
+        ({}, False),
+        ({"catalog_eligibility": {"status": "ineligible", "method": "patron"}}, True),
+        ({"catalog_eligibility": {"status": "needs_review", "method": "patron"}}, False),
+    ],
+)
+def test_public_products_hide_unsafe_source_products(
+    public_client: TestClient,
+    db_session: Session,
+    raw: dict[str, object],
+    is_not_product: bool,
+) -> None:
+    shop = ShopRepository(db_session).upsert(
+        ShopUpsert(source="2gis", source_id="public-hidden-patron", name="Hidden Patron Shop")
+    )
+    product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=shop.id,
+            source="2gis",
+            source_product_id="public-hidden-patron-product",
+            title="Hidden Patron Product",
+            normalized_title="hidden patron product",
+            raw=raw,
+            is_not_product=is_not_product,
+        )
+    )
+
+    response = public_client.get("/products", params={"q": "Hidden Patron Product"})
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+    assert public_client.get(f"/products/{product.id}").status_code == 404
+    assert public_client.get(f"/products/{product.id}/prices").status_code == 404

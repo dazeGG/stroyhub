@@ -58,8 +58,50 @@ class CatalogQualityPipeline:
         processed_at: datetime | None = None,
         generate_candidates: bool = True,
     ) -> CatalogQualityPipelineResult:
+        return self._run_for_products(
+            shop_id=shop_id,
+            products=self._source_products(shop_id),
+            processed_at=processed_at,
+            generate_candidates=generate_candidates,
+            candidate_source_product_id=None,
+        )
+
+    def run_for_product(
+        self,
+        source_product_id: int,
+        *,
+        processed_at: datetime | None = None,
+        generate_candidates: bool = False,
+    ) -> CatalogQualityPipelineResult:
+        product = self._source_product(source_product_id)
+        if product is None:
+            return CatalogQualityPipelineResult(
+                shop_id=0,
+                products_seen=0,
+                products_processed=0,
+                products_failed=0,
+                candidates_seen=0,
+                candidates_created=0,
+                candidates_skipped_existing=0,
+            )
+        return self._run_for_products(
+            shop_id=product.shop_id,
+            products=[product],
+            processed_at=processed_at,
+            generate_candidates=generate_candidates,
+            candidate_source_product_id=product.id,
+        )
+
+    def _run_for_products(
+        self,
+        *,
+        shop_id: int,
+        products: list[SourceProduct],
+        processed_at: datetime | None,
+        generate_candidates: bool,
+        candidate_source_product_id: int | None,
+    ) -> CatalogQualityPipelineResult:
         now = processed_at or datetime.now(UTC)
-        products = self._source_products(shop_id)
         categorizer = categorizer_for_session(self._session)
         category_repository = CategoryRepository(self._session)
         stage_data: dict[int, tuple[ProductAttributeExtraction, CategoryDecision]] = {}
@@ -114,7 +156,11 @@ class CatalogQualityPipeline:
         candidates_skipped_existing = 0
         if generate_candidates:
             candidate_result = ProductMatchCandidateGenerator(self._session).generate(
-                ProductMatchGenerationFilters(shop_id=shop_id, limit=1000)
+                ProductMatchGenerationFilters(
+                    shop_id=shop_id,
+                    source_product_id=candidate_source_product_id,
+                    limit=1000,
+                )
             )
             candidates_seen = candidate_result.candidates_seen
             candidates_created = candidate_result.candidates_created
@@ -172,6 +218,9 @@ class CatalogQualityPipeline:
             .order_by(SourceProduct.id.asc())
         )
         return list(self._session.scalars(statement))
+
+    def _source_product(self, source_product_id: int) -> SourceProduct | None:
+        return self._session.get(SourceProduct, source_product_id)
 
     def _canonical_candidates(self, product: SourceProduct) -> tuple[CanonicalProduct, ...]:
         statement = (

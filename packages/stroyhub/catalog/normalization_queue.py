@@ -6,7 +6,7 @@ from typing import Any, Literal
 from sqlalchemy import and_, exists, false, func, not_, or_, select
 from sqlalchemy.orm import Session
 
-from stroyhub.catalog.products import ProductLatestPrice, ProductShop
+from stroyhub.catalog.products import ProductLatestPrice, ProductShop, format_price_text
 from stroyhub.catalog.query_helpers import (
     category_descendant_ids,
     escape_like_pattern,
@@ -125,6 +125,7 @@ class ProductNormalizationQueue:
                 shop,
                 category,
                 latest_price,
+                latest_price_kind,
                 latest_currency,
                 latest_unit_raw,
                 latest_source_updated_at,
@@ -136,6 +137,7 @@ class ProductNormalizationQueue:
                 shop,
                 category,
                 latest_price,
+                latest_price_kind,
                 latest_currency,
                 latest_unit_raw,
                 latest_source_updated_at,
@@ -170,6 +172,7 @@ class ProductNormalizationQueue:
                 Shop,
                 Category,
                 latest_prices.c.latest_price,
+                latest_prices.c.latest_price_kind,
                 latest_prices.c.latest_currency,
                 latest_prices.c.latest_unit_raw,
                 latest_prices.c.latest_source_updated_at,
@@ -245,16 +248,20 @@ class ProductNormalizationQueue:
         )
         eligible_for_matching = and_(
             not_(ineligible),
-            or_(
-                eligibility_status.is_(None),
-                eligibility_status != "needs_review",
-            ),
+            eligibility_status == "eligible",
         )
 
         if state == "ineligible":
             return ineligible
         if state == "needs_review":
-            return and_(not_(ineligible), eligibility_status == "needs_review")
+            return and_(
+                not_(ineligible),
+                or_(
+                    eligibility_status.is_(None),
+                    eligibility_status == "",
+                    eligibility_status == "needs_review",
+                ),
+            )
         if state == "accepted":
             return and_(eligible_for_matching, accepted_exists)
         if state == "candidate_match":
@@ -322,6 +329,7 @@ class ProductNormalizationQueue:
         shop: Shop,
         category: Category | None,
         latest_price: Decimal | None,
+        latest_price_kind: str | None,
         latest_currency: str | None,
         latest_unit_raw: str | None,
         latest_source_updated_at: datetime | None,
@@ -332,6 +340,12 @@ class ProductNormalizationQueue:
         if latest_parsed_at is not None:
             latest = ProductLatestPrice(
                 price=latest_price,
+                price_kind=latest_price_kind or "exact",
+                price_text=format_price_text(
+                    price=latest_price,
+                    currency=latest_currency or "RUB",
+                    price_kind=latest_price_kind or "exact",
+                ),
                 currency=latest_currency or "RUB",
                 unit_raw=latest_unit_raw,
                 source_updated_at=latest_source_updated_at,
@@ -388,7 +402,7 @@ def _queue_state(
     eligibility_status = eligibility.status if eligibility is not None else None
     if product.is_not_product or eligibility_status == "ineligible":
         return "ineligible"
-    if eligibility_status == "needs_review":
+    if eligibility_status in {None, "", "needs_review"}:
         return "needs_review"
     if match_info.accepted_match_id is not None:
         return "accepted"

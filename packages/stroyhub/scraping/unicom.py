@@ -4,18 +4,17 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from stroyhub.catalog.categorization import RuleBasedCategorizer
+from stroyhub.catalog.product_suitability import ProductSuitabilityEvaluator
 from stroyhub.catalog.source_category_mappings import categorizer_for_session
 from stroyhub.db.repositories import (
     CategoryRepository,
     CategoryUpsert,
-    PriceSnapshotCreate,
     PriceSnapshotRepository,
     ScrapeRunCreate,
     ScrapeRunRepository,
     ShopRepository,
     ShopUpsert,
     SourceProductRepository,
-    SourceProductUpsert,
 )
 from stroyhub.models import Shop
 from stroyhub.parsers.common import JsonObject, ParsedProduct
@@ -26,6 +25,7 @@ from stroyhub.parsers.unicom import (
     UnicomProductsResult,
     parse_products,
 )
+from stroyhub.scraping.source_products import persist_source_product_observation
 
 UNICOM_DEFAULT_SHOP_NAME = "Юником"
 UNICOM_DEFAULT_SHOP_URL = "https://unicom-ykt.ru/"
@@ -66,6 +66,13 @@ class UnicomPersistResult:
     source_products_saved: int
     price_snapshots_saved: int
     scrape_status: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class _CategoryContext:
+    id: int
+    name: str
+    path: tuple[str, ...]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -148,6 +155,7 @@ def scrape_unicom_shop(
     *,
     client: UnicomClient | None = None,
     finished_at: datetime | None = None,
+    require_patron_model: bool = False,
 ) -> UnicomShopScrapeResult:
     completed_at = finished_at or datetime.now(UTC)
     config = unicom_shop_scrape_config(shop.raw)
@@ -160,6 +168,9 @@ def scrape_unicom_shop(
     source_products_saved = 0
     price_snapshots_saved = 0
     category_product_counts = _category_product_counts(shop.raw)
+    suitability_evaluator = ProductSuitabilityEvaluator.default(
+        require_patron=require_patron_model
+    )
 
     for category_uuid in category_uuids:
         result = scrape_unicom_category(
@@ -177,6 +188,7 @@ def scrape_unicom_shop(
             shop_name=shop.name,
             shop_url=shop.url or UNICOM_DEFAULT_SHOP_URL,
             finished_at=completed_at,
+            suitability_evaluator=suitability_evaluator,
         )
         products_seen += result.products_seen
         source_products_saved += persisted.source_products_saved
@@ -224,6 +236,8 @@ def persist_unicom_scrape_result(
     shop_name: str = "Юником",
     shop_url: str = "https://unicom-ykt.ru/",
     finished_at: datetime | None = None,
+    suitability_evaluator: ProductSuitabilityEvaluator | None = None,
+    require_patron_model: bool = False,
 ) -> UnicomPersistResult:
     completed_at = finished_at or datetime.now(UTC)
     scrape_run_status = "success" if result.completeness in {"complete", "empty"} else "partial"
@@ -263,47 +277,32 @@ def persist_unicom_scrape_result(
     price_repository = PriceSnapshotRepository(session)
     category_repository = CategoryRepository(session)
     categorizer = categorizer_for_session(session)
+    suitability_evaluator = suitability_evaluator or ProductSuitabilityEvaluator.default(
+        require_patron=require_patron_model
+    )
     source_products_saved = 0
     price_snapshots_saved = 0
 
     for product in result.products:
-        category_id = _category_id(
+        category = _category_context(
             category_repository=category_repository,
             categorizer=categorizer,
             product=product,
         )
 
-        source_product = product_repository.upsert(
-            SourceProductUpsert(
-                shop_id=shop.id,
-                source=product.source,
-                source_product_id=product.source_product_id,
-                fingerprint=product.fingerprint,
-                title=product.title,
-                normalized_title=product.normalized_title,
-                description=product.description,
-                category_id=category_id,
-                category_raw=product.category_raw,
-                unit_raw=product.unit_raw,
-                image_url=product.image_url,
-                source_updated_at=product.source_updated_at,
-                raw=product.raw,
-                observed_at=product.parsed_at,
-            )
+        persist_source_product_observation(
+            product_repository=product_repository,
+            price_repository=price_repository,
+            suitability_evaluator=suitability_evaluator,
+            shop_id=shop.id,
+            product=product,
+            category_id=category.id if category is not None else None,
+            shop_name=shop.name,
+            shop_url=shop.url,
+            category_name=category.name if category is not None else None,
+            category_path=category.path if category is not None else (),
         )
         source_products_saved += 1
-
-        price_repository.add(
-            PriceSnapshotCreate(
-                source_product_id=source_product.id,
-                price=product.price,
-                currency=product.currency,
-                unit_raw=product.unit_raw,
-                source_updated_at=product.source_updated_at,
-                parsed_at=product.parsed_at,
-                raw=product.raw,
-            )
-        )
         price_snapshots_saved += 1
 
     scrape_run_repository.finish(
@@ -462,12 +461,12 @@ def _category_product_counts(raw: JsonObject | None) -> dict[str, int]:
     }
 
 
-def _category_id(
+def _category_context(
     *,
     category_repository: CategoryRepository,
     categorizer: RuleBasedCategorizer,
     product: ParsedProduct,
-) -> int | None:
+) -> _CategoryContext | None:
     prediction = categorizer.categorize(
         title=product.title,
         source=product.source,
@@ -478,6 +477,7 @@ def _category_id(
         return None
 
     parent_id = None
+    path: list[str] = []
     if prediction.parent_slug is not None and prediction.parent_name is not None:
         parent = category_repository.upsert(
             CategoryUpsert(
@@ -486,6 +486,7 @@ def _category_id(
             )
         )
         parent_id = parent.id
+        path.append(parent.name)
 
     category = category_repository.upsert(
         CategoryUpsert(
@@ -494,7 +495,8 @@ def _category_id(
             parent_id=parent_id,
         )
     )
-    return category.id
+    path.append(category.name)
+    return _CategoryContext(id=category.id, name=category.name, path=tuple(path))
 
 
 def _first_parsed_at(products: list[ParsedProduct]) -> datetime | None:

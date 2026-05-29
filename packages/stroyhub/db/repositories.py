@@ -130,6 +130,7 @@ class SourceProductUpsert:
 class PriceSnapshotCreate:
     source_product_id: int
     price: Decimal | None
+    price_kind: str = "exact"
     currency: str = "RUB"
     unit_raw: str | None = None
     source_updated_at: datetime | None = None
@@ -656,9 +657,13 @@ class PriceSnapshotRepository:
         self._session = session
 
     def add(self, data: PriceSnapshotCreate) -> PriceSnapshot:
+        price_kind = (
+            "unknown" if data.price is None and data.price_kind == "exact" else data.price_kind
+        )
         snapshot = PriceSnapshot(
             source_product_id=data.source_product_id,
             price=data.price,
+            price_kind=price_kind,
             currency=data.currency,
             unit_raw=data.unit_raw,
             source_updated_at=data.source_updated_at,

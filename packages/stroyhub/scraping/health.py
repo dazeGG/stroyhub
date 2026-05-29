@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from stroyhub.models.tables import ScrapeRun, SourceProduct
@@ -14,6 +14,7 @@ class ScrapeHealthFilters:
     shop_id: int | None = None
     status: str | None = None
     limit: int = 20
+    include_catalog_pipeline: bool = True
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -88,37 +89,58 @@ class ScrapeHealthCatalog:
                 )
                 for run in self._session.scalars(runs_statement)
             ],
-            catalog_pipeline_status_counts=self._catalog_pipeline_status_counts(filters),
+            catalog_pipeline_status_counts=(
+                self._catalog_pipeline_status_counts(filters)
+                if filters.include_catalog_pipeline
+                else []
+            ),
         )
 
     def _catalog_pipeline_status_counts(
         self,
         filters: ScrapeHealthFilters,
     ) -> list[CatalogPipelineStatusCount]:
-        statement = select(SourceProduct).where(SourceProduct.is_active.is_(True))
+        base_filters: list[Any] = [SourceProduct.is_active.is_(True)]
         if filters.source is not None:
             source = filters.source.strip()
             if source:
-                statement = statement.where(SourceProduct.source == source)
+                base_filters.append(SourceProduct.source == source)
         if filters.shop_id is not None:
-            statement = statement.where(SourceProduct.shop_id == filters.shop_id)
+            base_filters.append(SourceProduct.shop_id == filters.shop_id)
 
         counts: dict[tuple[str, str], int] = {}
-        for product in self._session.scalars(statement):
-            quality = _catalog_quality(product.raw)
-            if not quality:
-                counts[("pipeline", "missing")] = counts.get(("pipeline", "missing"), 0) + 1
-                continue
-            pipeline_status = _string_value(quality.get("status")) or "unknown"
-            counts[("pipeline", pipeline_status)] = (
-                counts.get(("pipeline", pipeline_status), 0) + 1
+        quality_type = func.jsonb_typeof(SourceProduct.raw["catalog_quality"])
+        quality_is_object = quality_type == "object"
+        missing_count = self._session.scalar(
+            select(func.count(SourceProduct.id)).where(
+                *base_filters,
+                or_(quality_type.is_(None), quality_type != "object"),
             )
-            for stage in ("cleanup", "attributes", "categorization", "normalization"):
-                stage_value = quality.get(stage)
-                if not isinstance(stage_value, dict):
-                    continue
-                status = _string_value(stage_value.get("status")) or "unknown"
-                counts[(stage, status)] = counts.get((stage, status), 0) + 1
+        )
+        if missing_count:
+            counts[("pipeline", "missing")] = int(missing_count)
+
+        pipeline_status = _json_status(SourceProduct.raw["catalog_quality"]["status"])
+        for status, count in self._session.execute(
+            select(pipeline_status, func.count(SourceProduct.id))
+            .where(*base_filters, quality_is_object)
+            .group_by(pipeline_status)
+        ):
+            counts[("pipeline", status)] = int(count)
+
+        for stage in ("cleanup", "attributes", "categorization", "normalization"):
+            stage_value = SourceProduct.raw["catalog_quality"][stage]
+            stage_status = _json_status(stage_value["status"])
+            for status, count in self._session.execute(
+                select(stage_status, func.count(SourceProduct.id))
+                .where(
+                    *base_filters,
+                    quality_is_object,
+                    func.jsonb_typeof(stage_value) == "object",
+                )
+                .group_by(stage_status)
+            ):
+                counts[(stage, status)] = int(count)
 
         return [
             CatalogPipelineStatusCount(stage=stage, status=status, count=count)
@@ -144,12 +166,5 @@ class ScrapeHealthCatalog:
         return where_filters
 
 
-def _catalog_quality(raw: dict[str, Any] | None) -> dict[str, Any] | None:
-    if raw is None:
-        return None
-    value = raw.get("catalog_quality")
-    return value if isinstance(value, dict) else None
-
-
-def _string_value(value: object) -> str | None:
-    return value if isinstance(value, str) else None
+def _json_status(value: Any) -> Any:
+    return func.coalesce(func.nullif(value.astext, ""), "unknown")

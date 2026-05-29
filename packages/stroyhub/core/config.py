@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     timezone: str = "Asia/Yakutsk"
     database_url: str = "postgresql+psycopg://stroyhub:stroyhub@localhost:5432/stroyhub"
     redis_url: str = "redis://localhost:6379/0"
+    patron_model_dir: str = ".var/ml/patron/models/current"
 
     model_config = SettingsConfigDict(
         env_file=".env",

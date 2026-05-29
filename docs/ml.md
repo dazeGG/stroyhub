@@ -19,10 +19,23 @@ Until the first MVP release is complete:
 - New ML work should be limited to clearly optional experiments or maintenance
   that does not block release work.
 
+Patron is the first exception allowed into the scraping path: scheduled scrape
+persistence loads a ready Patron artifact to classify source cards as product or
+not product. The default artifact path is `.var/ml/patron/models/current` and can
+be overridden with `STROYHUB_PATRON_MODEL_DIR`. Scheduled scraping must fail
+closed when the artifact is missing; one-off scripts may opt into deterministic
+rules fallback explicitly.
+
+Patron is not the first gate for catalog eligibility. Deterministic hard
+constraints run before the model and can mark a card ineligible without a Patron
+prediction. For 2GIS this includes missing exact price data, `from`/range prices,
+and source descriptions that say the price is approximate or not a public offer.
+
 ## Boundaries
 
 - `apps/ml` owns CLI commands for labeling, dataset snapshots, training,
-  evaluation, reports, and model artifact management.
+  evaluation, reports, and model artifact management. Commands are grouped by
+  model under `apps/ml/<model>/`.
 - `packages/stroyhub/ml` owns reusable ML code: feature builders, model
   metadata readers, public verifier/predictor APIs, and runtime loaders.
 - `apps/api` and `apps/worker` may load ready model artifacts through
@@ -36,6 +49,27 @@ Until the first MVP release is complete:
 
 ML runtime data is stored under `.var/ml` in the repository root. `.var/` is
 ignored by git.
+
+Before enabling scheduled scrapes against an existing database, verify that the
+runtime model is present and every active source product has
+`raw.catalog_eligibility`:
+
+```bash
+uv run python scripts/check_patron_readiness.py
+```
+
+If readiness reports missing catalog eligibility, first run a dry backfill and
+inspect the counters:
+
+```bash
+uv run python scripts/backfill_product_suitability.py
+```
+
+Apply the backfill only after the dry-run looks correct:
+
+```bash
+uv run python scripts/backfill_product_suitability.py --apply --require-complete
+```
 
 ```text
 .var/ml/
@@ -104,11 +138,24 @@ when selecting candidates.
 files created from the live log before training. A snapshot is not created for
 every individual label.
 
+Patron datasets are rebuilt as frozen snapshots instead of patched in place.
+The builder reads current source products from PostgreSQL, applies label
+overlays by priority, and writes a new `dataset.jsonl` under the target model
+directory. Admin Patron review decisions from `operator_decisions` and CLI
+human labels have top priority, bulk labels are below them, and current
+DB/policy state is the fallback. `skip` is not a training label; `undo` removes
+the undone review decision from the overlay. The frozen dataset keeps
+`label_source`, `label_priority`, and a one-way review `decision_hash`, but does
+not store database ids or source product ids. Synthetic Patron examples must be
+stored separately, marked with `label_source=synthetic_not_product` and
+`synthetic=true`, and used as train-only support data rather than evaluation
+truth.
+
 The category verifier dataset CLI exposes the current workflow:
 
 ```bash
-uv run python -m apps.ml.category_verifier_dataset_cli status
-uv run python -m apps.ml.category_verifier_dataset_cli snapshot
+uv run python -m apps.ml.category_verifier.dataset_cli status
+uv run python -m apps.ml.category_verifier.dataset_cli snapshot
 ```
 
 `status` compares the live label log with the latest snapshot and reports total
@@ -144,7 +191,7 @@ The first training implementation is intentionally a small token baseline, not
 a neural network. It is trained by:
 
 ```bash
-uv run python -m apps.ml.category_verifier_train_cli
+uv run python -m apps.ml.category_verifier.train_cli
 ```
 
 The command checks whether at least 50 newly labeled products exist since the

@@ -8,7 +8,11 @@ from stroyhub.ml.category_queue import (
 )
 from stroyhub.ml.labels import CategoryLabelStore
 
-from apps.ml.category_label_cli import LabelAction, parse_label_answer, run_label_session
+from apps.ml.category_verifier.label_cli import (
+    LabelAction,
+    parse_label_answer,
+    run_label_session,
+)
 
 
 @pytest.mark.parametrize(

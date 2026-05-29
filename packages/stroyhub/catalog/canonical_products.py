@@ -7,6 +7,7 @@ from sqlalchemy import and_, false, func, or_, select
 from sqlalchemy.orm import Session
 
 from stroyhub.catalog.eligibility import is_matchable_source_product
+from stroyhub.catalog.products import format_price_text
 from stroyhub.catalog.query_helpers import (
     category_descendant_ids,
     escape_like_pattern,
@@ -85,6 +86,8 @@ class CanonicalLinkedSourceProduct:
 @dataclass(frozen=True, kw_only=True)
 class CanonicalSourceLatestPrice:
     price: Decimal | None
+    price_kind: str
+    price_text: str | None
     currency: str
     unit_raw: str | None
     source_updated_at: datetime | None
@@ -245,6 +248,7 @@ class CanonicalProductCatalog:
                 SourceProduct,
                 Shop,
                 latest_prices.c.latest_price,
+                latest_prices.c.latest_price_kind,
                 latest_prices.c.latest_currency,
                 latest_prices.c.latest_unit_raw,
                 latest_prices.c.latest_source_updated_at,
@@ -285,6 +289,12 @@ class CanonicalProductCatalog:
                 latest_price=(
                     CanonicalSourceLatestPrice(
                         price=latest_price,
+                        price_kind=latest_price_kind or "exact",
+                        price_text=format_price_text(
+                            price=latest_price,
+                            currency=latest_currency or "RUB",
+                            price_kind=latest_price_kind or "exact",
+                        ),
                         currency=latest_currency or "RUB",
                         unit_raw=latest_unit_raw,
                         source_updated_at=latest_source_updated_at,
@@ -300,6 +310,7 @@ class CanonicalProductCatalog:
                 product,
                 shop,
                 latest_price,
+                latest_price_kind,
                 latest_currency,
                 latest_unit_raw,
                 latest_source_updated_at,

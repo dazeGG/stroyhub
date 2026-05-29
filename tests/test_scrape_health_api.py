@@ -202,6 +202,18 @@ def test_scrape_health_endpoint_reports_catalog_pipeline_status_counts(
         {"stage": "pipeline", "status": "processed", "count": 1},
     ]
 
+    fast_response = client.get(
+        "/scrapes/health",
+        params={
+            "source": "2gis",
+            "shop": shop.id,
+            "include_catalog_pipeline": False,
+        },
+    )
+
+    assert fast_response.status_code == 200
+    assert fast_response.json()["catalog_pipeline_status_counts"] == []
+
 
 def test_scrape_health_endpoint_handles_empty_results(client: TestClient) -> None:
     response = client.get("/scrapes/health", params={"source": "missing-source"})

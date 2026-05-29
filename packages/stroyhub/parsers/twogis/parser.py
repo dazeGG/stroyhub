@@ -1,10 +1,13 @@
+import re
 from datetime import UTC, datetime
 from decimal import Decimal
 
 from stroyhub.parsers.common import (
     JsonObject,
     ParsedProduct,
+    PriceKind,
     build_fingerprint,
+    infer_price_kind,
     normalize_title,
     parse_decimal,
 )
@@ -25,6 +28,7 @@ MONTHS_RU = {
     "ноября": 11,
     "декабря": 12,
 }
+_PRICE_TEXT_FROM_PATTERN = re.compile(r"(^|\s)от\s*\d", re.IGNORECASE)
 
 
 def parse_product_items(
@@ -73,6 +77,7 @@ def parse_product_item(
     category_raw = _category_raw(product)
     unit_raw = _unit_raw(item)
     price = _price(offer)
+    raw_price_kind = _raw_price_kind(offer)
     currency = _string_or_none(offer.get("currency")) or _currency_from_price_value(offer) or "RUB"
 
     return ParsedProduct(
@@ -85,6 +90,7 @@ def parse_product_item(
         category_raw=category_raw,
         unit_raw=unit_raw,
         price=price,
+        price_kind=infer_price_kind(title=title, price=price, raw_kind=raw_price_kind),
         currency=currency,
         image_url=_first_string(product.get("images")),
         source_updated_at=parse_source_updated_at(source_updated_at_raw),
@@ -145,10 +151,39 @@ def _price(offer: JsonObject) -> Decimal | None:
         return None
 
     fixed = price_value.get("fixed")
-    if not isinstance(fixed, dict):
+    if isinstance(fixed, dict):
+        return parse_decimal(fixed.get("value"))
+
+    from_price = price_value.get("from")
+    if not isinstance(from_price, dict):
         return None
 
-    return parse_decimal(fixed.get("value"))
+    return parse_decimal(from_price.get("value"))
+
+
+def _raw_price_kind(offer: JsonObject) -> PriceKind | None:
+    text_price_kind = _price_text_kind(offer.get("price"))
+    if text_price_kind is not None:
+        return text_price_kind
+
+    price_value = offer.get("price_value")
+    if not isinstance(price_value, dict):
+        return None
+    if isinstance(price_value.get("from"), dict):
+        return "from"
+    if isinstance(price_value.get("fixed"), dict) or offer.get("price") is not None:
+        return "exact"
+    if isinstance(price_value.get("empty"), dict):
+        return "unknown"
+    return None
+
+
+def _price_text_kind(value: object) -> PriceKind | None:
+    if not isinstance(value, str):
+        return None
+    if _PRICE_TEXT_FROM_PATTERN.search(normalize_title(value)):
+        return "from"
+    return None
 
 
 def _currency_from_price_value(offer: JsonObject) -> str | None:
@@ -157,10 +192,14 @@ def _currency_from_price_value(offer: JsonObject) -> str | None:
         return None
 
     fixed = price_value.get("fixed")
-    if not isinstance(fixed, dict):
-        return None
+    if isinstance(fixed, dict):
+        return _string_or_none(fixed.get("currency"))
 
-    return _string_or_none(fixed.get("currency"))
+    from_price = price_value.get("from")
+    if isinstance(from_price, dict):
+        return _string_or_none(from_price.get("currency"))
+
+    return None
 
 
 def _category_raw(product: JsonObject) -> str | None:

@@ -236,6 +236,16 @@ def test_reject_candidate_match_records_review_metadata(
 ) -> None:
     canonical = _canonical(db_session, title="Reject Canonical")
     source_product = _source_product(db_session, source_id="reject-source")
+    other_product = SourceProductRepository(db_session).upsert(
+        SourceProductUpsert(
+            shop_id=source_product.shop_id,
+            source="2gis",
+            source_product_id="reject-other-source",
+            title="Reject Other Source",
+            normalized_title="reject other source",
+            raw={"catalog_quality": {"status": "stale"}},
+        )
+    )
     candidate = ProductMatchRepository(db_session).create(
         ProductMatchCreate(
             canonical_product_id=canonical.id,
@@ -263,6 +273,8 @@ def test_reject_candidate_match_records_review_metadata(
     assert canonical.id in source_product.raw["catalog_quality"]["normalization"][
         "rejected_canonical_product_ids"
     ]
+    db_session.expire(other_product)
+    assert other_product.raw == {"catalog_quality": {"status": "stale"}}
 
 
 def test_product_match_validation_rejects_blank_or_too_long_actor(
