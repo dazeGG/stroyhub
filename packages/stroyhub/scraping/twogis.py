@@ -206,6 +206,7 @@ def persist_twogis_scrape_result(
     finished_at: datetime | None = None,
     partial_shop_status: str = "failed",
     suitability_evaluator: ProductSuitabilityEvaluator | None = None,
+    require_patron_model: bool = False,
 ) -> TwogisPersistResult:
     completed_at = finished_at or datetime.now(UTC)
     scrape_run_status = "success" if result.completeness in {"complete", "empty"} else "partial"
@@ -242,12 +243,16 @@ def persist_twogis_scrape_result(
     price_repository = PriceSnapshotRepository(session)
     category_repository = CategoryRepository(session)
     categorizer = categorizer_for_session(session)
-    suitability_evaluator = suitability_evaluator or ProductSuitabilityEvaluator.default()
+    suitability_evaluator = suitability_evaluator or ProductSuitabilityEvaluator.default(
+        require_patron=require_patron_model
+    )
     source_products_saved = 0
     price_snapshots_saved = 0
 
     for product in result.products:
         category_id = None
+        category_name = None
+        category_path: tuple[str, ...] = ()
         prediction = categorizer.categorize(
             title=product.title,
             source=product.source,
@@ -256,6 +261,7 @@ def persist_twogis_scrape_result(
         )
         if prediction is not None:
             parent_id = None
+            path: list[str] = []
             if prediction.parent_slug is not None and prediction.parent_name is not None:
                 parent = category_repository.upsert(
                     CategoryUpsert(
@@ -264,6 +270,7 @@ def persist_twogis_scrape_result(
                     )
                 )
                 parent_id = parent.id
+                path.append(parent.name)
 
             category = category_repository.upsert(
                 CategoryUpsert(
@@ -273,6 +280,9 @@ def persist_twogis_scrape_result(
                 )
             )
             category_id = category.id
+            category_name = category.name
+            path.append(category.name)
+            category_path = tuple(path)
 
         persist_source_product_observation(
             product_repository=product_repository,
@@ -281,6 +291,10 @@ def persist_twogis_scrape_result(
             shop_id=shop.id,
             product=product,
             category_id=category_id,
+            shop_name=shop.name,
+            shop_url=shop.url,
+            category_name=category_name,
+            category_path=category_path,
         )
         source_products_saved += 1
         price_snapshots_saved += 1

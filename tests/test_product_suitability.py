@@ -4,7 +4,10 @@ from types import SimpleNamespace
 from typing import Any, Literal
 
 from stroyhub.catalog.product_suitability import ProductSuitabilityEvaluator
-from stroyhub.ml.not_product_classifier import NotProductClassifierResult
+from stroyhub.ml.not_product_classifier import (
+    NotProductClassifierModelUnavailableError,
+    NotProductClassifierResult,
+)
 from stroyhub.parsers.common import ParsedProduct, PriceKind
 
 
@@ -34,6 +37,34 @@ def test_product_suitability_routes_uncertain_patron_predictions_to_review() -> 
     assert decision.is_not_product is False
     assert decision.reasons == ("patron_uncertain",)
     assert decision.not_product_probability == Decimal("0.550")
+
+
+def test_product_suitability_passes_full_patron_feature_record() -> None:
+    patron = FakePatron(not_product_probability=0.10)
+    evaluator = ProductSuitabilityEvaluator(patron=patron)
+
+    evaluator.evaluate(
+        _product(
+            source="unicom",
+            title="Цемент М500 25 кг",
+            raw={"offer": {"price": 500}},
+            description="Портландцемент для строительных работ",
+            category_raw="Цемент",
+            unit_raw="мешок",
+        ),
+        shop_name="Юником",
+        shop_url="https://unicom-ykt.ru/",
+        category_name="Цемент",
+        category_path=("Сухие смеси", "Цемент"),
+    )
+
+    record = patron.records[0]
+    assert record["shop"]["name"] == "Юником"
+    assert record["shop"]["url"] == "https://unicom-ykt.ru/"
+    assert record["product"]["description"] == "Портландцемент для строительных работ"
+    assert record["product"]["category_name"] == "Цемент"
+    assert record["product"]["category_path"] == ["Сухие смеси", "Цемент"]
+    assert record["latest_price"]["price_text"] == "100.00 RUB"
 
 
 def test_product_suitability_applies_non_exact_price_rule_before_patron() -> None:
@@ -133,14 +164,25 @@ def test_product_suitability_preserves_operator_data_problem_review() -> None:
     assert decision.method == "operator_review"
 
 
+def test_product_suitability_can_require_patron_model(tmp_path) -> None:
+    try:
+        ProductSuitabilityEvaluator.default(root=tmp_path, require_patron=True)
+    except NotProductClassifierModelUnavailableError as error:
+        assert "Patron model is unavailable" in str(error)
+    else:
+        raise AssertionError("expected missing Patron model error")
+
+
 class FakePatron:
     def __init__(self, *, not_product_probability: float, threshold: float = 0.70) -> None:
         self._not_product_probability = not_product_probability
         self._threshold = threshold
         self.calls = 0
+        self.records: list[dict[str, Any]] = []
 
     def predict_record(self, record: dict[str, Any]) -> NotProductClassifierResult:
         self.calls += 1
+        self.records.append(record)
         probability = self._not_product_probability
         label: Literal["not_product", "product"] = (
             "not_product" if probability >= self._threshold else "product"
@@ -164,6 +206,9 @@ def _product(
     price: Decimal | None = Decimal("100.00"),
     price_kind: PriceKind = "exact",
     raw: dict[str, Any] | None = None,
+    description: str | None = None,
+    category_raw: str | None = None,
+    unit_raw: str | None = None,
 ) -> ParsedProduct:
     return ParsedProduct(
         source=source,
@@ -172,9 +217,9 @@ def _product(
         title=title,
         normalized_title=title.lower(),
         fingerprint="fingerprint-test",
-        description=None,
-        category_raw=None,
-        unit_raw=None,
+        description=description,
+        category_raw=category_raw,
+        unit_raw=unit_raw,
         price=price,
         currency="RUB",
         image_url=None,

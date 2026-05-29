@@ -13,7 +13,7 @@ from stroyhub.catalog.eligibility import with_catalog_eligibility
 from stroyhub.catalog.product_suitability import ProductSuitabilityEvaluator
 from stroyhub.catalog.query_helpers import latest_price_subquery
 from stroyhub.db import SessionLocal
-from stroyhub.models import Shop, SourceProduct
+from stroyhub.models import Category, Shop, SourceProduct
 from stroyhub.parsers.common import ParsedProduct, PriceKind
 
 
@@ -51,7 +51,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         statement = (
             select(
                 SourceProduct,
-                Shop.source_id,
+                Shop,
+                Category,
                 latest_prices.c.latest_price,
                 latest_prices.c.latest_price_kind,
                 latest_prices.c.latest_currency,
@@ -60,6 +61,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 latest_prices.c.latest_parsed_at,
             )
             .join(Shop, Shop.id == SourceProduct.shop_id)
+            .outerjoin(Category, Category.id == SourceProduct.category_id)
             .outerjoin(
                 latest_prices,
                 and_(
@@ -77,7 +79,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         rows = list(session.execute(statement))
         for (
             source_product,
-            shop_source_id,
+            shop,
+            category,
             latest_price,
             latest_price_kind,
             latest_currency,
@@ -87,7 +90,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ) in rows:
             product = _parsed_product(
                 source_product,
-                shop_source_id=shop_source_id,
+                shop_source_id=shop.source_id,
                 latest_price=_LatestPrice(
                     price=latest_price,
                     currency=latest_currency or "RUB",
@@ -99,7 +102,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             previous_is_not_product = source_product.is_not_product
             previous_status = _catalog_status(source_product.raw)
-            suitability = evaluator.evaluate(product, existing_product=source_product)
+            suitability = evaluator.evaluate(
+                product,
+                existing_product=source_product,
+                shop_name=shop.name,
+                shop_url=shop.url,
+                category_name=category.name if category is not None else None,
+                category_path=_category_path(category),
+            )
 
             source_product.raw = with_catalog_eligibility(
                 product.raw,
@@ -173,6 +183,15 @@ def _price_kind(value: object) -> PriceKind:
     if value in {"exact", "from", "range", "unknown"}:
         return cast(PriceKind, value)
     return "unknown"
+
+
+def _category_path(category: Category | None) -> tuple[str, ...]:
+    path: list[str] = []
+    current = category
+    while current is not None:
+        path.append(current.name)
+        current = current.parent
+    return tuple(reversed(path))
 
 
 @dataclass(frozen=True, kw_only=True)

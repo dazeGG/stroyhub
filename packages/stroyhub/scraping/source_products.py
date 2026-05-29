@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
 from stroyhub.catalog.eligibility import with_catalog_eligibility
@@ -28,6 +29,10 @@ def persist_source_product_observation(
     shop_id: int,
     product: ParsedProduct,
     category_id: int | None,
+    shop_name: str | None = None,
+    shop_url: str | None = None,
+    category_name: str | None = None,
+    category_path: Sequence[str] = (),
 ) -> PersistedSourceProductObservation:
     upsert = SourceProductUpsert(
         shop_id=shop_id,
@@ -49,6 +54,10 @@ def persist_source_product_observation(
     suitability = suitability_evaluator.evaluate(
         product,
         existing_product=existing_product,
+        shop_name=shop_name,
+        shop_url=shop_url,
+        category_name=category_name,
+        category_path=category_path,
     )
     source_product = product_repository.upsert(
         replace(

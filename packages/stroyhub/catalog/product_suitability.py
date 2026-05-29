@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -13,6 +15,7 @@ from stroyhub.catalog.eligibility import (
     evaluate_product_hard_constraints,
     operator_data_problem_mark,
 )
+from stroyhub.catalog.products import format_price_text
 from stroyhub.ml.not_product_classifier import (
     NotProductClassifierModelUnavailableError,
     NotProductClassifierResult,
@@ -22,6 +25,7 @@ from stroyhub.models import SourceProduct
 from stroyhub.parsers.common import JsonObject, ParsedProduct
 
 _DECIMAL_QUANT = Decimal("0.001")
+logger = logging.getLogger(__name__)
 
 
 class PatronClassifierLike(Protocol):
@@ -34,10 +38,18 @@ class ProductSuitabilityEvaluator:
     patron: PatronClassifierLike | None = None
 
     @classmethod
-    def default(cls, *, root: Path | None = None) -> ProductSuitabilityEvaluator:
+    def default(
+        cls,
+        *,
+        root: Path | None = None,
+        require_patron: bool = False,
+    ) -> ProductSuitabilityEvaluator:
         try:
             patron = PatronClassifier.default(root=root)
         except NotProductClassifierModelUnavailableError:
+            if require_patron:
+                raise
+            logger.warning("Patron model is unavailable; falling back to suitability rules")
             patron = None
         return cls(patron=patron)
 
@@ -46,6 +58,10 @@ class ProductSuitabilityEvaluator:
         product: ParsedProduct,
         *,
         existing_product: SourceProduct | None = None,
+        shop_name: str | None = None,
+        shop_url: str | None = None,
+        category_name: str | None = None,
+        category_path: Sequence[str] = (),
     ) -> ProductEligibility:
         operator_mark = operator_data_problem_mark(
             existing_product.raw if existing_product is not None else None
@@ -67,7 +83,15 @@ class ProductSuitabilityEvaluator:
         if self.patron is None:
             return evaluate_product_eligibility(eligibility_input)
 
-        prediction = self.patron.predict_record(_patron_record(product))
+        prediction = self.patron.predict_record(
+            _patron_record(
+                product,
+                shop_name=shop_name,
+                shop_url=shop_url,
+                category_name=category_name,
+                category_path=category_path,
+            )
+        )
         return _patron_decision(prediction)
 
 
@@ -117,20 +141,40 @@ def _patron_decision(prediction: NotProductClassifierResult) -> ProductEligibili
     )
 
 
-def _patron_record(product: ParsedProduct) -> JsonObject:
+def _patron_record(
+    product: ParsedProduct,
+    *,
+    shop_name: str | None,
+    shop_url: str | None,
+    category_name: str | None,
+    category_path: Sequence[str],
+) -> JsonObject:
     return {
         "source": product.source,
+        "shop": {
+            "name": shop_name,
+            "url": shop_url,
+        },
         "product": {
             "title": product.title,
             "normalized_title": product.normalized_title,
+            "description": product.description,
             "category_raw": product.category_raw,
+            "category_name": category_name,
+            "category_path": list(category_path),
             "unit_raw": product.unit_raw,
+            "image_url": product.image_url,
         },
         "latest_price": {
             "price": str(product.price) if product.price is not None else None,
             "currency": product.currency,
             "unit_raw": product.unit_raw,
             "price_kind": product.price_kind,
+            "price_text": format_price_text(
+                price=product.price,
+                currency=product.currency,
+                price_kind=product.price_kind,
+            ),
         },
     }
 

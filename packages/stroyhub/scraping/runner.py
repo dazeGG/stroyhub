@@ -126,6 +126,7 @@ def run_shop_scrape(session: Session, shop_id: int) -> dict[str, Any]:
                     shop_name=shop.name,
                     finished_at=completed_at,
                     partial_shop_status="partial",
+                    require_patron_model=True,
                 )
                 refreshed_shop = session.get(Shop, shop.id)
                 if refreshed_shop is not None:
@@ -145,6 +146,7 @@ def run_shop_scrape(session: Session, shop_id: int) -> dict[str, Any]:
                     result,
                     shop_name=shop.name,
                     finished_at=completed_at,
+                    require_patron_model=True,
                 )
                 scrape_status = persisted_twogis.scrape_status
                 products_seen = result.items_seen
@@ -156,6 +158,7 @@ def run_shop_scrape(session: Session, shop_id: int) -> dict[str, Any]:
                 session,
                 shop,
                 finished_at=completed_at,
+                require_patron_model=True,
             )
             scrape_status = persisted_unicom.scrape_status
             products_seen = persisted_unicom.products_seen
@@ -169,6 +172,7 @@ def run_shop_scrape(session: Session, shop_id: int) -> dict[str, Any]:
                 session,
                 shop,
                 finished_at=completed_at,
+                require_patron_model=True,
             )
             scrape_status = persisted_metalltorg.scrape_status
             products_seen = persisted_metalltorg.products_seen
