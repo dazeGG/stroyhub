@@ -340,6 +340,46 @@ def test_patron_dataset_example_hash_is_stable_across_relabels(
     assert product_row["example_hash"] == not_product_row["example_hash"]
 
 
+def test_patron_dataset_example_hash_is_stable_across_observation_timestamps(
+    db_session: Session,
+    tmp_path: Path,
+) -> None:
+    product = _source_product(db_session, source_id="patron-dataset-stable-time-hash")
+    first_path = tmp_path / "dataset-first.jsonl"
+    second_path = tmp_path / "dataset-second.jsonl"
+
+    first_result = build_patron_dataset_snapshot(
+        session=db_session,
+        dataset_path=first_path,
+        model_version="v3",
+        source_product_ids=[product.id],
+        created_at=datetime(2026, 5, 28, 11, 0, tzinfo=UTC),
+    )
+    product.last_seen_at = datetime(2026, 5, 29, 9, 0, tzinfo=UTC)
+    product.source_updated_at = datetime(2026, 5, 29, 8, 55, tzinfo=UTC)
+    PriceSnapshotRepository(db_session).add(
+        PriceSnapshotCreate(
+            source_product_id=product.id,
+            price=Decimal("1200.00"),
+            price_kind="exact",
+            parsed_at=datetime(2026, 5, 29, 9, 1, tzinfo=UTC),
+            source_updated_at=datetime(2026, 5, 29, 8, 55, tzinfo=UTC),
+        )
+    )
+
+    second_result = build_patron_dataset_snapshot(
+        session=db_session,
+        dataset_path=second_path,
+        model_version="v3",
+        source_product_ids=[product.id],
+        created_at=datetime(2026, 5, 29, 11, 0, tzinfo=UTC),
+    )
+
+    first_row = _read_jsonl(first_result.dataset_path)[0]
+    second_row = _read_jsonl(second_result.dataset_path)[0]
+    assert first_row["example_hash"] == second_row["example_hash"]
+
+
 def _source_product(
     session: Session,
     *,

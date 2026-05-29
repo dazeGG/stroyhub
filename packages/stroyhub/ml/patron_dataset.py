@@ -646,13 +646,40 @@ def _decision_hash(decision: OperatorDecision) -> str:
 
 
 def _example_hash(record: dict[str, Any]) -> str:
+    shop = _dict_value(record.get("shop"))
+    product = _dict_value(record.get("product"))
+    latest_price = _dict_value(record.get("latest_price"))
     payload = {
         "schema_version": record.get("schema_version"),
         "task": record.get("task"),
         "source": record.get("source"),
-        "shop": record.get("shop"),
-        "product": record.get("product"),
-        "latest_price": record.get("latest_price"),
+        "shop": _compact(
+            {
+                "name": shop.get("name"),
+                "address": shop.get("address"),
+                "url": shop.get("url"),
+            }
+        ),
+        "product": _compact(
+            {
+                "title": product.get("title"),
+                "normalized_title": product.get("normalized_title"),
+                "description": product.get("description"),
+                "category_raw": product.get("category_raw"),
+                "category_name": product.get("category_name"),
+                "category_path": product.get("category_path"),
+                "unit_raw": product.get("unit_raw"),
+            }
+        ),
+        "latest_price": _compact(
+            {
+                "price": latest_price.get("price"),
+                "price_kind": latest_price.get("price_kind"),
+                "price_text": latest_price.get("price_text"),
+                "currency": latest_price.get("currency"),
+                "unit_raw": latest_price.get("unit_raw"),
+            }
+        ),
     }
     encoded = json.dumps(
         payload,
@@ -665,6 +692,10 @@ def _example_hash(record: dict[str, Any]) -> str:
 
 def _compact(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if value is not None}
+
+
+def _dict_value(value: object) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
 
 
 def _operator_review(raw: dict[str, Any] | None) -> dict[str, Any] | None:
